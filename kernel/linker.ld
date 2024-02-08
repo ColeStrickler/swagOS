@@ -1,6 +1,6 @@
 /* The bootloader will look at this image and start execution at the symbol
    designated as the entry point. */
-ENTRY(_start)
+ENTRY(start)
  
 /* Tell where the various sections of the object files will be put in the final
    kernel image. */
@@ -22,9 +22,15 @@ SECTIONS
 	/* First put the multiboot header, as it is required to be put very early
 	   in the image or the bootloader won't recognize the file format.
 	   Next we'll put the .text section. */
+
+    .multiboot :
+    {
+        *(.multiboot)
+    }
+
+
 	.text BLOCK(4K) : ALIGN(4K)
 	{
-		*(.multiboot)
 		*(.text)
 	}
  

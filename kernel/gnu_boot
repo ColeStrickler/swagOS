@@ -1,3 +1,27 @@
+/* Constants */
+.equ KERNEL_VIRTUAL_ADDR, 0xFFFFFFFF80000000
+.equ EFER_MSR, 0xC0000080
+
+
+/* GDT FLAGS AND ACCESS BITS */
+.equ PRESENT,         0b10000000
+.equ NOT_SYS,         0b00010000
+.equ EXEC,            0b00001000
+.equ DC,              0b00000100
+.equ RW,              0b00000010
+.equ ACCESSED,        0b00000001
+
+.equ GRAN_4K,         0b10000000
+.equ SZ_32,           0b01000000
+.equ LONG_MODE,       0b00100000
+
+.equ HIGH_FLAG,       0b00001111
+
+.equ ACCESS_FLAGS_CODE, (PRESENT | NOT_SYS | EXEC | RW)
+.equ HIGH_FLAGS_CODE, (GRAN_4K | LONG_MODE | HIGH_FLAG)
+.equ ACCESS_FLAGS_DATA, (PRESENT | NOT_SYS | RW)                  
+.equ HIGH_FLAGS_DATA, (GRAN_4K | SZ_32 | HIGH_FLAG)     
+
 /* Declare constants for the multiboot header. */
 .set ALIGN,    1<<0             /* align loaded modules on page boundaries */
 .set MEMINFO,  1<<1             /* provide memory map */
@@ -38,6 +62,31 @@ stack_bottom:
 .skip 16384 # 16 KiB
 stack_top:
 
+
+.section .data
+.align 16
+GDT:
+GDT_Null: 
+        .quad 0
+GDT_Code: 
+        .long 0xFFFF                                   # Limit & Base (low, bits 0-15)
+        .byte 0                                        # Base (mid, bits 16-23)
+        .byte ACCESS_FLAGS_CODE                        # Access
+        .byte HIGH_FLAGS_CODE                          # Flags & Limit (high, bits 16-19)
+        .byte 0                                        # Base (high, bits 24-31)
+GDT_Data: 
+        .long 0xFFFF                                   # Limit & Base (low, bits 0-15)
+        .byte 0                                        # Base (mid, bits 16-23)
+        .byte ACCESS_FLAGS_DATA                        # Access
+        .byte HIGH_FLAGS_DATA                          # Flags & Limit (high, bits 16-19)
+        .byte 0                                        # Base (high, bits 24-31)
+GDT_TSS: 
+        .long 0x00000068
+        .long 0x00CF8900
+GDT_Pointer:
+        .word GDT_END - GDT - 1                              # size of gdt - 1
+        .quad GDT                                      # Base address of gdt
+GDT_END:
 
 
 .section .text
@@ -111,16 +160,6 @@ doesn't make sense to return from this function as the bootloader is gone.
 .type _start, @function
 _start:
 
-
-
-
-
-
-
-
-
-
-
 /*
 	The bootloader has loaded us into 32-bit protected mode on a x86
 	machine. Interrupts are disabled. Paging is disabled. The processor
@@ -185,9 +224,96 @@ disable_paging:
     andl $0b01111111111111111111111111111111, %eax
 	mov %eax, %cr0
 
+# this sequence clears the first page so we can set up the PML4T
+clear_first_page:
+    movl $0x1000, %edi   # set up our PML4T at 0x1000
+    mov %edi, %cr3      # CR3 holds the PML4T address
+    xor %eax, %eax      # set bytes = 0
+clp_loop:
+    mov %eax, (%edi)
+    inc %edi
+    inc %ecx
+    cmp $4096, %ecx
+    jne clp_loop
+    mov %cr3, %edi      # set edi back to 0x1000
+
+# Here we begin to set up direct mapped paging
+# PML4T --> 0x1000
+# PDPT  --> 0x2000
+# PDT   --> 0x3000
+# PT    --> 0x4000
+set_up_dm_paging:
+    mov $0x2000, %eax
+    shl $12, %eax
+    or 0b11, %eax
+    movl %eax, (%edi)
+    add $0x1000, %edi
+    xor %eax, %eax
+    mov $0x3000, %eax
+    shl $12, %eax
+    or 0b11, %eax
+    movl %eax, (%edi)
+    add $0x1000, %edi
+    xor %eax, %eax
+    mov $0x4000, %eax
+    shl $12, %eax
+    or 0b11, %eax
+    movl %eax, (%edi)
+    xor %eax, %eax
+    #movl $0x03, %ebx
+    
+    xor %ebx, %ebx
+    movl $512, %ecx
+    xor %edx, %edx
+
+# this loop identity maps the first 2mb of memory, we may need to do more later
+dm_pages:
+    cmp $0, %ecx
+    je pages_identity_mapped_success
+    or 0b11, %ebx
+    movl %ebx, (%edi)
+    xor %ebx, %ebx
+    add $0x1000, %edx
+    mov %edx, %ebx
+    shl $12, %ebx
+    add $0x8, %edi
+    dec %ecx
+    jmp dm_pages
+
+pages_identity_mapped_success:
+
+enable_pae:
+    mov %cr4, %eax
+    or $1 << 5, %eax        # we set the PAE-bit, which is bit 6
+    mov %eax, %cr4
+    mov $EFER_MSR, %ecx
+    rdmsr
+    or $1 << 8, %eax        # result of rdmsr is in eax, and we want to set the long-mode(LM) bit which is bit 8
+    wrmsr                   # wrmsr writes eax to the msr register selected by ecx
+
+reenable_paging:
+    mov %cr0, %eax
+    or $1 << 31, %eax
+    mov %eax, %cr0
+
+test:
+    jmp test
+
+load_lm_gdt:
+    lgdt [GDT_Pointer]
+
+.code64
+    movw $0x8, %ax      # Assuming your code segment selector is 0x8 (adjust as necessary)
+    movw %ax, %cs       # Load the segment selector into the CS register
+
+    # Load the address into a register
+    movq $enter_long_mode, %rax    # Assuming 'addr' is the address you want to jump to
+
+    # Perform the far jump
+    ljmp *(%rax)        # Far jump to the address using CS segment selector
 
 # henceforth we are in 64bit mode
-.code64
+
 
     /*
 	Enter the high-level kernel. The ABI requires the stack is 16-byte
@@ -197,7 +323,9 @@ disable_paging:
 	stack since (pushed 0 bytes so far), so the alignment has thus been
 	preserved and the call is well defined.
 	*/
+enter_long_mode:
 
+    jmp enter_long_mode
 	call kernel_main
 
 

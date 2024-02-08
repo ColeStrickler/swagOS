@@ -1,17 +1,17 @@
 # toolchain
 CC=x86_64-elf-gcc
-AS=x86_64-elf-as
+AS=nasm
 LD=x86_64-elf-ld
 CC_FLAGS=-std=gnu99 -ffreestanding -O2 -Wall -Wextra
-LD_FLAGS=-ffreestanding -O2 -nostdlib -lgcc 
+LD_FLAGS=-ffreestanding -O2 -nostdlib -lgcc -n
 
 
 # KERNEL PARTS
 KERNEL_CSRC=$(shell cd kernel; find -name "*.c")
-KERNEL_ASMSRC=$(shell cd kernel; find -name "*.s")
+KERNEL_ASMSRC=$(shell cd kernel; find -name "*.asm")
 
 KERNEL_OBJ=$(patsubst %.c, build/%.c.o, $(KERNEL_CSRC))
-KERNEL_OBJ+=$(patsubst %.s, build/%.s.o, $(KERNEL_ASMSRC))
+KERNEL_OBJ+=$(patsubst %.asm, build/%.asm.o, $(KERNEL_ASMSRC))
 
 
 
@@ -26,8 +26,8 @@ test:
 
 
 
-build/%.s.o : kernel/%.s
-	$(AS) $< -o $@
+build/%.asm.o : kernel/%.asm
+	$(AS) -f elf64 $< -o $@
 
 
 build/%.c.o: kernel/%.c
@@ -50,4 +50,4 @@ qemu: myos.iso
 
 clean:
 	# beginning line with a hyphen tells make to ignore errors
-	-rm build/* myos.iso myos.bin
+	-rm build/* myos.iso myos.bin kernel/isodir/boot/myos.bin
