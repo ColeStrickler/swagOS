@@ -3,7 +3,9 @@ extern kernel_stub
 global pml4t
 global pdpt
 global pdt
-
+global global_gdt_ptr_high
+global global_stack_top
+global start
 section .bss
 align 4096
 ; since we are going to do 2mb mapping initially, we will not need a PT and our page tables will only be 3 levels
@@ -52,13 +54,21 @@ GDT:
     .TSS: equ $ - GDT
         dd 0x00000068
         dd 0x00CF8900
-    .Pointer:
+gdt_ptr:
         dw $ - GDT - 1
         dq GDT-HH_VA
+gdt_ptr_high:
+        dw gdt_ptr - GDT - 1
+        dq GDT
+
+section .data
+global_gdt_ptr_high:
+    dq gdt_ptr_high
+global_stack_top:
+    dq stack_top
 
 
 
-global start
 
 section .text
 [bits 32]
@@ -189,8 +199,7 @@ enable_paging:
 
 
 load_gdt:
-   
-    lgdt [GDT.Pointer - HH_VA] 
+    lgdt [gdt_ptr - HH_VA] 
     
     jmp GDT.Code:enter_longmode_success - HH_VA
     jmp error
@@ -210,10 +219,6 @@ bp_test:
     
 
 setup_higher_half:
-
-
-
-
 
     mov rax, kernel_stub
     sub rax, HH_VA

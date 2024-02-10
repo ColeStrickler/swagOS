@@ -1,4 +1,7 @@
-import os
+import subprocess
+
+
+result = subprocess.run(["nm", "-C", "myos.bin"])
 
 
 
