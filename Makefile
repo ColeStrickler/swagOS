@@ -62,11 +62,18 @@ myos.bin: $(KERNEL_OBJ)
 	$(CC) -T kernel/linker.ld $(KERNEL_OBJ) -o myos.bin $(LD_FLAGS)
 	$(GRUB_CHECK_SCRIPT)
 
-myos.iso : myos.bin
+myos.iso: myos.bin
 	mkdir -p kernel/isodir/boot/grub
 	cp myos.bin kernel/isodir/boot/myos.bin
 	cp kernel/grub.cfg kernel/isodir/boot/grub/grub.cfg
 	grub-mkrescue -o myos.iso kernel/isodir
+
+
+git_push: clean
+	git add *
+
+	git commit -m "makefile autopush"
+	git push -u origin main
 
 
 qemu: clean myos.iso

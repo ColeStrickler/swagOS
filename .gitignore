@@ -1,0 +1,8 @@
+*.o
+*.iso
+*.bin
+*.log
+build/
+tools/
+.*q
+
