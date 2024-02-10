@@ -1,4 +1,8 @@
-extern kernel_main
+extern kernel_stub
+
+global pml4t
+global pdpt
+global pdt
 
 section .bss
 align 4096
@@ -15,6 +19,8 @@ stack_bottom:
 stack_top:
 
 section .rodata
+; Higher half virtual address
+HH_VA equ 0xFFFFFFFF80000000 
 ; Access bits
 PRESENT        equ 1 << 7
 NOT_SYS        equ 1 << 4
@@ -48,7 +54,7 @@ GDT:
         dd 0x00CF8900
     .Pointer:
         dw $ - GDT - 1
-        dq GDT
+        dq GDT-HH_VA
 
 
 
@@ -126,40 +132,40 @@ no_longmode:
 
 
 
-start:
-    
-    mov esp, stack_top
+start: 
+    mov esp, stack_top - HH_VA
     call check_multiboot
-    
     call check_cpuid
-    
     call check_longmode
+    
+
     ; using 2mb pages for our direct mapping will allow us to direct map the first 1gb of the kernel
 pagetable_setup:
 
     ; set pml4t entry to point to pdpt
-    mov eax, pdpt
+    mov eax, pdpt - HH_VA
     or eax, 0b11        ; set write and present bit
-    mov [pml4t], eax
-
+    mov [pml4t-HH_VA], eax
+    
     ; set pdpt entry to point to pdt
-    mov eax, pdt
+    mov eax, pdt-HH_VA
     or eax, 0b11
-    mov [pdpt], eax
+    mov [pdpt-HH_VA], eax
 
     xor ecx, ecx
-    
+
+; we map a total of 1gb=1024mb
 direct_map_pdte:    
     mov eax, 0x200000           ; 2mb
     mul ecx                     ; eax = 2mb*ecx, this is the mapped address
     or eax, 0b10000011          ; present + writable + huge
-    mov [pdt + ecx * 8], eax    ; pdt[ecx] = eax
+    mov [pdt-HH_VA + ecx * 8], eax    ; pdt[ecx] = eax
     inc ecx
     cmp ecx, 512
     jne direct_map_pdte
 
 ; now that pages are created we move the top level directory to cr3
-    mov eax, pml4t
+    mov eax, pml4t-HH_VA
     mov cr3, eax
     
 enable_pae_bit:
@@ -173,31 +179,50 @@ set_efer_msr:
     or eax, 1 << 8
     wrmsr
 
-
+    
     
 enable_paging:
     mov eax, cr0
     or eax, 1 << 31
     mov cr0, eax
+    
+
 
 load_gdt:
-    lgdt [GDT.Pointer]
-    jmp GDT.Code:enter_longmode_success
+   
+    lgdt [GDT.Pointer - HH_VA] 
+    
+    jmp GDT.Code:enter_longmode_success - HH_VA
     jmp error
 [bits 64]
 enter_longmode_success:
-    cli                           ; Clear the interrupt flag.
-    mov ax, GDT.Data                       ; set data segments
+                              ; Clear the interrupt flag.
+    mov ax, GDT.Data            ; set data segments
     mov ds, ax                    
     mov es, ax                    
     mov fs, ax                    
     mov gs, ax                    
     mov ss, ax                    
     mov rax, 0x2f592f412f4b2f4f
+
+bp_test:
     mov qword [0xb8000], rax
-    call kernel_main
+    
+
+setup_higher_half:
 
 
+
+
+
+    mov rax, kernel_stub
+    sub rax, HH_VA
+    call rax
+    
+    mov rax, 0x2f592f412f4b2f4f
+    mov qword [0xb8000], rax
+    jmp $
+    
 
 
 
