@@ -7,6 +7,8 @@ CC_FLAGS=-ffreestanding -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2
 CC_FLAGS+=-g -O0
 LD_FLAGS=-ffreestanding -nostdlib -lgcc -mcmodel=kernel -g
 TARGET=x86_64
+SCRIPT_FOLDER=scripts/
+
 
 
 CRTI_OBJ=build/crti.asm.o
@@ -16,22 +18,28 @@ CRTN_OBJ=build/crtn.asm.o
 
 
 # KERNEL PARTS
-KERNEL_CSRC=$(shell cd kernel; find . -name "*.c" -exec basename {} \;)
-KERNEL_CSRC+=$(shell cd libc; find . -name "*.c" -exec basename {} \;)
-KERNEL_ASMSRC=$(shell cd kernel; find . -name "*.asm" -exec basename {} \;)
+#KERNEL_CSRC=$(shell cd kernel; find . -name "*.c" -exec basename {} \;)
+#KERNEL_CSRC+=$(shell cd libc; find . -name "*.c" -exec basename {} \;)
+#KERNEL_ASMSRC=$(shell cd kernel; find . -name "*.asm" -exec basename {} \;)
+KERNEL_CSRC=$(shell find . -type f -name "*.c")
+KERNEL_ASMSRC=$(shell find . -type f -name "*.asm")
 
-KERNEL_OBJ=$(patsubst %.c, build/%.c.o, $(KERNEL_CSRC))
-KERNEL_OBJ+=$(patsubst %.asm, build/%.asm.o, $(KERNEL_ASMSRC))
+
+
+
+KERNEL_OBJ=$(patsubst ./src/%.c, build/%.c.o, $(KERNEL_CSRC))
+KERNEL_OBJ+=$(patsubst ./src/%.asm, build/%.asm.o, $(KERNEL_ASMSRC))
 
 
 
 KERNEL_INCLUDES=\
--I./kernel/include/ \
--I./kernel/arch/$(TARGET)/ \
+-I./src/kernel/include/ \
+-I./src/kernel/include/arch/$(TARGET)/ \
+-I./src/kernel/include/sys/ \
 
 
 # SCRIPTS
-GRUB_CHECK_SCRIPT=kernel/grub_file_check.sh
+GRUB_CHECK_SCRIPT=$(SCRIPT_FOLDER)/grub_file_check.sh
 
 
 test:
@@ -41,39 +49,34 @@ test:
 	echo $(KERNEL)
 
 
-build/%.c.o : kernel/arch/x86_64/%.c
-	$(CC) $(CC_FLAGS) $(KERNEL_INCLUDES) $< -c -o $@ 
+#build/%.c.o : kernel/arch/$(TARGET)/%.c
+#	$(CC) $(CC_FLAGS) $(KERNEL_INCLUDES) $< -c -o $@ 
 
-build/%.c.o : libc/%.c
+build/%.c.o: src/%.c
+	mkdir -p "$(@D)"	# this nifty command will create the directory we need in the build folder
 	$(CC) $(CC_FLAGS) $(KERNEL_INCLUDES) $< -c -o $@ 
 
 
 # -g is add debug symbols
-build/%.asm.o : kernel/%.asm
+build/%.asm.o : src/%.asm
+	mkdir -p "$(@D)"	# this nifty command will create the directory we need in the build folder
 	$(AS) -g -f elf64 $< -o $@ 
 
 
 
-build/%.c.o: kernel/%.c
-	$(CC) $(CC_FLAGS) $(KERNEL_INCLUDES) $< -c -o $@ 
+
 
 
 myos.bin: $(KERNEL_OBJ)
-	$(CC) -T kernel/linker.ld $(KERNEL_OBJ) -o myos.bin $(LD_FLAGS)
+	$(CC) -T src/kernel/linker.ld $(KERNEL_OBJ) -o myos.bin $(LD_FLAGS)
 	$(GRUB_CHECK_SCRIPT)
 
 myos.iso: myos.bin
 	mkdir -p kernel/isodir/boot/grub
-	cp myos.bin kernel/isodir/boot/myos.bin
-	cp kernel/grub.cfg kernel/isodir/boot/grub/grub.cfg
-	grub-mkrescue -o myos.iso kernel/isodir
+	cp myos.bin src/kernel/isodir/boot/myos.bin
+	cp src/kernel/grub.cfg src/kernel/isodir/boot/grub/grub.cfg
+	grub-mkrescue -o myos.iso src/kernel/isodir
 
-
-git_push: clean
-	git add *
-
-	git commit -m "makefile autopush"
-	git push -u origin main
 
 
 qemu: clean myos.iso

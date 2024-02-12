@@ -1,4 +1,4 @@
-extern kernel_stub
+extern __higherhalf_stubentry
 
 global pml4t
 global pdpt
@@ -220,7 +220,7 @@ bp_test:
 
 setup_higher_half:
 
-    mov rax, kernel_stub
+    mov rax, __higherhalf_stubentry
     sub rax, HH_VA
     call rax
     
