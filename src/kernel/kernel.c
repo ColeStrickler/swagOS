@@ -7,6 +7,8 @@
 #include <idt.h> 
 #include "tty.h"
 #include <asm_routines.h>
+#include <apic.h>
+#include <kernel.h>
 
 /*
 	These global variables are created in boot.asm
@@ -16,6 +18,7 @@ extern uint64_t pdpt[512] __attribute__((aligned(0x1000)));
 extern uint64_t pdt[512] __attribute__((aligned(0x1000)));
 extern uint64_t global_gdt_ptr_high;
 extern uint64_t global_stack_top;
+KernelSettings global_Settings;
 
 
 #define KERNEL_HH_START 0xffffffff80000000
@@ -130,6 +133,7 @@ void higher_half_entry(void)
 	/*
 		We will never return from here
 	*/
+	
 	kernel_main();
 }
 
@@ -145,25 +149,44 @@ void higher_half_entry(void)
 	4.
 	5.
 */
+
+void set_pit_periodic(uint16_t count) {
+   // outb(0x43, 0b00110100);
+	outb(0x43, 0b00110100);
+    outb(0x40, count & 0xFF); //low-byte
+    outb(0x40, count >> 8); //high-byte
+}
+
+
 void kernel_main(void)
 {
 	log_to_serial("[kernel_main()]: Entered.\n");
 
 	build_IDT();
-	lidt(&IDT);
+	lidt();
 	log_to_serial("idt loaded\n");
 
-	sti();
+	//sti();
 
-	log_to_serial("interrupts enabled\n");
+	
+	apic_init();
+	log_to_serial("APIC init!\n");
+	set_pit_periodic(0x4a9);
+	log_to_serial("pit init\n");
+	sti();
+	
+	//uint64_t apic_pa = get_local_apic_pa();
 
 	// test page fault exception
 
-	uint64_t* addr = 0x100000;
-
-	uint64_t test = *addr;
-
+	int i = 0;
 	
+	while(1)
+	{
+		i++;
+		if (i == INT32_MAX)
+			log_to_serial("MAX\n");
+	}
 
-	while(1);
 }
+

@@ -1,9 +1,15 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <cpu.h>
-
 #define IDT_SIZE 256
+
+/*
+    Interrupt numbers
+*/
+#define IDT_APIC_TIMER_INT    32
+#define IDT_APIC_SPURIOUS_INT 255
+
+
 
 
 typedef struct IDTR
@@ -23,6 +29,7 @@ typedef struct IDTR
 #define IDT_DESC_TYPE_TRAP  0xf
 #define IDT_DESC_DPL_USER   (1 << 6 | 1 << 5)
 #define IDT_DESC_DPL_ROOT   (0 << 6 | 0 << 5)
+#define IDT_PRESENT_FLAG 0x80
 
 typedef struct InterruptDescriptor64 {
    uint16_t offset_low;         // offset bits 0..15
@@ -75,7 +82,7 @@ typedef struct trapframe64_t
     uint64_t i_rflags;      // handled automatically by CPU iret instruction
     uint64_t i_rsp;         // handled automatically by CPU iret instruction
     uint64_t i_ss;          // handled automatically by CPU iret instruction
-}trapframe64_t;
+}__attribute__((packed))trapframe64_t;
 
 
 /*
@@ -83,7 +90,7 @@ typedef struct trapframe64_t
 
     We only add ones that may need to be called from elsewhere here
 */
-void lidt(void* IDT_address);
+void lidt();
 void build_IDT(void);
 
 
@@ -91,5 +98,40 @@ void build_IDT(void);
 /*
     External declarations of our ISRs
 */
+
+extern void isr_0();
+extern void isr_1();
+extern void isr_2();
+extern void isr_3();
+extern void isr_4();
+extern void isr_5();
+extern void isr_6();
+extern void isr_7();
+extern void isr_errorcode_8();
+extern void isr_9();
+extern void isr_errorcode_10();
+extern void isr_errorcode_11();
+extern void isr_errorcode_12();
 extern void isr_errorcode_13();
 extern void isr_errorcode_14();
+extern void isr_15();
+extern void isr_16();
+extern void isr_errorcode_17();
+extern void isr_18();
+extern void isr_19();
+extern void isr_20();
+extern void isr_21();
+extern void isr_22();
+extern void isr_23();
+extern void isr_24();
+extern void isr_25();
+extern void isr_26();
+extern void isr_27();
+extern void isr_28();
+extern void isr_29();
+extern void isr_30();
+extern void isr_31();
+extern void isr_32();
+extern void isr_33();
+extern void isr_34();
+extern void isr_255();

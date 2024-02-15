@@ -11,13 +11,14 @@ isr_%1:
     ; These registers are pushed and popped automatically by the CPU during ISR invocation
     push 0x0                ; we push a dummy error code to maintain stack equivalence with isr_errocode_%1
     push %1                 ; save interrupt # for later use
+
     save_gpr                ; push all general purpose registers to stack
     mov rdi, rsp            ; with System V ABI the first parameter to a function is in rdi. We pass the stack pointer here
     cld                     ; C code following the sysV ABI requires DF to be clear on function entry
     call isr_handler        
     restore_gpr             ; restore all general purpose registers from stack
     add rsp, 16             ; reclaim both the error code and the interrupt # previously pushed onto the stack
-    iret                    ; interrupt return
+    iretq                    ; interrupt return
 %endmacro
 
 %macro isr_errorcode 1
@@ -36,7 +37,7 @@ isr_errorcode_%1:
     call isr_handler        
     restore_gpr             ; restore all general purpose registers from stack
     add rsp, 16             ; reclaim both the error code and the interrupt # previously pushed onto the stack
-    iret                    ; interrupt return
+    iretq                    ; interrupt return
 %endmacro
 
 
@@ -83,6 +84,37 @@ isr_errorcode_%1:
 
 isr 0
 isr 1
+isr 2
+isr 3
+isr 4
+isr 5
+isr 6
+isr 7
+isr_errorcode 8
+isr 9
+isr_errorcode 10
+isr_errorcode 11
+isr_errorcode 12
 isr_errorcode 13
 isr_errorcode 14
-
+isr 15
+isr 16
+isr_errorcode 17
+isr 18
+isr 19
+isr 20
+isr 21
+isr 22
+isr 23
+isr 24
+isr 25
+isr 26
+isr 27
+isr 28
+isr 29
+isr 30
+isr 31
+isr 32
+isr 33
+isr 34
+isr 255

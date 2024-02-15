@@ -21,14 +21,14 @@ CRTN_OBJ=build/crtn.asm.o
 #KERNEL_CSRC=$(shell cd kernel; find . -name "*.c" -exec basename {} \;)
 #KERNEL_CSRC+=$(shell cd libc; find . -name "*.c" -exec basename {} \;)
 #KERNEL_ASMSRC=$(shell cd kernel; find . -name "*.asm" -exec basename {} \;)
-KERNEL_CSRC=$(shell find . -type f -name "*.c")
-KERNEL_ASMSRC=$(shell find . -type f -name "*.asm")
+KERNEL_CSRC=$(shell cd src; find . -type f -name "*.c")
+KERNEL_ASMSRC=$(shell cd src; find . -type f -name "*.asm")
 
 
 
 
-KERNEL_OBJ=$(patsubst ./src/%.c, build/%.c.o, $(KERNEL_CSRC))
-KERNEL_OBJ+=$(patsubst ./src/%.asm, build/%.asm.o, $(KERNEL_ASMSRC))
+KERNEL_OBJ=$(patsubst ./%.c, build/%.c.o, $(KERNEL_CSRC))
+KERNEL_OBJ+=$(patsubst ./%.asm, build/%.asm.o, $(KERNEL_ASMSRC))
 
 
 
@@ -36,6 +36,7 @@ KERNEL_INCLUDES=\
 -I./src/kernel/include/ \
 -I./src/kernel/include/arch/$(TARGET)/ \
 -I./src/kernel/include/sys/ \
+-I./src/kernel/include/kernel/ \
 
 
 # SCRIPTS
@@ -80,14 +81,14 @@ myos.iso: myos.bin
 
 
 qemu: clean myos.iso
-	qemu-system-x86_64 -serial file:out.log -cdrom myos.iso
+	qemu-system-x86_64 -cpu qemu64,+x2apic -serial file:out.log -cdrom myos.iso
 
 debug: clean myos.iso
-	qemu-system-x86_64 -s -S -cdrom myos.iso
+	qemu-system-x86_64 -cpu qemu64,+x2apic -s -S -serial file:out.log -cdrom myos.iso
 
 clean:
 	# beginning line with a hyphen tells make to ignore errors
-	-rm build/* \
+	-rm -rf build/* \
 	myos.iso \
 	myos.bin \
 	kernel/isodir/boot/myos.bin \
