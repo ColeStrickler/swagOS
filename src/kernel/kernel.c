@@ -9,6 +9,7 @@
 #include <asm_routines.h>
 #include <apic.h>
 #include <kernel.h>
+#include <multiboot.h>
 
 /*
 	These global variables are created in boot.asm
@@ -26,8 +27,8 @@ KernelSettings global_Settings;
 extern InterruptDescriptor64 IDT[];
 
 /* Forward declarations */
-void higher_half_entry(void);
-void kernel_main(void);
+void higher_half_entry(uint64_t);
+void kernel_main(uint64_t);
 
 
 
@@ -37,7 +38,7 @@ void kernel_main(void);
 
 	We will want to pass in the multiboot information here eventually]
 */
-void __higherhalf_stubentry(void) 
+void __higherhalf_stubentry(uint64_t ptr_multiboot_info) 
 {
 	uint64_t pml4t_index = (KERNEL_HH_START >> 39) & 0x1FF; // 511
 	uint64_t pdpt_index = (KERNEL_HH_START >> 30) & 0x1FF; // 510
@@ -94,7 +95,7 @@ void __higherhalf_stubentry(void)
 
 		We will never return from here
 	*/
-	higher_half_entry();
+	higher_half_entry(ptr_multiboot_info);
 }
 
 
@@ -106,7 +107,7 @@ void __higherhalf_stubentry(void)
 	Once this task is completed we simply call kernel_main().
 
 */
-void higher_half_entry(void)
+void higher_half_entry(uint64_t ptr_multiboot_info)
 {
 	uint64_t* pml4t_addr = ((uint64_t*)((uint64_t)&pml4t & ~KERNEL_HH_START));
 
@@ -134,7 +135,7 @@ void higher_half_entry(void)
 		We will never return from here
 	*/
 	
-	kernel_main();
+	kernel_main(ptr_multiboot_info);
 }
 
 
@@ -150,18 +151,37 @@ void higher_half_entry(void)
 	5.
 */
 
-void set_pit_periodic(uint16_t count) {
-   // outb(0x43, 0b00110100);
-	outb(0x43, 0b00110100);
-    outb(0x40, count & 0xFF); //low-byte
-    outb(0x40, count >> 8); //high-byte
+void multiboot_check(uint64_t ptr_multiboot_info)
+{					/* We stored the pointer at ptr_multiboot_info */
+	uint64_t addr = ptr_multiboot_info;
+	if ((uint64_t)addr & 7)
+	{
+		log_to_serial("unaligned multiboot info.\n");
+		return;
+	}
+
+	struct multiboot_tag *tag;
+	unsigned* size = *(unsigned *) addr;
+	for (tag = (struct multiboot_tag *) (addr + 8); tag->type != MULTIBOOT_TAG_TYPE_END; tag = (struct multiboot_tag *) ((multiboot_uint8_t *) tag + ((tag->size + 7) & ~7)))
+	{
+		log_to_serial("multiboot tag!\n");
+		if (tag->type == MULTIBOOT_TAG_TYPE_ACPI_NEW)
+			log_to_serial("Found multiboot acpi tag new!\n");
+		else if (tag->type == MULTIBOOT_TAG_TYPE_ACPI_OLD)
+			log_to_serial("Found multiboot acpi tag old!\n");
+	}
+	if (tag->type== MULTIBOOT_TAG_TYPE_END)
+		log_to_serial("found end immediately!\n");
+		
+
 }
 
 
-void kernel_main(void)
+
+void kernel_main(uint64_t ptr_multiboot_info)
 {
 	log_to_serial("[kernel_main()]: Entered.\n");
-
+	multiboot_check(ptr_multiboot_info);
 	build_IDT();
 	lidt();
 	log_to_serial("idt loaded\n");
@@ -171,9 +191,11 @@ void kernel_main(void)
 	
 	apic_init();
 	log_to_serial("APIC init!\n");
-	set_pit_periodic(0x4a9);
-	log_to_serial("pit init\n");
 	sti();
+
+	//int x = 45 / 0;
+
+	apic_calibrate_timer();
 	
 	//uint64_t apic_pa = get_local_apic_pa();
 

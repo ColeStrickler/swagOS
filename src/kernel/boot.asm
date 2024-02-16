@@ -5,6 +5,7 @@ global pdpt
 global pdt
 global global_gdt_ptr_high
 global global_stack_top
+global ptr_multiboot_info
 global start
 section .bss
 align 4096
@@ -66,6 +67,8 @@ global_gdt_ptr_high:
     dq gdt_ptr_high
 global_stack_top:
     dq stack_top
+ptr_multiboot_info:
+    dq HH_VA    ; we will add a value to this
 
 
 
@@ -77,6 +80,7 @@ section .text
 check_multiboot:
     cmp eax, 0x36d76289
     jne no_multiboot
+    add [ptr_multiboot_info-HH_VA], ebx    ; if we get a valid checksum also store a physical pointer to the multiboot2 structure 
     ret
 no_multiboot:
     mov al, "0"
@@ -220,6 +224,7 @@ bp_test:
 
 setup_higher_half:
 
+    mov rdi, [ptr_multiboot_info-HH_VA]
     mov rax, __higherhalf_stubentry
     sub rax, HH_VA
     call rax

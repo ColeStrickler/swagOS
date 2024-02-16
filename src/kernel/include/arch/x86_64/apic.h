@@ -34,14 +34,20 @@
 #define APIC_REG_VERSION        0x30 /* defines APIC version */
 #define APIC_REG_EOI            0xB0
 #define APIC_REG_SPURIOUS_INT   0xF0
-#define APIC_REG_TIMER_LVTE     0x320
+#define APIC_REG_TIMER_LVT      0x320
+#define APIC_REG_TIMER_INITCNT  0x380
+#define APIC_REG_TIMER_CURRCNT  0x390    
+#define APIC_REG_TIMER_DIV      0x3E0
+
 
 
 /*
     APIC register bit selectors
 */
 
-#define APIC_SOFTWARE_ENABLE 1 << 8
+#define APIC_SOFTWARE_ENABLE            1 << 8
+#define APIC_LVT_INT_MASKED             0x10000
+#define APIC_LVT_TIMER_MODE_PERIODIC    0x20000
 
 
 
@@ -56,8 +62,10 @@
 
 
 void apic_end_of_interrupt();
+void apic_start_timer();
 bool is_local_apic_available();
 bool is_x2_apic_available();
 void disable_pic_legacy();
 uint64_t get_local_apic_pa();
 int apic_init();
+void apic_calibrate_timer();

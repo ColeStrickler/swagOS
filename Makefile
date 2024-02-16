@@ -37,6 +37,8 @@ KERNEL_INCLUDES=\
 -I./src/kernel/include/arch/$(TARGET)/ \
 -I./src/kernel/include/sys/ \
 -I./src/kernel/include/kernel/ \
+-I./src/kernel/include/boot/ \
+
 
 
 # SCRIPTS
@@ -81,10 +83,10 @@ myos.iso: myos.bin
 
 
 qemu: clean myos.iso
-	qemu-system-x86_64 -cpu qemu64,+x2apic -serial file:out.log -cdrom myos.iso
+	qemu-system-x86_64 -enable-kvm -cpu host -serial file:out.log -cdrom myos.iso
 
 debug: clean myos.iso
-	qemu-system-x86_64 -cpu qemu64,+x2apic -s -S -serial file:out.log -cdrom myos.iso
+	qemu-system-x86_64 -enable-kvm -cpu host -s -S -serial file:out.log -cdrom myos.iso
 
 clean:
 	# beginning line with a hyphen tells make to ignore errors

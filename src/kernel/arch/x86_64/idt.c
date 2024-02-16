@@ -2,6 +2,9 @@
 #include <idt.h>
 #include <serial.h>
 #include <apic.h>
+#include <kernel.h>
+
+extern KernelSettings global_Settings;
 
 __attribute__((aligned(0x10)))
 InterruptDescriptor64 IDT[IDT_SIZE];
@@ -164,11 +167,21 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         }
         case IDT_APIC_TIMER_INT:
         {
-            log_to_serial("timer interrupt.\n");
-            apic_end_of_interrupt();
-            	outb(0x43, 0b00110100);
-                outb(0x40, 1193 & 0xFF); //low-byte
-                outb(0x40, 1193 >> 8); //high-byte
+            
+            if (!global_Settings.bTimerCalibrated)
+            {
+                log_to_serial("timer interrupt.\n");
+                global_Settings.tickCount++;
+                outb(0x20,0x20); outb(0xa0,0x20);
+            }
+            else
+            {
+                log_to_serial("apic interrupt.\n");
+                apic_end_of_interrupt();
+            }
+            
+            // abstract to end_of_interrupt();
+
             break;
         }
         case IDT_APIC_SPURIOUS_INT:

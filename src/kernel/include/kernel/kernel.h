@@ -8,4 +8,6 @@
 typedef struct KernelSettings
 {
     struct x8664_Settings settings_x8664;
+    bool bTimerCalibrated;
+    uint64_t tickCount;
 } KernelSettings;
