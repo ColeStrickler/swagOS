@@ -50,16 +50,75 @@
 #define APIC_LVT_TIMER_MODE_PERIODIC    0x20000
 
 
+/*
+    IOAPIC structures in the MADT
+*/
 
+typedef struct proc_lapic
+{
+    unsigned char type;
+    unsigned char record_length;
+    unsigned char acpi_procID;
+    unsigned char apic_id;
+    uint32_t flags;
+}__attribute__((packed))proc_lapic;
+
+
+typedef struct io_apic
+{
+    unsigned char type;
+    unsigned char record_length;
+    unsigned char ioapic_id;
+    unsigned char reserved;
+    uint32_t io_apic_address;
+    uint16_t global_sys_int_base;
+}__attribute__((packed))io_apic;
+
+
+typedef struct io_apic_int_src_override
+{
+    unsigned char type;
+    unsigned char record_length;
+    unsigned char bus_src;
+    unsigned char irq_src;
+    uint32_t global_sys_int;
+    uint16_t flags;
+}__attribute__((packed))io_apic_int_src_override;
+
+
+typedef struct io_apic_nmi_src
+{
+    unsigned char type;
+    unsigned char record_length;
+    unsigned char nmi_src;
+    unsigned char reserved;
+    uint16_t flags;
+    uint32_t global_sys_int;
+}__attribute__((packed))io_apic_nmi_src;
+
+typedef struct lapic_addr_override
+{
+    unsigned char type;
+    unsigned char record_length;
+    uint16_t reserved;
+    uint64_t lapic_pa;
+}__attribute__((packed))lapic_addr_override;
+
+typedef struct proc_local_x2apic
+{
+    unsigned char type;
+    unsigned char record_length;
+    uint16_t reserved;
+    uint32_t local_x2apic_id;
+    uint32_t flags;
+    uint32_t acpi_id;
+}__attribute__((packed))proc_local_x2apic;
 
 /*
     APIC Timer and PIT constants
 
     PIT runs at a fixed frequency of 1.19318MHz and we use it to calibrate the APIC timer
 */
-
-
-
 
 void apic_end_of_interrupt();
 void apic_start_timer();
@@ -69,3 +128,7 @@ void disable_pic_legacy();
 uint64_t get_local_apic_pa();
 int apic_init();
 void apic_calibrate_timer();
+
+
+
+

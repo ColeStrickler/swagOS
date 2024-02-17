@@ -10,7 +10,7 @@
 #include <apic.h>
 #include <kernel.h>
 #include <multiboot.h>
-
+#include <acpi.h>
 /*
 	These global variables are created in boot.asm
 */
@@ -22,7 +22,7 @@ extern uint64_t global_stack_top;
 KernelSettings global_Settings;
 
 
-#define KERNEL_HH_START 0xffffffff80000000
+
 
 extern InterruptDescriptor64 IDT[];
 
@@ -140,6 +140,33 @@ void higher_half_entry(uint64_t ptr_multiboot_info)
 
 
 
+RSDP_t* multiboot_retrieve_rsdp(uint64_t addr, bool* extended_rsdp)
+{	
+	if ((uint64_t)addr & 7)
+	{
+		log_to_serial("unaligned multiboot info.\n");
+		return (void*)0x0;
+	}
+
+	struct multiboot_tag *tag;
+	unsigned* size = *(unsigned *) addr;
+	for (tag = (struct multiboot_tag *) (addr + 8); tag->type != MULTIBOOT_TAG_TYPE_END; tag = (struct multiboot_tag *) ((multiboot_uint8_t *) tag + ((tag->size + 7) & ~7)))
+	{
+		log_to_serial("multiboot tag!\n");
+		if (tag->type == MULTIBOOT_TAG_TYPE_ACPI_NEW)
+		{
+			*extended_rsdp = true;
+			return (RSDP_t*)((uint64_t)tag + 2*sizeof(uint32_t));
+		}
+		else if (tag->type == MULTIBOOT_TAG_TYPE_ACPI_OLD)
+		{
+			return (RSDP_t*)((uint64_t)tag + 2*sizeof(uint32_t));
+		}
+	}
+	return (void*)0x0;
+}
+
+
 /*
 	In kernel_main() is where we set up our various kernel functionality.
 
@@ -151,37 +178,37 @@ void higher_half_entry(uint64_t ptr_multiboot_info)
 	5.
 */
 
-void multiboot_check(uint64_t ptr_multiboot_info)
-{					/* We stored the pointer at ptr_multiboot_info */
-	uint64_t addr = ptr_multiboot_info;
-	if ((uint64_t)addr & 7)
-	{
-		log_to_serial("unaligned multiboot info.\n");
-		return;
-	}
-
-	struct multiboot_tag *tag;
-	unsigned* size = *(unsigned *) addr;
-	for (tag = (struct multiboot_tag *) (addr + 8); tag->type != MULTIBOOT_TAG_TYPE_END; tag = (struct multiboot_tag *) ((multiboot_uint8_t *) tag + ((tag->size + 7) & ~7)))
-	{
-		log_to_serial("multiboot tag!\n");
-		if (tag->type == MULTIBOOT_TAG_TYPE_ACPI_NEW)
-			log_to_serial("Found multiboot acpi tag new!\n");
-		else if (tag->type == MULTIBOOT_TAG_TYPE_ACPI_OLD)
-			log_to_serial("Found multiboot acpi tag old!\n");
-	}
-	if (tag->type== MULTIBOOT_TAG_TYPE_END)
-		log_to_serial("found end immediately!\n");
-		
-
-}
-
-
 
 void kernel_main(uint64_t ptr_multiboot_info)
 {
 	log_to_serial("[kernel_main()]: Entered.\n");
-	multiboot_check(ptr_multiboot_info);
+	bool useExtendedRSDP = false;
+	MADT* madt_header;
+
+	void* rsdp = multiboot_retrieve_rsdp(ptr_multiboot_info, &useExtendedRSDP);
+
+	if (!doRSDPChecksum(rsdp, sizeof(RSDP_t)))
+	{
+		log_to_serial(((RSDP_t*)rsdp)->Signature);
+	}
+	global_Settings.SystemDescriptorPointer = rsdp;
+
+	
+	if (!(madt_header = retrieveMADT(useExtendedRSDP, rsdp)))
+	{
+		log_to_serial("MADT not found!\n");
+	}
+
+	if (!madt_get_item(madt_header, MADT_ITEM_IO_APIC, 0))
+	{
+		log_to_serial("Could not find IOAPIC entry in MADT.\n");
+	}
+	else
+		log_to_serial("found IOAPIC entry!\n");
+
+	while(1);
+
+
 	build_IDT();
 	lidt();
 	log_to_serial("idt loaded\n");

@@ -3,6 +3,5 @@
 *.bin
 *.log
 build/
-tools/
 .*q
 

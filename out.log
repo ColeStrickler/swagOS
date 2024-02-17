@@ -1,16 +1,13 @@
 [higher_half_entry()]: Successfully entered higher half.
 [kernel_main()]: Entered.
-idt loaded
-APIC init!
-pit init
-isr_handler()
-timer interrupt.
-MAX
-MAX
-MAX
-MAX
-MAX
-MAX
-MAX
-MAX
-MAX
+multiboot tag!
+multiboot tag!
+multiboot tag!
+multiboot tag!
+multiboot tag!
+multiboot tag!
+multiboot tag!
+multiboot tag!
+multiboot tag!
+multiboot tag!
+found IOAPIC entry!
