@@ -50,6 +50,31 @@
 #define APIC_LVT_TIMER_MODE_PERIODIC    0x20000
 
 
+
+/*
+    IOAPIC REGISTERS
+*/
+#define IOAPICID            0x0
+#define IOAPICVER           0x1
+#define IOAPICARB           0x2
+#define IOAPICREDTBL(n)     (0x10 + 2 * n) // lower-32bits (add +1 for upper 32-bits)
+
+
+/*
+    IOREDTBL Bit selectors
+*/
+#define IOREDTBL_VECTOR         0xff
+#define IOREDTBL_DELMODE        0x700 //bits 8-10
+#define IOREDTBL_DSTMODE        1 << 11
+#define IOREDTBL_DELSTAT        1 << 12
+#define IOREDTBL_PINPOL         1 << 13
+#define IOREDTBL_REMOTEIRR      1 << 14
+#define IOREDTBL_TRIGMODE       1 << 15
+#define IOREDTBL_MASK           1 << 16
+#define IOREDTBL_DST            0xff000000 // only use for the second register bits 56-63
+
+
+
 /*
     IOAPIC structures in the MADT
 */
@@ -128,6 +153,8 @@ void disable_pic_legacy();
 uint64_t get_local_apic_pa();
 int apic_init();
 void apic_calibrate_timer();
+void set_io_apic_redirect(io_apic* ioapic, uint32_t irq_num, uint32_t entry1_write, uint32_t entry2_write);
+bool get_io_apic_redirect(io_apic* ioapic, uint32_t irq_num, uint32_t* entry1_out, uint32_t* entry2_out);
 
 
 

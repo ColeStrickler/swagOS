@@ -4,6 +4,9 @@
 #include <idt.h>
 #include <asm_routines.h>
 #include <kernel.h>
+
+
+
 extern KernelSettings global_Settings;
 uint64_t apic_read_reg(uint32_t reg_offset);
 void apic_write_reg(uint32_t reg_offset, uint32_t eax, uint32_t edx);
@@ -108,7 +111,11 @@ void init_pic_legacy(int offset1, int offset2)
 	outb(PIC2_DATA, ICW4_8086);
 	io_wait();
  
-	disable_pic_legacy();   // mask all interrupts
+    // unmask all interrupts
+    outb(PIC1_DATA, 0x0);
+    outb(PIC2_DATA, 0x0);
+
+	//disable_pic_legacy();   // mask all interrupts
 }
 
 
@@ -194,31 +201,110 @@ void pit_perform_sleep(uint32_t milliseconds)
 */
 void apic_calibrate_timer() {
 
-        // stop the APIC to begin the calibration
-        apic_write_reg(APIC_REG_TIMER_INITCNT, 0x00, 0x00);
+    // stop the APIC to begin the calibration
+    apic_write_reg(APIC_REG_TIMER_INITCNT, 0x00, 0x00);
+    // Tell APIC timer to use divider 16
+    apic_write_reg(APIC_REG_TIMER_DIV, 0x3, 0x00);
+
+    // Set APIC init counter to -1
+    apic_write_reg(APIC_REG_TIMER_INITCNT, 0xFFFFFFFF, 0);
+
+    log_to_serial("sleeping for 10ms\n");
+    // Perform PIT-supported sleep for 10ms
+    pit_perform_sleep(10);
+
+    // Stop the APIC timer
+    apic_write_reg(APIC_REG_TIMER_LVT, APIC_LVT_INT_MASKED, 0x00);
+    // Now we know how often the APIC timer has ticked in 10ms
+    uint32_t ticksIn10ms = (uint32_t)0xFFFFFFFF - (uint32_t)apic_read_reg(APIC_REG_TIMER_CURRCNT);
+    log_to_serial("calibration done!\n");
+    // Start timer as periodic on IRQ 0, divider 16, with the number of ticks we counted
+    
+    apic_write_reg(APIC_REG_TIMER_DIV, 0x3, 0x00);
+    apic_write_reg(APIC_REG_TIMER_INITCNT, ticksIn10ms, 0x00);
+    apic_write_reg(APIC_REG_TIMER_LVT, 32 | APIC_LVT_TIMER_MODE_PERIODIC, 0x00);
+    global_Settings.bTimerCalibrated = true;
+    disable_pic_legacy();
+}
 
 
-        // Tell APIC timer to use divider 16
-        apic_write_reg(APIC_REG_TIMER_DIV, 0x3, 0x00);
- 
+/*
+    helper function, once we 
+*/
+static uint64_t dm_ioapic_address(io_apic* ioapic)
+{
+    if (!ioapic)
+        return 0x0;
+    log_int_to_serial(ioapic->io_apic_address);
+    return ioapic->io_apic_address + KERNEL_HH_START;
+}
 
-        // Set APIC init counter to -1
-        apic_write_reg(APIC_REG_TIMER_INITCNT, 0xFFFFFFFF, 0);
- 
-        log_to_serial("sleeping for 10ms\n");
-        // Perform PIT-supported sleep for 10ms
-        pit_perform_sleep(10);
- 
-        // Stop the APIC timer
-        apic_write_reg(APIC_REG_TIMER_LVT, APIC_LVT_INT_MASKED, 0x00);
-        // Now we know how often the APIC timer has ticked in 10ms
-        uint32_t ticksIn10ms = (uint32_t)0xFFFFFFFF - (uint32_t)apic_read_reg(APIC_REG_TIMER_CURRCNT);
-        log_to_serial("calibration done!\n");
-        // Start timer as periodic on IRQ 0, divider 16, with the number of ticks we counted
-        
-        apic_write_reg(APIC_REG_TIMER_DIV, 0x3, 0x00);
-        apic_write_reg(APIC_REG_TIMER_INITCNT, ticksIn10ms, 0x00);
-        apic_write_reg(APIC_REG_TIMER_LVT, 32 | APIC_LVT_TIMER_MODE_PERIODIC, 0x00);
-        global_Settings.bTimerCalibrated = true;
-        
-    }
+
+bool io_apic_write(io_apic* ioapic, uint8_t offset, uint32_t write_value)
+{
+    uint64_t base = dm_ioapic_address(ioapic);
+    if (!base)
+        return false;
+
+    // ioregsel selects the specific register we will write to
+    uint32_t* ioregsel = (uint32_t*)base;
+    // ioregwin is the value we will write
+    uint32_t* ioregwin = (uint32_t*)(0x10 + base);
+
+    *ioregsel = offset;
+    *ioregwin = write_value;
+    return true;
+}
+
+bool io_apic_read(io_apic* ioapic, uint8_t offset, uint32_t* read_out)
+{
+    uint64_t base = dm_ioapic_address(ioapic);
+    if (!base)
+        return false;
+    // ioregsel selects the specific register we will read from
+    uint32_t* ioregsel = (uint32_t*)base;
+    // ioregwin is the value we will read
+    uint32_t* ioregwin = (uint32_t*)(0x10 + base);
+
+    *ioregsel = offset;
+    *read_out = *ioregwin;
+    return true;
+}
+
+/*
+    For irq_num we must use the value we parsed out of the 
+    (Entry Type 2: I/O APIC Interrupt Source Override)->global_sys_interrupt from the MADT
+
+*/
+void set_io_apic_redirect(io_apic* ioapic, uint32_t irq_num, uint32_t entry1_write, uint32_t entry2_write)
+{
+   
+    // redirect_entry1 contains the low order bits
+    uint32_t redirect_entry1 = IOAPICREDTBL(irq_num);
+    // high order bits in the second entry
+    uint32_t redirect_entry2 = redirect_entry1 + 0x1;
+    
+    if (!io_apic_write(ioapic, redirect_entry1, entry1_write))
+        return false;
+    if (!io_apic_write(ioapic, redirect_entry2, entry2_write))
+        return false;
+    return true;
+}
+
+
+/*
+    entry1_out will recieve the lower 32bits and entry2_out will receive the higher 32bits
+*/
+bool get_io_apic_redirect(io_apic* ioapic, uint32_t irq_num, uint32_t* entry1_out, uint32_t* entry2_out)
+{
+    // redirect_entry1 contains the low order bits
+    uint32_t redirect_entry1 = IOAPICREDTBL(irq_num);
+    // high order bits in the second entry
+    uint32_t redirect_entry2 = redirect_entry1 + 0x1;
+
+    if (!io_apic_read(ioapic, redirect_entry1, entry1_out))
+        return false;
+    if (!io_apic_read(ioapic, redirect_entry2, entry2_out))
+        return false;
+    return true;
+}

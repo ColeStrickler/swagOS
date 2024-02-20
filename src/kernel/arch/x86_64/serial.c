@@ -1,5 +1,6 @@
 #include <string.h>
 #include <serial.h>
+#include <stdint.h>
 
  
 unsigned char inb(int portnum)
@@ -37,6 +38,31 @@ int init_serial() {
    outb((int)PORT_COM1 + 4, (unsigned char)0x0F);
    return 0;
 }
+
+
+void log_int_to_serial(uint32_t num)
+{
+  if (!num)
+  {
+    outb(PORT_COM1, '0');
+    return;
+  }
+  uint32_t x = num;
+  int div = 10;
+  int i = 19;
+  char unsafe_buf[21];
+  memset(unsafe_buf, 0x00, 21);
+
+  while (x > 0)
+  {
+    unsafe_buf[i] = '0' + x%10;
+    x -= (x%10);
+    x /= 10;
+    i--;
+  }
+  log_to_serial(unsafe_buf+i+1);
+}
+
 
 
 void log_to_serial (char *string) {

@@ -65,6 +65,15 @@ MADT_ITEM* madt_get_item(MADT* madt, uint32_t item_type, uint32_t item_index)
     {
         if (item->type == item_type)
         {
+            /*
+            log_to_serial("Item->type: ");
+            log_int_to_serial(item->type);
+            log_to_serial(" item index: ");
+            log_int_to_serial((int)item_index);
+            log_to_serial(" curr index: ");
+            log_int_to_serial((int)curr_index);
+            log_to_serial("\n");
+            */
             if (item_index == curr_index)
                 return item;
             curr_index++;

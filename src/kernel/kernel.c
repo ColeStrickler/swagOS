@@ -152,7 +152,6 @@ RSDP_t* multiboot_retrieve_rsdp(uint64_t addr, bool* extended_rsdp)
 	unsigned* size = *(unsigned *) addr;
 	for (tag = (struct multiboot_tag *) (addr + 8); tag->type != MULTIBOOT_TAG_TYPE_END; tag = (struct multiboot_tag *) ((multiboot_uint8_t *) tag + ((tag->size + 7) & ~7)))
 	{
-		log_to_serial("multiboot tag!\n");
 		if (tag->type == MULTIBOOT_TAG_TYPE_ACPI_NEW)
 		{
 			*extended_rsdp = true;
@@ -182,14 +181,20 @@ RSDP_t* multiboot_retrieve_rsdp(uint64_t addr, bool* extended_rsdp)
 void kernel_main(uint64_t ptr_multiboot_info)
 {
 	log_to_serial("[kernel_main()]: Entered.\n");
+
+
+
 	bool useExtendedRSDP = false;
-	MADT* madt_header;
+	MADT* madt_header = NULL;
+	io_apic* io_apic_madt = NULL;
+	io_apic_int_src_override* int_src_override = NULL;
 
 	void* rsdp = multiboot_retrieve_rsdp(ptr_multiboot_info, &useExtendedRSDP);
 
 	if (!doRSDPChecksum(rsdp, sizeof(RSDP_t)))
 	{
 		log_to_serial(((RSDP_t*)rsdp)->Signature);
+		log_to_serial("Bad RSDP checksum.\n");
 	}
 	global_Settings.SystemDescriptorPointer = rsdp;
 
@@ -199,14 +204,39 @@ void kernel_main(uint64_t ptr_multiboot_info)
 		log_to_serial("MADT not found!\n");
 	}
 
-	if (!madt_get_item(madt_header, MADT_ITEM_IO_APIC, 0))
+	if (!(io_apic_madt = (io_apic*)madt_get_item(madt_header, MADT_ITEM_IO_APIC, 0)))
 	{
 		log_to_serial("Could not find IOAPIC entry in MADT.\n");
 	}
-	else
-		log_to_serial("found IOAPIC entry!\n");
+	global_Settings.pIoApic = io_apic_madt;
 
-	while(1);
+	int i = 0;
+	while ((int_src_override = (io_apic_int_src_override*)madt_get_item(madt_header, MADT_ITEM_IO_APIC_SRCOVERRIDE, i)))
+	{
+		log_to_serial("Global System Interrupt: ");
+		log_int_to_serial(int_src_override->global_sys_int);
+		log_to_serial("IRQ source: ");
+		log_int_to_serial(int_src_override->irq_src);
+		log_to_serial("\n");
+		if (int_src_override->global_sys_int == 2)
+		{
+			uint32_t read_low = 0;
+			uint32_t read_high = 0;
+			if (!get_io_apic_redirect(global_Settings.pIoApic, int_src_override->global_sys_int, &read_low, &read_high))
+			{
+				log_to_serial("Could not read ioapic redirect entry!\n");
+			}
+		}
+
+		i++;
+	}
+
+	
+		
+	
+
+
+	
 
 
 	build_IDT();
@@ -224,18 +254,14 @@ void kernel_main(uint64_t ptr_multiboot_info)
 
 	apic_calibrate_timer();
 	
+	
 	//uint64_t apic_pa = get_local_apic_pa();
 
 	// test page fault exception
 
-	int i = 0;
-	
-	while(1)
-	{
-		i++;
-		if (i == INT32_MAX)
-			log_to_serial("MAX\n");
-	}
+
+	log_to_serial("end\n");
+	while(1);
 
 }
 

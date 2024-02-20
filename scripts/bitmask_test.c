@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#define bitmask 0xFFFFFFFFFF000ULL
+#define bitmask 0xff00000000000000ULL
 int main()
 {
     for (int i = 0; i < 64; i++)
