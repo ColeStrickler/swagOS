@@ -5,4 +5,4 @@
 
 void log_to_serial (char *string);
 void outb(int portnum, unsigned char data);
-void log_int_to_serial(uint32_t num);
+void log_int_to_serial(uint64_t num);

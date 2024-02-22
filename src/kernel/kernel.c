@@ -204,7 +204,7 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	}
 
 
-
+	while(1);
 	
 	if (!(madt_header = retrieveMADT(useExtendedRSDP, rsdp)))
 	{

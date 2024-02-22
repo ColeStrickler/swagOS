@@ -40,16 +40,16 @@ int init_serial() {
 }
 
 
-void log_int_to_serial(uint32_t num)
+void log_int_to_serial(uint64_t num)
 {
   if (!num)
   {
     outb(PORT_COM1, '0');
     return;
   }
-  uint32_t x = num;
-  int div = 10;
-  int i = 19;
+  uint64_t x = num;
+  uint32_t div = 10;
+  uint32_t i = 19;
   char unsafe_buf[21];
   memset(unsafe_buf, 0x00, 21);
 

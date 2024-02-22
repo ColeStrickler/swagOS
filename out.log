@@ -1,3 +1,10 @@
 [higher_half_entry()]: Successfully entered higher half.
 [kernel_main()]: Entered.
 0-654336
+654336-655360
+983040-1048576
+1048576-134086656
+134086656-134217728
+4278173696-4278190080
+4294705152-4294967296
+Found memory map!

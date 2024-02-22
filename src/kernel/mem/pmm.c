@@ -35,6 +35,14 @@ bool parse_multiboot_memorymap(uint64_t addr)
 }
 
 
+static void log_mmap_entry(struct multiboot_mmap_entry* entry)
+{
+    log_int_to_serial(entry->addr);
+    log_to_serial("-");
+    log_int_to_serial(entry->addr + entry->len);
+    log_to_serial("\n");
+}
+
 
 void parse_multiboot_mmap_entries(struct multiboot_tag_mmap* mm_tag)
 {
@@ -43,10 +51,11 @@ void parse_multiboot_mmap_entries(struct multiboot_tag_mmap* mm_tag)
     uint32_t curr_size = sizeof(struct multiboot_tag_mmap);
     while(curr_size < mm_tag->size)
     {
-        log_int_to_serial(entry->addr);
-        log_to_serial("-");
-        log_int_to_serial(entry->addr + entry->len);
-        while(1);
+        
+        log_mmap_entry(entry);
+        entry_addr += sizeof(struct multiboot_mmap_entry);
+        curr_size += sizeof(struct multiboot_mmap_entry);
+        entry = (struct multiboot_mmap_entry*)entry_addr;
     }
 
 }
