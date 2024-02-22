@@ -38,6 +38,7 @@ KERNEL_INCLUDES=\
 -I./src/kernel/include/sys/ \
 -I./src/kernel/include/kernel/ \
 -I./src/kernel/include/boot/ \
+-I./src/kernel/include/mem/ \
 
 
 
