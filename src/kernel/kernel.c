@@ -11,14 +11,26 @@
 #include <kernel.h>
 #include <multiboot.h>
 #include <acpi.h>
+#include <panic.h>
 /*
 	These global variables are created in boot.asm
 */
+
+// these initial page tables are the direct mapped page tables
 extern uint64_t pml4t[512] __attribute__((aligned(0x1000))); 
 extern uint64_t pdpt[512] __attribute__((aligned(0x1000)));
 extern uint64_t pdt[512] __attribute__((aligned(0x1000)));
+
+uint64_t hh_pdt[512] __attribute__((aligned(0x1000)));
+
+
 extern uint64_t global_gdt_ptr_high;
 extern uint64_t global_stack_top;
+
+
+extern uint64_t KERNEL_START;
+extern uint64_t KERNEL_END;
+
 KernelSettings global_Settings;
 
 
@@ -40,6 +52,7 @@ void kernel_main(uint64_t);
 */
 void __higherhalf_stubentry(uint64_t ptr_multiboot_info) 
 {
+
 	uint64_t pml4t_index = (KERNEL_HH_START >> 39) & 0x1FF; // 511
 	uint64_t pdpt_index = (KERNEL_HH_START >> 30) & 0x1FF; // 510
 	uint64_t pdt_index = (KERNEL_HH_START >> 21) & 0x1FF; // 0
@@ -53,8 +66,7 @@ void __higherhalf_stubentry(uint64_t ptr_multiboot_info)
 	*/
 	uint64_t* pml4t_addr = ((uint64_t*)((uint64_t)&pml4t & ~KERNEL_HH_START));
 	uint64_t* pdpt_addr = ((uint64_t*)((uint64_t)&pdpt & ~KERNEL_HH_START));
-	uint64_t* pdt_addr = (uint64_t*)((uint64_t)&pdt & ~KERNEL_HH_START);
-
+	uint64_t* pdt_addr = (uint64_t*)((uint64_t)&hh_pdt & ~KERNEL_HH_START);
 
 	pml4t_addr[pml4t_index] = ((uint64_t)pdpt_addr) | (PAGE_PRESENT | PAGE_WRITE);
 	pml4t_addr[510] = ((uint64_t)pml4t_addr) | (PAGE_PRESENT | PAGE_WRITE);
@@ -121,7 +133,7 @@ void higher_half_entry(uint64_t ptr_multiboot_info)
 	*/
 	__asm__ __volatile__(
 		"xor %%rax, %%rax\n\t"
-		"mov %%eax, (%0)\n\t"
+		//"mov %%eax, (%0)\n\t"
 		"mov %%cr3, %%rax\n\t"
         "mov %%rax, %%cr3\n\t"
 		"cpuid"			
@@ -182,7 +194,11 @@ void kernel_main(uint64_t ptr_multiboot_info)
 {
 	log_to_serial("[kernel_main()]: Entered.\n");
 
+	// Linker symbols have addresses only
+	global_Settings.PMM.kernel_loadaddr = &KERNEL_START;
+	global_Settings.PMM.kernel_phystop = &KERNEL_END;
 
+	
 
 	bool useExtendedRSDP = false;
 	MADT* madt_header = NULL;

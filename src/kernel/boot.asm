@@ -18,7 +18,7 @@ pdt:
     resb 4096
 
 stack_bottom:
-    resb 128
+    resb 4096*4
 stack_top:
 
 section .rodata

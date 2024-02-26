@@ -39,6 +39,7 @@ KERNEL_INCLUDES=\
 -I./src/kernel/include/kernel/ \
 -I./src/kernel/include/boot/ \
 -I./src/kernel/include/mem/ \
+-I./src/kernel/include/data_structures/
 
 
 
@@ -84,10 +85,10 @@ myos.iso: myos.bin
 
 
 qemu: clean myos.iso
-	qemu-system-x86_64 -enable-kvm -cpu host -serial file:out.log -cdrom myos.iso
+	qemu-system-x86_64 -enable-kvm -cpu host -serial file:out.log -m 8G -cdrom myos.iso
 
 debug: clean myos.iso
-	qemu-system-x86_64 -enable-kvm -cpu host -s -S -serial file:out.log -cdrom myos.iso
+	qemu-system-x86_64 -enable-kvm -cpu host -s -S -serial file:out.log -m 4G -cdrom myos.iso
 
 clean:
 	# beginning line with a hyphen tells make to ignore errors

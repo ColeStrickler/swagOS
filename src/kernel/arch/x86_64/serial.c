@@ -16,6 +16,14 @@ void outb(int portnum, unsigned char data)
 }
 
 
+void log_hexval(char* label, uint64_t hexval)
+{
+  log_to_serial(label);
+  log_to_serial(": ");
+  log_hex_to_serial(hexval);
+  log_to_serial("\n");
+}
+
 
 int init_serial() {
    outb((int)PORT_COM1 + 1, (unsigned char)0x00);    // Disable all interrupts
@@ -63,6 +71,37 @@ void log_int_to_serial(uint64_t num)
   log_to_serial(unsafe_buf+i+1);
 }
 
+
+void log_hex_to_serial(uint64_t num)
+{
+  outb(PORT_COM1, '0');
+  outb(PORT_COM1, 'x');
+  if (!num)
+  {
+    outb(PORT_COM1, '0');
+    return;
+  }
+
+  uint64_t x = num;
+  uint32_t div = 16;
+  uint32_t i = 19;
+  char unsafe_buf[21];
+  memset(unsafe_buf, 0x00, 21);
+
+  while (x > 0)
+  {
+    uint64_t ires = x%div;
+
+    if (ires < 10)
+      unsafe_buf[i] = '0' + ires;
+    else
+      unsafe_buf[i] = 'a' + (ires - 10);
+    x -= (x%div);
+    x /= div;
+    i--;
+  }
+  log_to_serial(unsafe_buf+i+1);
+}
 
 
 void log_to_serial (char *string) {
