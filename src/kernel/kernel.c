@@ -216,6 +216,8 @@ void kernel_main(uint64_t ptr_multiboot_info)
 
 	if (parse_multiboot_memorymap(ptr_multiboot_info))
 	{
+
+		log_to_serial("MADE IT!");
 		while(1);
 	}
 

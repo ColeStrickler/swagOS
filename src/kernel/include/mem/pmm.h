@@ -7,31 +7,43 @@
 #define HUGEPGSIZE (2*1024*1024) // 2mb
 #define HUGEPGROUNDUP(sz)  ((sz+HUGEPGSIZE) - ((sz+HUGEPGSIZE)%HUGEPGSIZE))
 #define HUGEPGROUNDDOWN(sz) (sz - (sz%HUGEPGSIZE))
-
-
 #define PGROUNDUP(sz)  ((sz+PGSIZE) - ((sz+PGSIZE)%PGSIZE))
 #define PGROUNDDOWN(sz) (sz - (sz%PGSIZE))
-
 #define PTADDRMASK 0xFFFFFFFFFFFFF000
+
+//  (8 bytes/entry) * (512 entries) * (8 bits/byte) * (2mb / bit) = 64GB maximum memory that we will support
+#define MAXPHYSICALMEM (2*1024*1024)*(512*8*8)
+
+
+
+
 
 
 typedef struct PhysicalMemoryManager
 {
-    struct dll_Head free_framelist;
-    uint32_t free_framecount;
-    uint32_t total_framecount;
-    uint64_t physmem_upper_limit;
-    uint64_t kernel_loadaddr;
-    uint64_t kernel_phystop;
+    /*
+    We will use this bitmap to keep track of what pages are currently in use
+    and to allocate free pages.
+
+    (8 bytes/entry) * (512 entries) * (8 bits/byte) * (2mb / bit) = 64GB maximum memory that we will support
+
+    If bit is set --> in use
+    */
+    uint64_t    PhysicalPageBitmap[512];
+
+    /*
+        We will use these other entries to keep statistics and impose sanity checks
+    */
+    uint32_t    free_framecount;
+    uint32_t    total_framecount;
+    uint64_t    physmem_upper_limit;
+    uint64_t    kernel_loadaddr;
+    uint64_t    kernel_phystop;
+    bool        init_success; // we will set this value if we are successfully initialized
 } PhysicalMemoryManager;
 
 
 
-typedef struct PhysicalFrame
-{
-    struct dll_Entry list_entry;
-    uint64_t physical_address;
-} PhysicalFrame;
 #endif
 
 bool parse_multiboot_memorymap(uint64_t addr);
