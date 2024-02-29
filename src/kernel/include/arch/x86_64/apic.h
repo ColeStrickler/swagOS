@@ -139,6 +139,24 @@ typedef struct proc_local_x2apic
     uint32_t acpi_id;
 }__attribute__((packed))proc_local_x2apic;
 
+typedef union io_apic_redirect_entry_t {
+    struct
+    {
+    uint64_t    vector  :8;
+    uint64_t    delivery_mode   :3;
+    uint64_t    destination_mode    :1;
+    uint64_t    delivery_status :1;
+    uint64_t    pin_polarity    :1;
+    uint64_t    remote_irr  :1;
+    uint64_t    trigger_mode    :1;
+    uint64_t    interrupt_mask  :1;
+    uint64_t    reserved    :39;
+    uint64_t    destination_field   :8;
+    };
+    uint64_t raw;
+} __attribute__((packed)) io_apic_redirect_entry_t;
+
+
 /*
     APIC Timer and PIT constants
 
@@ -153,9 +171,7 @@ void disable_pic_legacy();
 uint64_t get_local_apic_pa();
 int apic_init();
 void apic_calibrate_timer();
-void set_io_apic_redirect(io_apic* ioapic, uint32_t irq_num, uint32_t entry1_write, uint32_t entry2_write);
+bool set_io_apic_redirect(io_apic* ioapic, uint32_t irq_num, uint32_t entry1_write, uint32_t entry2_write);
 bool get_io_apic_redirect(io_apic* ioapic, uint32_t irq_num, uint32_t* entry1_out, uint32_t* entry2_out);
 
-
-
-
+void set_irq_override(uint8_t irq_type, uint8_t redirect_table_pos, uint8_t idt_entry, uint8_t destination_field, uint32_t flags, bool masked, io_apic_int_src_override *src_overr);

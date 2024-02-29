@@ -5,6 +5,7 @@
 #include <string.h>
 #include <panic.h>
 #include <linked_list.h>
+#include <paging.h>
 
 
 extern KernelSettings global_Settings;
@@ -134,7 +135,7 @@ void parse_multiboot_mmap_entries(struct multiboot_tag_mmap* mm_tag)
     page_bitmap_whiteout(); // before we free any pages set all bit entries to 1
     while(curr_size < mm_tag->size)
     {
-        //log_mmap_entry(entry);
+        log_mmap_entry(entry);
         if (entry->type == MULTIBOOT_MEMORY_AVAILABLE)
         {
             free_hugeframe_range(entry->addr, entry->addr+entry->len);
@@ -148,13 +149,88 @@ void parse_multiboot_mmap_entries(struct multiboot_tag_mmap* mm_tag)
 
 
 
+/*
+    Returns the physical address of the requested frame on success,
 
+    Upon failure return UINT64_MAX
+*/
 uint64_t physical_frame_request()
 {
     if (global_Settings.PMM.free_framecount == 0)
-        return -1;
-    return -1;
+        return UINT64_MAX; // -1
+    
+    for (uint32_t i = 0; i < 512; i++)
+    {
+        // 64 bits per 8 bytes
+        for (uint32_t j = 0; j < 64; j++)
+        {
+            if (global_Settings.PMM.PhysicalPageBitmap[i] & (1 << j))
+            {
+                // each uint64_t has 64 bits each accounting for 2mb each
+                return (i*64*(HUGEPGSIZE))+(j*HUGEPGSIZE);
+            }
+        }
+    }
+    return UINT64_MAX;
 }
+
+
+/*
+    Since we reserve of our page tables at compile time, 
+*/
+uint32_t find_proper_pdt_table(uint64_t pa)
+{
+    // each pdt has (512 entries/pdt) * (2mb/entry) = 1GB/pdt
+    // Math formula is to just round down
+    uint32_t table_selector = (pa - (pa%(1*1024*1024*1024)))/(1*1024*1024*1024);
+    return table_selector;
+}
+
+
+/*
+    This function will map a virtual address(va) to a corresponding physical address(pa) inside of the
+    kernel page tables
+
+    You should only pass in return values from physical_frame_request() in for pa - this can be bypassed at some points during setup
+    for example when we already know the physical address of the IOAPIC 
+
+    Currently set up for huge pages
+*/
+bool map_kernel_page(uint64_t va, uint64_t pa)
+{
+    uint64_t pml4t_index =  (va >> 39) & 0x1FF; 
+	uint64_t pdpt_index =   (va >> 30) & 0x1FF; 
+	uint64_t pdt_index =    (va >> 21) & 0x1FF; 
+
+
+    uint32_t proper_pdt_table = find_proper_pdt_table(pa);
+
+    // table physical addresses
+    uint64_t* pml4t_addr = ((uint64_t*)((uint64_t)global_Settings.pml4t_kernel & ~KERNEL_HH_START));
+	uint64_t* pdpt_addr = ((uint64_t*)((uint64_t)global_Settings.pdpt_kernel & ~KERNEL_HH_START));
+	uint64_t* pdt_addr = (uint64_t*)((uint64_t)global_Settings.pdt_kernel[proper_pdt_table] & ~KERNEL_HH_START);
+
+    // access via virtual addresses
+    global_Settings.pml4t_kernel[pml4t_index] = ((uint64_t)pdpt_addr) | (PAGE_PRESENT | PAGE_WRITE);
+	global_Settings.pdpt_kernel[pdpt_index] = ((uint64_t)pdt_addr) | (PAGE_PRESENT | PAGE_WRITE); 
+    global_Settings.pdt_kernel[proper_pdt_table][pdt_index] = pa | (PAGE_PRESENT | PAGE_WRITE | PAGE_HUGE);
+}
+
+
+
+
+/*
+    For kalloc we want to be able to just request memory and it give it to us.
+
+    We want to keep the kernel in the top 2gb or so, and we need a way to keep track of this before we can do it 
+*/
+uint64_t kalloc()
+{
+    
+}
+
+
+
 
 
 
@@ -169,23 +245,22 @@ bool is_frame_mapped_hugepages(uint64_t virtual_address, uint64_t* pml4t_addr)
     uint64_t pml4t_index = (virtual_address >> 39) & 0x1FF; 
 	uint64_t pdpt_index = (virtual_address >> 30) & 0x1FF; 
 	uint64_t pdt_index = (virtual_address >> 21) & 0x1FF; 
-    uint64_t* pdpt = (uint64_t*)(pml4t_addr[pml4t_index] & PTADDRMASK); 
+    uint64_t* pdpt = (uint64_t*)((pml4t_addr[pml4t_index] & PTADDRMASK)); 
 
     if (pdpt == NULL)
     {
-        log_hexval("pdpt address", pdpt);
-        log_to_serial("is_frame_mapped_hugepages() -- > no pdpt entry\n");
         return false;
     }
-
-    uint64_t* pdt = (uint64_t*)(pdpt[pdpt_index] & PTADDRMASK);
+    pdpt = (uint64_t*)((char*)&*global_Settings.pdpt_kernel);
+    uint64_t* pdt = (uint64_t*)((pdpt[pdpt_index] & PTADDRMASK));
     if (pdt == NULL)
     {
-        log_hexval("pdt address", pdt);
-        log_to_serial("is_frame_mapped_hugepages() -- > no pdt entry\n");
         return false;
     }
-        
+    pdt = (uint64_t*)((char*)pdt + KERNEL_HH_START);
+    
+    if (pdt[pdt_index] == NULL)
+        return false;
     return true;
 }
 

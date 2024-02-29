@@ -21,7 +21,8 @@ extern uint64_t pml4t[512] __attribute__((aligned(0x1000)));
 extern uint64_t pdpt[512] __attribute__((aligned(0x1000)));
 extern uint64_t pdt[512] __attribute__((aligned(0x1000)));
 
-uint64_t hh_pdt[512] __attribute__((aligned(0x1000)));
+
+
 
 
 extern uint64_t global_gdt_ptr_high;
@@ -66,14 +67,14 @@ void __higherhalf_stubentry(uint64_t ptr_multiboot_info)
 	*/
 	uint64_t* pml4t_addr = ((uint64_t*)((uint64_t)&pml4t & ~KERNEL_HH_START));
 	uint64_t* pdpt_addr = ((uint64_t*)((uint64_t)&pdpt & ~KERNEL_HH_START));
-	uint64_t* pdt_addr = (uint64_t*)((uint64_t)&hh_pdt & ~KERNEL_HH_START);
+	uint64_t* pdt_addr = (uint64_t*)((uint64_t)global_Settings.pdt_kernel[0] & ~KERNEL_HH_START);
 
 	pml4t_addr[pml4t_index] = ((uint64_t)pdpt_addr) | (PAGE_PRESENT | PAGE_WRITE);
 	pml4t_addr[510] = ((uint64_t)pml4t_addr) | (PAGE_PRESENT | PAGE_WRITE);
 	pdpt_addr[pdpt_index] = ((uint64_t)pdt_addr) | (PAGE_PRESENT | PAGE_WRITE); 
 
 
-	uint64_t pg_size = (2 * 1024 * 1024);
+	uint64_t pg_size = HUGEPGSIZE;
 	for (unsigned int i = 0; i < 512; i++)
 	{
 		pdt_addr[i] = ((i*pg_size)) | (PAGE_PRESENT | PAGE_WRITE | PAGE_HUGE);
@@ -133,7 +134,7 @@ void higher_half_entry(uint64_t ptr_multiboot_info)
 	*/
 	__asm__ __volatile__(
 		"xor %%rax, %%rax\n\t"
-		//"mov %%eax, (%0)\n\t"
+		"mov %%eax, (%0)\n\t"
 		"mov %%cr3, %%rax\n\t"
         "mov %%rax, %%cr3\n\t"
 		"cpuid"			
@@ -197,8 +198,9 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	// Linker symbols have addresses only
 	global_Settings.PMM.kernel_loadaddr = &KERNEL_START;
 	global_Settings.PMM.kernel_phystop = &KERNEL_END;
+	global_Settings.pml4t_kernel = &pml4t;
+	global_Settings.pdpt_kernel = &pdpt;
 
-	
 
 	bool useExtendedRSDP = false;
 	MADT* madt_header = NULL;
@@ -214,21 +216,16 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	}
 	global_Settings.SystemDescriptorPointer = rsdp;
 
-	if (parse_multiboot_memorymap(ptr_multiboot_info))
+	if (!parse_multiboot_memorymap(ptr_multiboot_info))
 	{
-
-		log_to_serial("MADE IT!");
-		while(1);
+		panic("Error parsing multiboot memory map.\n");
 	}
 
-
-	while(1);
-	
 	if (!(madt_header = retrieveMADT(useExtendedRSDP, rsdp)))
 	{
-		log_to_serial("MADT not found!\n");
+		panic("MADT not found!\n");
 	}
-
+	log_to_serial("searching ioapic\n");
 	if (!(io_apic_madt = (io_apic*)madt_get_item(madt_header, MADT_ITEM_IO_APIC, 0)))
 	{
 		log_to_serial("Could not find IOAPIC entry in MADT.\n");
@@ -236,6 +233,7 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	global_Settings.pIoApic = io_apic_madt;
 
 	int i = 0;
+	
 	while ((int_src_override = (io_apic_int_src_override*)madt_get_item(madt_header, MADT_ITEM_IO_APIC_SRCOVERRIDE, i)))
 	{
 		log_to_serial("Global System Interrupt: ");
@@ -245,12 +243,8 @@ void kernel_main(uint64_t ptr_multiboot_info)
 		log_to_serial("\n");
 		if (int_src_override->global_sys_int == 2)
 		{
-			uint32_t read_low = 0;
-			uint32_t read_high = 0;
-			if (!get_io_apic_redirect(global_Settings.pIoApic, int_src_override->global_sys_int, &read_low, &read_high))
-			{
-				log_to_serial("Could not read ioapic redirect entry!\n");
-			}
+			set_irq_override(0x02, 0x02, 0x22, 0, 0, false, int_src_override);
+
 		}
 
 		i++;
@@ -274,14 +268,11 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	apic_init();
 	log_to_serial("APIC init!\n");
 	sti();
-
-	//int x = 45 / 0;
+	
+	
 
 	apic_calibrate_timer();
 	
-	
-	//uint64_t apic_pa = get_local_apic_pa();
-
 	// test page fault exception
 
 

@@ -16,4 +16,7 @@ typedef struct KernelSettings
     void* SystemDescriptorPointer;
     struct io_apic* pIoApic;
     PhysicalMemoryManager PMM;
+    uint64_t* pml4t_kernel;
+    uint64_t* pdpt_kernel;
+    uint64_t pdt_kernel[512][512]__attribute__((aligned(0x1000)));
 } KernelSettings;

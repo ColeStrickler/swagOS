@@ -50,3 +50,7 @@ bool parse_multiboot_memorymap(uint64_t addr);
 
 void free_frame_range(uint64_t start, uint64_t end);
 bool retrieve_multiboot_mem_basicinfo(uint64_t addr);
+
+bool map_kernel_page(uint64_t va, uint64_t pa);
+
+bool is_frame_mapped_hugepages(uint64_t virtual_address, uint64_t *pml4t_addr);

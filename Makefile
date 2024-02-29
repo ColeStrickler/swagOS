@@ -88,7 +88,7 @@ qemu: clean myos.iso
 	qemu-system-x86_64 -enable-kvm -cpu host -serial file:out.log -m 8G -cdrom myos.iso
 
 debug: clean myos.iso
-	qemu-system-x86_64 -enable-kvm -cpu host -s -S -serial file:out.log -m 4G -cdrom myos.iso
+	qemu-system-x86_64 -enable-kvm -cpu host -s -S -serial file:out.log -m 8G -cdrom myos.iso
 
 clean:
 	# beginning line with a hyphen tells make to ignore errors

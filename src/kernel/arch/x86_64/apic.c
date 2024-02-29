@@ -55,8 +55,6 @@ int apic_init()
         apic_msr_lo |= IA32_APIC_BASE_MSR_X2ENABLE;
         cpuSetMSR(IA32_APIC_BASE_MSR, apic_msr_lo, apic_msr_hi);
         apic_write_reg(APIC_REG_SPURIOUS_INT,  IDT_APIC_SPURIOUS_INT | APIC_SOFTWARE_ENABLE, 0);
-        //disable_pic_legacy();
-        //io_wait();
         log_to_serial("Proceeding with X2APIC.\n");
     }
     else if (apic_available)    // add support for regular APIC later
@@ -112,10 +110,9 @@ void init_pic_legacy(int offset1, int offset2)
 	io_wait();
  
     // unmask all interrupts
-    outb(PIC1_DATA, 0x0);
-    outb(PIC2_DATA, 0x0);
 
-	//disable_pic_legacy();   // mask all interrupts
+
+	disable_pic_legacy();   // mask all interrupts
 }
 
 
@@ -217,14 +214,16 @@ void apic_calibrate_timer() {
     apic_write_reg(APIC_REG_TIMER_LVT, APIC_LVT_INT_MASKED, 0x00);
     // Now we know how often the APIC timer has ticked in 10ms
     uint32_t ticksIn10ms = (uint32_t)0xFFFFFFFF - (uint32_t)apic_read_reg(APIC_REG_TIMER_CURRCNT);
-    log_to_serial("calibration done!\n");
-    // Start timer as periodic on IRQ 0, divider 16, with the number of ticks we counted
-    
-    apic_write_reg(APIC_REG_TIMER_DIV, 0x3, 0x00);
-    apic_write_reg(APIC_REG_TIMER_INITCNT, ticksIn10ms, 0x00);
-    apic_write_reg(APIC_REG_TIMER_LVT, 32 | APIC_LVT_TIMER_MODE_PERIODIC, 0x00);
-    global_Settings.bTimerCalibrated = true;
     disable_pic_legacy();
+    log_to_serial("calibration done!\n");
+    
+    // Start timer as periodic on IRQ 0, divider 16, with the number of ticks we counted
+    apic_write_reg(APIC_REG_TIMER_DIV, 0x3, 0x00);
+    apic_write_reg(APIC_REG_TIMER_LVT, 32 | APIC_LVT_TIMER_MODE_PERIODIC, 0x00);
+    apic_write_reg(APIC_REG_TIMER_INITCNT, ticksIn10ms, 0x00);
+   
+    global_Settings.bTimerCalibrated = true;
+    
 }
 
 
@@ -236,7 +235,11 @@ static uint64_t dm_ioapic_address(io_apic* ioapic)
     if (!ioapic)
         return 0x0;
     log_int_to_serial(ioapic->io_apic_address);
-    return ioapic->io_apic_address + KERNEL_HH_START;
+    if (!is_frame_mapped_hugepages(ioapic->io_apic_address, global_Settings.pml4t_kernel))
+    {
+        map_kernel_page(HUGEPGROUNDDOWN(ioapic->io_apic_address), HUGEPGROUNDDOWN(ioapic->io_apic_address));
+    }
+    return ioapic->io_apic_address;
 }
 
 
@@ -276,7 +279,7 @@ bool io_apic_read(io_apic* ioapic, uint8_t offset, uint32_t* read_out)
     (Entry Type 2: I/O APIC Interrupt Source Override)->global_sys_interrupt from the MADT
 
 */
-void set_io_apic_redirect(io_apic* ioapic, uint32_t irq_num, uint32_t entry1_write, uint32_t entry2_write)
+bool set_io_apic_redirect(io_apic* ioapic, uint32_t irq_num, uint32_t entry1_write, uint32_t entry2_write)
 {
    
     // redirect_entry1 contains the low order bits
@@ -307,4 +310,32 @@ bool get_io_apic_redirect(io_apic* ioapic, uint32_t irq_num, uint32_t* entry1_ou
     if (!io_apic_read(ioapic, redirect_entry2, entry2_out))
         return false;
     return true;
+}
+
+
+
+// irq type is the going to be zero
+void set_irq_override(uint8_t irq_type, uint8_t redirect_table_pos, uint8_t idt_entry, uint8_t destination_field, uint32_t flags, bool masked, io_apic_int_src_override* src_overr) {
+
+    // masked: if true the redirection table entry is set, but the IRQ is not enabled.
+    // 1. Check if irq_type is in the Source overrides
+    uint8_t selected_pin = src_overr->global_sys_int;
+    io_apic_redirect_entry_t entry;
+    entry.raw = flags | (idt_entry & 0xFF);
+    // https://wiki.osdev.org/MADT
+    if ((src_overr->flags & 0b11) == 2)
+        entry.pin_polarity = 0b1;
+    else
+        entry.pin_polarity = 0b0;
+
+    if (((src_overr->flags >> 2) & 0b11) == 2)
+        entry.pin_polarity = 0b1;
+    else
+        entry.pin_polarity = 0b0;
+
+    entry.destination_field = destination_field;
+    entry.interrupt_mask = masked;
+
+    set_io_apic_redirect(global_Settings.pIoApic, redirect_table_pos, (uint32_t)entry.raw, (uint32_t)((uint64_t)entry.raw >> 32));
+
 }
