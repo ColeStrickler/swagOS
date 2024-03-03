@@ -93,7 +93,7 @@ typedef struct trapframe64_t
 void lidt();
 void build_IDT(void);
 
-
+void idt_setup();
 
 /*
     External declarations of our ISRs

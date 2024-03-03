@@ -149,6 +149,13 @@ void build_IDT(void)
 }
 
 
+void idt_setup()
+{
+    build_IDT();
+    lidt();
+}
+
+
 
 trapframe64_t* isr_handler(trapframe64_t* tf)
 {
@@ -170,14 +177,14 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
             
             if (!global_Settings.bTimerCalibrated)
             {
-                log_to_serial("timer interrupt.\n");
+                //log_to_serial("timer interrupt.\n");
                 global_Settings.tickCount++;
                 outb(0x20,0x20); outb(0xa0,0x20);
                 apic_end_of_interrupt();
             }
             else
             {
-                log_to_serial("apic interrupt.\n");
+                //log_to_serial("apic interrupt.\n");
                 apic_end_of_interrupt();
             }
             

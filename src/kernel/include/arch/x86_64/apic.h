@@ -171,7 +171,8 @@ void disable_pic_legacy();
 uint64_t get_local_apic_pa();
 int apic_init();
 void apic_calibrate_timer();
-bool set_io_apic_redirect(io_apic* ioapic, uint32_t irq_num, uint32_t entry1_write, uint32_t entry2_write);
+void apic_setup();
+bool set_io_apic_redirect(io_apic *ioapic, uint32_t irq_num, uint32_t entry1_write, uint32_t entry2_write);
 bool get_io_apic_redirect(io_apic* ioapic, uint32_t irq_num, uint32_t* entry1_out, uint32_t* entry2_out);
 
 void set_irq_override(uint8_t irq_type, uint8_t redirect_table_pos, uint8_t idt_entry, uint8_t destination_field, uint32_t flags, bool masked, io_apic_int_src_override *src_overr);

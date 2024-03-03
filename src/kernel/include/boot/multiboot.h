@@ -419,3 +419,7 @@ struct multiboot_tag_load_base_addr
 #endif /*  ! ASM_FILE */
 
 #endif /*  ! MULTIBOOT_HEADER */
+
+struct RSDP_t *multiboot_retrieve_rsdp(uint64_t addr, bool *extended_rsdp);
+
+void parse_multiboot_info(uint64_t ptr_multiboot_info);

@@ -132,10 +132,11 @@ uint64_t apic_read_reg(uint32_t reg_offset)
 {
     if (global_Settings.settings_x8664.use_x2_apic)
     {
+        log_to_serial("apic_read_reg()\n");
         uint32_t eax, edx;
         // we tinker with the offset so we can use the same values for both DMA in APIC and MSR access in X2APIC
         cpuGetMSR((reg_offset >> 4) + 0x800, &eax, &edx);
-        return ((edx << 32) & eax);
+        return ((edx << 32) | eax);
     }
     else
     {
@@ -190,51 +191,17 @@ void pit_perform_sleep(uint32_t milliseconds)
 }
 
 
-/*
-    https://wiki.osdev.org/APIC_timer#Prerequisites
 
 
-    This method calibrates the APIC Timer to go off every 10ms
-*/
-void apic_calibrate_timer() {
-
-    // stop the APIC to begin the calibration
-    apic_write_reg(APIC_REG_TIMER_INITCNT, 0x00, 0x00);
-    // Tell APIC timer to use divider 16
-    apic_write_reg(APIC_REG_TIMER_DIV, 0x3, 0x00);
-
-    // Set APIC init counter to -1
-    apic_write_reg(APIC_REG_TIMER_INITCNT, 0xFFFFFFFF, 0);
-
-    log_to_serial("sleeping for 10ms\n");
-    // Perform PIT-supported sleep for 10ms
-    pit_perform_sleep(10);
-
-    // Stop the APIC timer
-    apic_write_reg(APIC_REG_TIMER_LVT, APIC_LVT_INT_MASKED, 0x00);
-    // Now we know how often the APIC timer has ticked in 10ms
-    uint32_t ticksIn10ms = (uint32_t)0xFFFFFFFF - (uint32_t)apic_read_reg(APIC_REG_TIMER_CURRCNT);
-    disable_pic_legacy();
-    log_to_serial("calibration done!\n");
-    
-    // Start timer as periodic on IRQ 0, divider 16, with the number of ticks we counted
-    apic_write_reg(APIC_REG_TIMER_DIV, 0x3, 0x00);
-    apic_write_reg(APIC_REG_TIMER_LVT, 32 | APIC_LVT_TIMER_MODE_PERIODIC, 0x00);
-    apic_write_reg(APIC_REG_TIMER_INITCNT, ticksIn10ms, 0x00);
-   
-    global_Settings.bTimerCalibrated = true;
-    
-}
-
-
-/*
-    helper function, once we 
-*/
 static uint64_t dm_ioapic_address(io_apic* ioapic)
 {
     if (!ioapic)
         return 0x0;
     log_int_to_serial(ioapic->io_apic_address);
+
+    /*
+        For these direct mapped devices we will just direct map their addresses into the kernel page table
+    */
     if (!is_frame_mapped_hugepages(ioapic->io_apic_address, global_Settings.pml4t_kernel))
     {
         map_kernel_page(HUGEPGROUNDDOWN(ioapic->io_apic_address), HUGEPGROUNDDOWN(ioapic->io_apic_address));
@@ -337,5 +304,58 @@ void set_irq_override(uint8_t irq_type, uint8_t redirect_table_pos, uint8_t idt_
     entry.interrupt_mask = masked;
 
     set_io_apic_redirect(global_Settings.pIoApic, redirect_table_pos, (uint32_t)entry.raw, (uint32_t)((uint64_t)entry.raw >> 32));
+}
 
+
+
+void set_irq_mask(uint8_t redirect_table_pos, bool masked)
+{
+    io_apic_redirect_entry_t entry;;
+    get_io_apic_redirect(global_Settings.pIoApic, redirect_table_pos, (uint32_t*)&entry, (uint32_t*)((char*)&entry + sizeof(uint32_t)));
+    entry.interrupt_mask = masked;
+    set_io_apic_redirect(global_Settings.pIoApic, redirect_table_pos, (uint32_t)entry.raw, (uint32_t)((uint64_t)entry.raw >> 32));
+}
+
+/*
+    https://wiki.osdev.org/APIC_timer#Prerequisites
+
+
+    This method calibrates the APIC Timer to go off every 10ms
+*/
+void apic_calibrate_timer() {
+
+    // stop the APIC to begin the calibration
+    apic_write_reg(APIC_REG_TIMER_INITCNT, 0x00, 0x00);
+    // Tell APIC timer to use divider 16
+    apic_write_reg(APIC_REG_TIMER_DIV, 0x3, 0x00);
+
+    // Set APIC init counter to -1
+    apic_write_reg(APIC_REG_TIMER_INITCNT, 0xFFFFFFFF, 0);
+
+    log_to_serial("sleeping for 10ms\n");
+    set_irq_mask(0x2, false);
+    // Perform PIT-supported sleep for 10ms
+    pit_perform_sleep(10);
+
+    // Stop the APIC timer
+    apic_write_reg(APIC_REG_TIMER_LVT, APIC_LVT_INT_MASKED, 0x00);
+    // Now we know how often the APIC timer has ticked in 10ms
+    uint32_t ticksIn10ms = (uint32_t)0xFFFFFFFF - (uint32_t)apic_read_reg(APIC_REG_TIMER_CURRCNT);
+    set_irq_mask(0x2, true);
+    log_to_serial("calibration done!\n");
+    
+    // Start timer as periodic on IRQ 0, divider 16, with the number of ticks we counted
+    apic_write_reg(APIC_REG_TIMER_DIV, 0x3, 0x00);
+    apic_write_reg(APIC_REG_TIMER_LVT, 32 | APIC_LVT_TIMER_MODE_PERIODIC, 0x00);
+    
+    apic_write_reg(APIC_REG_TIMER_INITCNT, ticksIn10ms, 0x00);
+    global_Settings.bTimerCalibrated = true;
+}
+
+
+void apic_setup()
+{
+    apic_init();
+	sti();
+	apic_calibrate_timer();
 }

@@ -41,6 +41,9 @@ MADT* retrieveMADT(bool use_xsdt, void* sdp)
     log_hexval("rsdt", rsdt);
     if (a1 > 0x40000000 || a2 > 0x40000000)
     {
+        /*
+            We will just direct map these frames into the kernel since they are reserved memory anyways
+        */
         if (use_xsdt)
             map_kernel_page(HUGEPGROUNDDOWN((uint64_t)xsdt), HUGEPGROUNDDOWN((uint64_t)xsdt));
         else
@@ -51,14 +54,9 @@ MADT* retrieveMADT(bool use_xsdt, void* sdp)
     {
         panic("not mapped");
     }
-    log_hexval("test working map", &rsdt->sdtHeader.Checksum);
-    log_to_serial("preparing test");
-    
-    log_hexval("test working map", rsdt->sdtHeader.Checksum);
-     
+   
     ACPISDTHeader* madt;
     size_t number_of_items = use_xsdt ? (xsdt->sdtHeader.Length - sizeof(ACPISDTHeader)) / 8 : (rsdt->sdtHeader.Length - sizeof(ACPISDTHeader)) / 4;
-   log_to_serial("Here!\n");
     if (use_xsdt && !doSDTChecksum((ACPISDTHeader*)xsdt))
     {
         log_to_serial("Could not validate xsdt checksum!\n");
@@ -74,6 +72,10 @@ MADT* retrieveMADT(bool use_xsdt, void* sdp)
     {
         log_hex_to_serial(i);
         madt = (ACPISDTHeader*)(use_xsdt ? xsdt->sdtAddresses[i] : (uint64_t)rsdt->sdtAddresses[i]);
+
+        /*
+            We will just direct map these frames into the kernel since they are reserved memory anyways
+        */
         if (!is_frame_mapped_hugepages(PGROUNDDOWN((uint64_t)madt), pml4t))
         {
             map_kernel_page(PGROUNDDOWN((uint64_t)madt), PGROUNDDOWN((uint64_t)madt));
@@ -99,15 +101,6 @@ MADT_ITEM* madt_get_item(MADT* madt, uint32_t item_type, uint32_t item_index)
     {
         if (item->type == item_type)
         {
-            /*
-            log_to_serial("Item->type: ");
-            log_int_to_serial(item->type);
-            log_to_serial(" item index: ");
-            log_int_to_serial((int)item_index);
-            log_to_serial(" curr index: ");
-            log_int_to_serial((int)curr_index);
-            log_to_serial("\n");
-            */
             if (item_index == curr_index)
                 return item;
             curr_index++;
