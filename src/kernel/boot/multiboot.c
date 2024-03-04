@@ -34,6 +34,29 @@ RSDP_t* multiboot_retrieve_rsdp(uint64_t addr, bool* extended_rsdp)
 }
 
 
+bool muiltiboot_retrieve_framebuffer(uint64_t addr)
+{	
+	if ((uint64_t)addr & 7)
+	{
+		log_to_serial("unaligned multiboot info.\n");
+		return (void*)0x0;
+	}
+
+	struct multiboot_tag *tag;
+	unsigned* size = *(unsigned *) addr;
+	for (tag = (struct multiboot_tag *) (addr + 8); tag->type != MULTIBOOT_TAG_TYPE_END; tag = (struct multiboot_tag *) ((multiboot_uint8_t *) tag + ((tag->size + 7) & ~7)))
+	{
+		if (tag->type == MULTIBOOT_TAG_TYPE_FRAMEBUFFER)
+		{
+			global_Settings.framebuffer = (struct multiboot_tag_framebuffer*)tag;
+			return true;
+		}
+	}
+	return false;
+}
+
+
+
 
 
 
@@ -52,6 +75,11 @@ void parse_multiboot_info(uint64_t ptr_multiboot_info)
 		log_to_serial("Bad RSDP checksum.\n");
 	}
 	global_Settings.SystemDescriptorPointer = rsdp;
+
+	if (!muiltiboot_retrieve_framebuffer(ptr_multiboot_info))
+	{
+		panic("parse_multiboot_info() --> could not retrieve framebuffer.\n");
+	}
 
 	if (!parse_multiboot_memorymap(ptr_multiboot_info))
 	{
@@ -73,11 +101,9 @@ void parse_multiboot_info(uint64_t ptr_multiboot_info)
 	
 	while ((int_src_override = (io_apic_int_src_override*)madt_get_item(madt_header, MADT_ITEM_IO_APIC_SRCOVERRIDE, i)))
 	{
-		if (int_src_override->global_sys_int == 2)
-		{
-			set_irq_override(0x02, 0x02, 0x22, 0, 0, true, int_src_override);
-		}
-
+		uint32_t count = global_Settings.settings_x8664.interrupt_override_count;
+		global_Settings.settings_x8664.interrupt_overrides[int_src_override->global_sys_int] = int_src_override;
+		global_Settings.settings_x8664.interrupt_override_count++;
 		i++;
 	}
 }

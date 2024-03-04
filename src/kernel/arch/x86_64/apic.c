@@ -282,24 +282,31 @@ bool get_io_apic_redirect(io_apic* ioapic, uint32_t irq_num, uint32_t* entry1_ou
 
 
 // irq type is the going to be zero
-void set_irq_override(uint8_t irq_type, uint8_t redirect_table_pos, uint8_t idt_entry, uint8_t destination_field, uint32_t flags, bool masked, io_apic_int_src_override* src_overr) {
+void set_irq(uint8_t irq_type, uint8_t redirect_table_pos, uint8_t idt_entry, uint8_t destination_field, uint32_t flags, bool masked) {
 
     // masked: if true the redirection table entry is set, but the IRQ is not enabled.
     // 1. Check if irq_type is in the Source overrides
-    uint8_t selected_pin = src_overr->global_sys_int;
+    
     io_apic_redirect_entry_t entry;
     entry.raw = flags | (idt_entry & 0xFF);
     // https://wiki.osdev.org/MADT
-    if ((src_overr->flags & 0b11) == 2)
-        entry.pin_polarity = 0b1;
-    else
-        entry.pin_polarity = 0b0;
 
-    if (((src_overr->flags >> 2) & 0b11) == 2)
-        entry.pin_polarity = 0b1;
-    else
-        entry.pin_polarity = 0b0;
+    if (global_Settings.settings_x8664.interrupt_overrides[irq_type] != NULL)
+    {
+        
+        io_apic_int_src_override* src_overr = global_Settings.settings_x8664.interrupt_overrides[irq_type];
+        uint8_t selected_pin = src_overr->global_sys_int;
+        if ((src_overr->flags & 0b11) == 2)
+            entry.pin_polarity = 0b1;
+        else
+            entry.pin_polarity = 0b0;
 
+        if (((src_overr->flags >> 2) & 0b11) == 2)
+            entry.pin_polarity = 0b1;
+        else
+            entry.pin_polarity = 0b0;
+    }
+    
     entry.destination_field = destination_field;
     entry.interrupt_mask = masked;
 

@@ -12,6 +12,8 @@
 #include <multiboot.h>
 #include <acpi.h>
 #include <panic.h>
+#include <ps2_keyboard.h>
+#include <video.h>
 /*
 	These global variables are created in boot.asm
 */
@@ -176,6 +178,8 @@ void setup_global_data()
 */
 
 
+
+
 void kernel_main(uint64_t ptr_multiboot_info)
 {
 	log_to_serial("[kernel_main()]: Entered.\n");
@@ -184,7 +188,18 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	setup_global_data();
 	parse_multiboot_info(ptr_multiboot_info);
 	idt_setup();
+	set_irq(0x02, 0x02, 0x22, 0, 0, true);
 	apic_setup();
+	keyboard_driver_init();
+	
+	
+	video_init();
+
+	set_pixel(0,0, 0x7800);
+
+
+	//set_pixel(0, 0, 100, 100, 100);
+	
 	
 	
 	// test page fault exception

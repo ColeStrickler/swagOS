@@ -3,6 +3,8 @@
 #include <serial.h>
 #include <apic.h>
 #include <kernel.h>
+#include <panic.h>
+#include <ps2_keyboard.h>
 
 extern KernelSettings global_Settings;
 
@@ -144,8 +146,8 @@ void build_IDT(void)
     SetIDT_Descriptor(30, (uint64_t)isr_30, false, false);
     SetIDT_Descriptor(31, (uint64_t)isr_31, false, false);
     SetIDT_Descriptor(32, (uint64_t)isr_32, false, false);
-    SetIDT_Descriptor(33, (uint64_t)isr_32, false, false);
-    SetIDT_Descriptor(34, (uint64_t)isr_32, false, false);
+    SetIDT_Descriptor(33, (uint64_t)isr_33, false, false);
+    SetIDT_Descriptor(34, (uint64_t)isr_34, false, false);
 }
 
 
@@ -157,9 +159,9 @@ void idt_setup()
 
 
 
+
 trapframe64_t* isr_handler(trapframe64_t* tf)
 {
-    log_to_serial("isr_handler()\n");
     switch(tf->isr_id)
     {
         case 13:
@@ -176,20 +178,23 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         {
             
             if (!global_Settings.bTimerCalibrated)
-            {
-                //log_to_serial("timer interrupt.\n");
-                global_Settings.tickCount++;
-                outb(0x20,0x20); outb(0xa0,0x20);
-                apic_end_of_interrupt();
-            }
-            else
-            {
-                //log_to_serial("apic interrupt.\n");
-                apic_end_of_interrupt();
-            }
-            
-            // abstract to end_of_interrupt();
+                panic("isr_handler() --> APIC TIMER INTERRUPT BEFORE CALIBRATION.\n");
+                
 
+            apic_end_of_interrupt();
+            break;
+        }
+        case IDT_KEYBOARD_INT:
+        {
+            keyboard_irq_handler();
+            apic_end_of_interrupt();
+            break;
+        }
+        case IDT_PIT_INT:
+        {
+            global_Settings.tickCount++;
+            outb(0x20,0x20); outb(0xa0,0x20);
+            apic_end_of_interrupt();
             break;
         }
         case IDT_APIC_SPURIOUS_INT:
@@ -201,7 +206,7 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         {
             if (tf->isr_id < 32)
                 log_to_serial((char*)exception_names[tf->isr_id]);
-            log_to_serial("\nExperienced unexpected interrupt.\n");
+            log_hexval("\nExperienced unexpected interrupt.", tf->isr_id);
             __asm__ __volatile__ ("hlt");
         }
     }

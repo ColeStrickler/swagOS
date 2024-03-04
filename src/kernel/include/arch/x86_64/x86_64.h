@@ -1,9 +1,17 @@
+
+#ifndef X8664
+#define X8664
+#include <apic.h>
 /*
     Global settings for x86-64
 */
+#define MAX_INTERRUPT_OVERRIDE_COUNT 32
+
 typedef struct x8664_Settings
 {
     bool use_x2_apic;
+    uint32_t interrupt_override_count;
+    io_apic_int_src_override* interrupt_overrides[MAX_INTERRUPT_OVERRIDE_COUNT];
 } x8664_Settings;
 
 
@@ -47,3 +55,5 @@ typedef struct x8664_Settings
 #define IA32_APIC_BASE_MSR_X2ENABLE     1 << 10 // enable X2APIC
 #define IA32_APIC_BASE_MSR_ENABLE       1 << 11 
 #define IA32_APIC_BASE_ADDRESS          0xFFFFFFFFFF000ULL
+
+#endif

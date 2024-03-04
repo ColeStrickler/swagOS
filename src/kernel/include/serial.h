@@ -7,4 +7,5 @@ void log_to_serial (char *string);
 void outb(int portnum, unsigned char data);
 void log_int_to_serial(uint64_t num);
 void log_hex_to_serial(uint64_t num);
-void log_hexval(char* label, uint64_t hexval);
+void log_char_to_serial(char c);
+void log_hexval(char *label, uint64_t hexval);

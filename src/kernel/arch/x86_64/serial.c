@@ -104,6 +104,12 @@ void log_hex_to_serial(uint64_t num)
 }
 
 
+void log_char_to_serial(char c)
+{
+  outb(PORT_COM1, c);
+}
+
+
 void log_to_serial (char *string) {
     int i = 0;
     while(string[i])

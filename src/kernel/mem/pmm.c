@@ -195,6 +195,8 @@ uint32_t find_proper_pdt_table(uint64_t pa)
     for example when we already know the physical address of the IOAPIC 
 
     Currently set up for huge pages
+
+    NOTE: this function does not alter the available page bitmap and should not be used to map MULTIBOOT_MEMORY_AVAILABLE regions
 */
 bool map_kernel_page(uint64_t va, uint64_t pa)
 {
@@ -209,11 +211,15 @@ bool map_kernel_page(uint64_t va, uint64_t pa)
     uint64_t* pml4t_addr = ((uint64_t*)((uint64_t)global_Settings.pml4t_kernel & ~KERNEL_HH_START));
 	uint64_t* pdpt_addr = ((uint64_t*)((uint64_t)global_Settings.pdpt_kernel & ~KERNEL_HH_START));
 	uint64_t* pdt_addr = (uint64_t*)((uint64_t)global_Settings.pdt_kernel[proper_pdt_table] & ~KERNEL_HH_START);
+    log_hexval("pdpt addr", pdpt_addr);
+    log_hexval("pdpt index", pdpt_index);
+    log_hexval("pdt addr", pdt_addr);
 
     // access via virtual addresses
     global_Settings.pml4t_kernel[pml4t_index] = ((uint64_t)pdpt_addr) | (PAGE_PRESENT | PAGE_WRITE);
 	global_Settings.pdpt_kernel[pdpt_index] = ((uint64_t)pdt_addr) | (PAGE_PRESENT | PAGE_WRITE); 
     global_Settings.pdt_kernel[proper_pdt_table][pdt_index] = pa | (PAGE_PRESENT | PAGE_WRITE | PAGE_HUGE);
+    return true;
 }
 
 
@@ -246,21 +252,29 @@ bool is_frame_mapped_hugepages(uint64_t virtual_address, uint64_t* pml4t_addr)
 	uint64_t pdpt_index = (virtual_address >> 30) & 0x1FF; 
 	uint64_t pdt_index = (virtual_address >> 21) & 0x1FF; 
     uint64_t* pdpt = (uint64_t*)((pml4t_addr[pml4t_index] & PTADDRMASK)); 
-
+    log_hexval("is_frame_mapped_hugepages pdpt", pdpt);
+    log_hexval("is_frame_mapped_hugepages pdpt index", pdpt_index);
     if (pdpt == NULL)
     {
+        log_to_serial("pdpt null\n");
         return false;
     }
     pdpt = (uint64_t*)((char*)&*global_Settings.pdpt_kernel);
     uint64_t* pdt = (uint64_t*)((pdpt[pdpt_index] & PTADDRMASK));
+    log_hexval("pdt", pdt);
     if (pdt == NULL)
     {
+        log_to_serial("pdt null\n");
         return false;
     }
     pdt = (uint64_t*)((char*)pdt + KERNEL_HH_START);
     
     if (pdt[pdt_index] == NULL)
+    {
+        log_to_serial("is_frame_mapped_hugepages pdt entry null\n");
         return false;
+    }
+    log_to_serial("is_frame_mapped_hugepages --> return");
     return true;
 }
 

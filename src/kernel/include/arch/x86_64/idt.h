@@ -7,6 +7,8 @@
     Interrupt numbers
 */
 #define IDT_APIC_TIMER_INT    32
+#define IDT_KEYBOARD_INT      33
+#define IDT_PIT_INT           34
 #define IDT_APIC_SPURIOUS_INT 255
 
 
