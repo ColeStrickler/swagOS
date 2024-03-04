@@ -195,8 +195,8 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	
 	video_init();
 
-	set_pixel(0,0, 0x7800);
 
+	clear_screen(0, 0, 0);
 
 	//set_pixel(0, 0, 100, 100, 100);
 	

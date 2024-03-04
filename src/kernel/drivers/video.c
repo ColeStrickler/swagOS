@@ -10,23 +10,21 @@
 extern KernelSettings global_Settings;
 
 
-uint64_t get_pixel_location(int x, int y)
+uint64_t get_pixel_index(int x, int y)
 {
     struct multiboot_tag_framebuffer_common* framebuffer = global_Settings.framebuffer;
-    uint64_t base = framebuffer->framebuffer_addr;
     uint32_t pitch = framebuffer->framebuffer_pitch;
-    uint32_t pixel_width = framebuffer->framebuffer_bpp;
-    log_hexval("bpp", pixel_width);
-    uint64_t *pixel = base + (uint64_t)(y*pitch) + (uint64_t)(x*pixel_width);
-    return pixel;
+    uint32_t pixel_width = framebuffer->framebuffer_bpp/8;
+    uint64_t pixel_index = pitch*y + pixel_width*x;
+    return pixel_index;
 }
 
 
 void set_pixel(int x,int y, int color) {
     struct multiboot_tag_framebuffer_common* framebuffer = global_Settings.framebuffer;
-    unsigned where = x*framebuffer->framebuffer_bpp + y*framebuffer->framebuffer_pitch;
+    struct multiboot_tag_framebuffer* fb = global_Settings.framebuffer;
+    uint64_t where = get_pixel_index(x, y);
     unsigned char* screen = (unsigned char*)framebuffer->framebuffer_addr;
-    log_hexval("Writing pixel to", screen);
     screen[where] = color & 255;              // BLUE
     screen[where + 1] = (color >> 8) & 255;   // GREEN
     screen[where + 2] = (color >> 16) & 255;  // RED
@@ -39,14 +37,14 @@ void clear_screen(uint8_t r, uint8_t g, uint8_t b)
     uint32_t ymax = framebuffer->framebuffer_height;
     uint32_t bpp = framebuffer->framebuffer_bpp;
 
-    for (int y = 0; y < ymax; y += bpp)
+    for (int y = 0; y < ymax; y++)
     {
-        for (int x = 0; x < xmax; x += bpp)
+        for (int x = 0; x < xmax; x++)
         {
-            log_hexval("x", x);
-            log_hexval("y", y);
+            set_pixel(x, y, 0xffff0000);
         }
     }
+    log_to_serial("done clearing");
 }
 
 
@@ -76,17 +74,18 @@ void video_init()
         log_to_serial("\n");
    uint64_t total_framebuffer_size = framebuffer->framebuffer_pitch*framebuffer->framebuffer_height;
    log_hexval("framebuffer addr", framebuffer->framebuffer_addr);
+   uint64_t framebuffer_addr = framebuffer->framebuffer_addr;
    log_hexval("framebuffer size", total_framebuffer_size);
     uint64_t mapped = 0;
     while(mapped < total_framebuffer_size)
     {
-        //log_hexval("mapped", mapped);
-        if (!map_kernel_page(HUGEPGROUNDDOWN(framebuffer->framebuffer_addr + mapped), HUGEPGROUNDDOWN(framebuffer->framebuffer_addr + mapped)))
+        if (!map_kernel_page(HUGEPGROUNDDOWN(framebuffer_addr), HUGEPGROUNDDOWN(framebuffer_addr)))
             panic("video_init() --> map_kernel_page() failure");
-        if (!is_frame_mapped_hugepages(HUGEPGROUNDDOWN(framebuffer->framebuffer_addr + mapped), global_Settings.pml4t_kernel))
+        if (!is_frame_mapped_hugepages(HUGEPGROUNDDOWN(framebuffer_addr), global_Settings.pml4t_kernel))
             panic("video_init() --> is_frame_mapped_hugepages() failure");
         //log_hexval("check", ((char*)HUGEPGROUNDDOWN(framebuffer->framebuffer_addr + mapped))[0]);
         mapped += HUGEPGSIZE;
+        framebuffer_addr += HUGEPGSIZE;
     }
     log_hexval("total mapped", mapped);
     
