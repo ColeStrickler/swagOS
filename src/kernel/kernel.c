@@ -14,6 +14,7 @@
 #include <panic.h>
 #include <ps2_keyboard.h>
 #include <video.h>
+
 /*
 	These global variables are created in boot.asm
 */
@@ -196,8 +197,18 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	video_init();
 
 
-	clear_screen(0, 0, 0);
 
+	clear_screen(0, 0, 0);
+	
+	draw_character(400, 400, RGB_COLOR(0x00, 0xff, 0xff), FONT_BITMAP_LATIN_CAPITAL_LETTER_S);
+	draw_character(416, 400, RGB_COLOR(0x00, 0xff, 0xff), FONT_BITMAP_LATIN_CAPITAL_LETTER_W);
+	draw_character(432, 400, RGB_COLOR(0x00, 0xff, 0xff), FONT_BITMAP_LATIN_CAPITAL_LETTER_A);
+	draw_character(448, 400, RGB_COLOR(0x00, 0xff, 0xff), FONT_BITMAP_LATIN_CAPITAL_LETTER_G);
+	draw_character(464, 400, RGB_COLOR(0x00, 0xff, 0xff), FONT_BITMAP_SPACE);
+	draw_character(480, 400, RGB_COLOR(0x00, 0xff, 0xff), FONT_BITMAP_LATIN_CAPITAL_LETTER_Y);
+	draw_character(496, 400, RGB_COLOR(0x00, 0xff, 0xff), FONT_BITMAP_LATIN_CAPITAL_LETTER_O);
+	draw_character(512, 400, RGB_COLOR(0x00, 0xff, 0xff), FONT_BITMAP_LATIN_CAPITAL_LETTER_L);
+	draw_character(528, 400, RGB_COLOR(0x00, 0xff, 0xff), FONT_BITMAP_LATIN_CAPITAL_LETTER_O);
 	//set_pixel(0, 0, 100, 100, 100);
 	
 	

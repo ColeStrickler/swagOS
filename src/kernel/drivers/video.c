@@ -3,11 +3,14 @@
 #include <stdint.h>
 #include <kernel.h>
 #include <pmm.h>
-#include "video.h"
+
 #include <panic.h>
+#include <font.h>
 
 
 extern KernelSettings global_Settings;
+
+
 
 
 uint64_t get_pixel_index(int x, int y)
@@ -18,6 +21,20 @@ uint64_t get_pixel_index(int x, int y)
     uint64_t pixel_index = pitch*y + pixel_width*x;
     return pixel_index;
 }
+
+void draw_character(int x, int y, uint32_t color, enum FONT_BITMAP_KEY key)
+{
+    for (int i = x; i < x+8; i++)
+    {
+        for (int j = y; j < y+16; j++)
+        {
+            if ((BITMAP_GLOBAL[key][j-y] >> (8-(i-x))) & 1)
+                set_pixel(i, j, color);
+        }
+    }
+}
+
+
 
 
 void set_pixel(int x,int y, int color) {
@@ -41,13 +58,33 @@ void clear_screen(uint8_t r, uint8_t g, uint8_t b)
     {
         for (int x = 0; x < xmax; x++)
         {
-            set_pixel(x, y, 0xffff0000);
+            set_pixel(x, y, RGB_COLOR(r, g, b));
         }
     }
     log_to_serial("done clearing");
 }
 
 
+void draw_rect(uint32_t top_left_x, uint32_t top_left_y, uint32_t width, uint32_t height, uint8_t r, uint8_t g, uint8_t b)
+{
+    struct multiboot_tag_framebuffer_common* framebuffer = global_Settings.framebuffer;
+    uint32_t xmax = framebuffer->framebuffer_width;
+    uint32_t ymax = framebuffer->framebuffer_height;
+
+    if (top_left_x >= xmax || top_left_y >= ymax)
+        return;
+
+    for (int x = top_left_x; x < top_left_x + width; x++)
+    {
+        for (int y = top_left_y; y < top_left_y + height; y++)
+        {
+            if (x >= xmax || y >= ymax)
+                continue;
+            set_pixel(x, y, RGB_COLOR(r, g, b));
+        }
+    }
+    log_hexval("color",  RGB_COLOR(r, g, b));
+}
 
 
 
