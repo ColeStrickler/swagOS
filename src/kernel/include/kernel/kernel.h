@@ -10,13 +10,14 @@
 #include <ps2_keyboard.h>
 #include <multiboot.h>
 #include <video.h>
-
+#include <terminal.h>
 
 #define KERNEL_HH_START 0xffffffff80000000
 typedef struct KernelSettings
 {
     struct x8664_Settings settings_x8664;
     struct KeyboardDriverSettings KeyboardDriver;
+    struct TerminalState TerminalDriver;
     bool bTimerCalibrated;
     uint64_t tickCount;
     bool useXSDT;

@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <serial.h>
 #include <kernel.h>
+#include <terminal.h>
 
 extern KernelSettings global_Settings;
 
@@ -280,6 +281,6 @@ void keyboard_irq_handler()
     uint8_t scancode = inb(0x60);
     char c;
     if(scancode_to_char(scancode, &c) && is_ascii(c))
-        log_char_to_serial(c);
+        terminal_print_char(c, RGB_COLOR(0x00, 0xdd, 0x44));
 }
 

@@ -94,4 +94,3 @@ is_frame_mapped_hugepages pdpt index: 0x3
 pdt: 0x113000
 is_frame_mapped_hugepages --> returntotal mapped: 0x400000
 done clearingend
-[ENTER]
