@@ -3,6 +3,7 @@
 #include "vmm.h"
 #include <serial.h>
 #include <panic.h>
+#include <spinlock.h>
 
 extern KernelSettings global_Settings;
 
@@ -27,7 +28,7 @@ void kheap_init()
     if (free_frame == UINT64_MAX)
         panic("kheap_init() --> could not find free frame for kernel heap initialization.\n");
     log_to_serial("here2\n");
-	physical_frame_checkout(free_frame);
+	//physical_frame_checkout(free_frame);
     log_to_serial("here3\n");
     log_hexval("current heap", global_Settings.KernelHeap.current);
     log_hexval("free_frame", free_frame);
@@ -51,18 +52,26 @@ bool new_frame_needed_kalloc(uint32_t size_needed)
 
 /*
     This function will request memory on the kernel heap
+    
+    On success return the address of the newly request memory
+
+    Upon failure return UINT64_MAX
 */
 uint64_t kheap_request(uint32_t size)
 {
     if (global_Settings.KernelHeap.current + size > global_Settings.KernelHeap.top)
-        return 0x0;
+        return NULL;
 
     if (new_frame_needed_kalloc(size))
     {
-        log_to_serial("new frame needed!\n");
+        
         uint64_t frame_address = physical_frame_request();
-        log_hexval("using physical frame", frame_address);
-        physical_frame_checkout(frame_address);
+        if (frame_address == UINT64_MAX)
+        {
+            return UINT64_MAX;
+        }
+        // no longer need physical_frame_checkout(), this action is done inside physical frame_request
+        //physical_frame_checkout(frame_address);
         map_kernel_page(HUGEPGROUNDDOWN(global_Settings.KernelHeap.current + size), frame_address);
     }
     return global_Settings.KernelHeap.current;

@@ -208,7 +208,7 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	int i = 0;
 	while(i < global_Settings.TerminalDriver.terminal_buf_size-1)
 	{
-		
+		log_hexval("write", i);
 		terminal_write_char('l', RGB_COLOR(r | i, g - i, b & i));
 		i++;
 	}

@@ -27,7 +27,7 @@ void init_terminal()
         Characters are only 8bits wide, but we will allow 16 bits per character
         so that the letters are not squashing into each other
     */
-    driver->terminal_buf_size = (driver->max_x * driver->max_y * (global_Settings.framebuffer->common.framebuffer_bpp/8)) / (2*16*16);
+    driver->terminal_buf_size = (driver->max_x * driver->max_y) /  (16*16);
     char* terminal_buf = (char*)kalloc(driver->terminal_buf_size);
     driver->buffer_write_location = 0;
     log_hexval("terminal_buf", terminal_buf);
@@ -77,7 +77,8 @@ void terminal_print_string(const char* str, uint32_t color)
 void terminal_scroll_down()
 {
     TerminalState* driver = &global_Settings.TerminalDriver;
-    uint32_t row_size_in_chars = (driver->max_x*(global_Settings.framebuffer->common.framebuffer_bpp/8)) / (32);
+    // total bytes per row /  ()
+    uint32_t row_size_in_chars = (driver->max_x) / (16);
     //log_hexval("row size", row_size_in_chars);
     for (int i = row_size_in_chars; i < driver->terminal_buf_size; i++)
     {
@@ -97,15 +98,17 @@ uint32_t terminal_buf_location_to_ypixel()
 {
     // each character takes up 16x16 space, each pixel is 4 bytes
     TerminalState* driver = &global_Settings.TerminalDriver;
-    uint32_t x = (driver->buffer_write_location * 2 * (global_Settings.framebuffer->common.framebuffer_bpp/8)) % driver->max_x;
-    uint32_t y = 16*((driver->buffer_write_location*2*(global_Settings.framebuffer->common.framebuffer_bpp/8))-x) / (driver->max_x);
+    // 16 pixels per character
+    uint32_t x = (driver->buffer_write_location * 16) % driver->max_x;
+    uint32_t y = 16 * ((driver->buffer_write_location*16)-x) / (driver->max_x);
     return y;
 }
 
 uint32_t terminal_buf_location_to_xpixel()
 {
     TerminalState* driver = &global_Settings.TerminalDriver;
-    uint32_t x = (driver->buffer_write_location * 2*(global_Settings.framebuffer->common.framebuffer_bpp/8)) % driver->max_x;
+    // 16 pixels per character
+    uint32_t x = (driver->buffer_write_location * 16) % driver->max_x;
     return x;
 }
 

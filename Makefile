@@ -41,6 +41,7 @@ KERNEL_INCLUDES=\
 -I./src/kernel/include/mem/ \
 -I./src/kernel/include/data_structures/ \
 -I./src/kernel/include/drivers/ \
+-I./src/kernel/include/core/ \
 
 
 

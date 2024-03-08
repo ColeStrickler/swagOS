@@ -118,3 +118,4 @@ void log_to_serial (char *string) {
         i++;
     }
 }
+

@@ -154,16 +154,48 @@ void parse_multiboot_mmap_entries(struct multiboot_tag_mmap* mm_tag)
 }
 
 
+/*
+    This function will mark the correct bit in the page bitmap and do free free frame count accounting
+
+    This function should never be called directly
+*/
+void physical_frame_checkout(uint64_t physical_address)
+{
+    /*
+        There are 8bytes/entry * 512 entries * 8bits/byte = 32768 bits in our bitmap
+        each corresponding to a 2mb page.
+    */
+   //log_hexval("physical_frame_checkout", physical_address);
+    uint64_t absolute_index = HUGEPGROUNDDOWN(physical_address) / (2*1024*1024);
+    uint64_t inner_entry_index = absolute_index%64; 
+    uint64_t entry_index = (absolute_index-inner_entry_index)/64;
+    
+    //log_hexval("Absolute Index", absolute_index);
+    //log_hexval("Entry Index:", entry_index);
+    //log_hexval("Inner Entry Index", inner_entry_index);
+
+
+    // setting the bit to 1 marks the page in use
+    global_Settings.PMM.PhysicalPageBitmap[entry_index] |= ((uint64_t)1 << inner_entry_index);
+    global_Settings.PMM.free_framecount--;
+}
+
+
+
 
 /*
-    Returns the physical address of the requested frame on success,
+    Returns the physical address of an allocated frame on success
 
     Upon failure return UINT64_MAX
 */
 uint64_t physical_frame_request()
 {
+    acquire_Spinlock(&global_Settings.PMM.lock);
     if (global_Settings.PMM.free_framecount == 0)
+    {
+        release_Spinlock(&global_Settings.PMM.lock);
         return UINT64_MAX; // -1
+    }
     
     for (uint32_t i = 0; i < 512; i++)
     {
@@ -173,10 +205,14 @@ uint64_t physical_frame_request()
             if (!(global_Settings.PMM.PhysicalPageBitmap[i] & ((uint64_t)1 << j)))
             {
                 // each uint64_t has 64 bits each accounting for 2mb each
-                return (i*64*(HUGEPGSIZE))+(j*HUGEPGSIZE);
+                uint64_t valid_frame =  (i*64*(HUGEPGSIZE))+(j*HUGEPGSIZE);
+                physical_frame_checkout(valid_frame);
+                release_Spinlock(&global_Settings.PMM.lock);
+                return valid_frame;
             }
         }
     }
+    release_Spinlock(&global_Settings.PMM.lock);
     return UINT64_MAX;
 }
 
@@ -344,31 +380,6 @@ void physical_frame_checkin(uint64_t physical_address)
     //log_hexval("Free Frame Count:", global_Settings.PMM.free_framecount);
 }
 
-/*
-    This function will mark the correct bit in the page bitmap and do free free frame count accounting
-
-    This function should never be called directly
-*/
-void physical_frame_checkout(uint64_t physical_address)
-{
-    /*
-        There are 8bytes/entry * 512 entries * 8bits/byte = 32768 bits in our bitmap
-        each corresponding to a 2mb page.
-    */
-   //log_hexval("physical_frame_checkout", physical_address);
-    uint64_t absolute_index = HUGEPGROUNDDOWN(physical_address) / (2*1024*1024);
-    uint64_t inner_entry_index = absolute_index%64; 
-    uint64_t entry_index = (absolute_index-inner_entry_index)/64;
-    
-    //log_hexval("Absolute Index", absolute_index);
-    //log_hexval("Entry Index:", entry_index);
-    //log_hexval("Inner Entry Index", inner_entry_index);
-
-
-    // setting the bit to 1 marks the page in use
-    global_Settings.PMM.PhysicalPageBitmap[entry_index] |= ((uint64_t)1 << inner_entry_index);
-    global_Settings.PMM.free_framecount--;
-}
 
 
 

@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <linked_list.h>
+#include <spinlock.h>
 
 
 
@@ -47,6 +48,12 @@ typedef struct PhysicalMemoryManager
     uint64_t    kernel_loadaddr;
     uint64_t    kernel_phystop;
     bool        init_success; // we will set this value if we are successfully initialized
+
+    /*
+        We must synchronize requests for physical pages so we do not give to threads the same page in
+        a race conditions
+    */
+    Spinlock lock;
 } PhysicalMemoryManager;
 
 
