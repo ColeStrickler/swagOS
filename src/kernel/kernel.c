@@ -188,6 +188,8 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	// Linker symbols have addresses only
 	setup_global_data();
 	parse_multiboot_info(ptr_multiboot_info);
+
+	kheap_init();
 	idt_setup();
 	set_irq(0x02, 0x02, 0x22, 0, 0, true);
 	apic_setup();
@@ -198,8 +200,20 @@ void kernel_main(uint64_t ptr_multiboot_info)
 
 
 	init_terminal();
-	clear_screen(0, 0, 0);
-	char* label = "swag yolo";
+	uint8_t r = 0xae;
+	uint8_t g = 0x18;
+	uint8_t b = 0xed;
+
+
+	int i = 0;
+	while(i < global_Settings.TerminalDriver.terminal_buf_size-1)
+	{
+		
+		terminal_write_char('l', RGB_COLOR(r | i, g - i, b & i));
+		i++;
+	}
+	//clear_screen(0, 0, 0);
+	//char* label = "swag yolo";
 
 	
 	

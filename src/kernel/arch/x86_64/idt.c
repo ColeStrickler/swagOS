@@ -171,7 +171,7 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         }
         case 14:
         {
-            log_to_serial("Page fault interrupt.\n");
+            panic("Page Fault Interrupt");
             break;
         }
         case IDT_APIC_TIMER_INT:

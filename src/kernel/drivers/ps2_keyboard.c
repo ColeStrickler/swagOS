@@ -278,9 +278,10 @@ bool scancode_to_char(uint8_t scancode, char* outchar)
 
 void keyboard_irq_handler()
 {
+    log_to_serial("keyboard_irq_handler()\n");
     uint8_t scancode = inb(0x60);
     char c;
     if(scancode_to_char(scancode, &c) && is_ascii(c))
-        terminal_print_char(c, RGB_COLOR(0x00, 0xdd, 0x44));
+        terminal_write_char(c, RGB_COLOR(0x00, 0xdd, 0x44));
 }
 

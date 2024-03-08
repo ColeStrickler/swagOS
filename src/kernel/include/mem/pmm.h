@@ -1,8 +1,15 @@
-#include <stdint.h>
-#include <linked_list.h>
+
 
 #ifndef PMM_H
 #define PMM_H
+
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+#include <linked_list.h>
+
+
+
 #define PGSIZE 4096 // 4*1024b
 #define HUGEPGSIZE (2*1024*1024) // 2mb
 #define HUGEPGROUNDUP(sz)  ((sz+HUGEPGSIZE) - ((sz+HUGEPGSIZE)%HUGEPGSIZE))
@@ -48,8 +55,12 @@ typedef struct PhysicalMemoryManager
 
 bool parse_multiboot_memorymap(uint64_t addr);
 
+void physical_frame_checkout(uint64_t physical_address);
+
 void free_frame_range(uint64_t start, uint64_t end);
 bool retrieve_multiboot_mem_basicinfo(uint64_t addr);
+
+uint64_t physical_frame_request();
 
 bool map_kernel_page(uint64_t va, uint64_t pa);
 

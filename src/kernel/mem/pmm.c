@@ -113,7 +113,7 @@ static void log_mmap_entry(struct multiboot_mmap_entry* entry)
 }
 
 /*
-    This function simply sets all the bits in the page bitmap to 1. Doing this
+    This function simply sets all the bits in the page bitmap to bit-1 ==> in use. Doing this
     will simplify things and allow use to explicitly free and make available only
     what is there
 */
@@ -121,6 +121,12 @@ void page_bitmap_whiteout()
 {
     for (uint16_t i = 0; i < 512; i++)
         global_Settings.PMM.PhysicalPageBitmap[i] = UINT64_MAX;
+
+
+    
+    if ((global_Settings.PMM.PhysicalPageBitmap[0] & ((uint64_t)1 << 22)) == 0)
+        panic("whiteout failure");
+
 }
 
 /*
@@ -164,7 +170,7 @@ uint64_t physical_frame_request()
         // 64 bits per 8 bytes
         for (uint32_t j = 0; j < 64; j++)
         {
-            if (global_Settings.PMM.PhysicalPageBitmap[i] & (1 << j))
+            if (!(global_Settings.PMM.PhysicalPageBitmap[i] & ((uint64_t)1 << j)))
             {
                 // each uint64_t has 64 bits each accounting for 2mb each
                 return (i*64*(HUGEPGSIZE))+(j*HUGEPGSIZE);
@@ -211,9 +217,6 @@ bool map_kernel_page(uint64_t va, uint64_t pa)
     uint64_t* pml4t_addr = ((uint64_t*)((uint64_t)global_Settings.pml4t_kernel & ~KERNEL_HH_START));
 	uint64_t* pdpt_addr = ((uint64_t*)((uint64_t)global_Settings.pdpt_kernel & ~KERNEL_HH_START));
 	uint64_t* pdt_addr = (uint64_t*)((uint64_t)global_Settings.pdt_kernel[proper_pdt_table] & ~KERNEL_HH_START);
-    log_hexval("pdpt addr", pdpt_addr);
-    log_hexval("pdpt index", pdpt_index);
-    log_hexval("pdt addr", pdt_addr);
 
     // access via virtual addresses
     global_Settings.pml4t_kernel[pml4t_index] = ((uint64_t)pdpt_addr) | (PAGE_PRESENT | PAGE_WRITE);
@@ -225,15 +228,7 @@ bool map_kernel_page(uint64_t va, uint64_t pa)
 
 
 
-/*
-    For kalloc we want to be able to just request memory and it give it to us.
 
-    We want to keep the kernel in the top 2gb or so, and we need a way to keep track of this before we can do it 
-*/
-uint64_t kalloc()
-{
-    
-}
 
 
 
@@ -252,8 +247,6 @@ bool is_frame_mapped_hugepages(uint64_t virtual_address, uint64_t* pml4t_addr)
 	uint64_t pdpt_index = (virtual_address >> 30) & 0x1FF; 
 	uint64_t pdt_index = (virtual_address >> 21) & 0x1FF; 
     uint64_t* pdpt = (uint64_t*)((pml4t_addr[pml4t_index] & PTADDRMASK)); 
-    log_hexval("is_frame_mapped_hugepages pdpt", pdpt);
-    log_hexval("is_frame_mapped_hugepages pdpt index", pdpt_index);
     if (pdpt == NULL)
     {
         log_to_serial("pdpt null\n");
@@ -261,7 +254,6 @@ bool is_frame_mapped_hugepages(uint64_t virtual_address, uint64_t* pml4t_addr)
     }
     pdpt = (uint64_t*)((char*)&*global_Settings.pdpt_kernel);
     uint64_t* pdt = (uint64_t*)((pdpt[pdpt_index] & PTADDRMASK));
-    log_hexval("pdt", pdt);
     if (pdt == NULL)
     {
         log_to_serial("pdt null\n");
@@ -274,7 +266,6 @@ bool is_frame_mapped_hugepages(uint64_t virtual_address, uint64_t* pml4t_addr)
         log_to_serial("is_frame_mapped_hugepages pdt entry null\n");
         return false;
     }
-    log_to_serial("is_frame_mapped_hugepages --> return");
     return true;
 }
 
@@ -291,8 +282,8 @@ bool check_kernel_frame(uint64_t physical_frame)
     uint64_t lower_limit = global_Settings.PMM.kernel_loadaddr;
     uint64_t upper_limit = global_Settings.PMM.kernel_phystop;
 
-
-    if (physical_frame >= lower_limit && physical_frame <= upper_limit)
+    // we currently are going to allocate the first 1gb to the kernel
+    if ((physical_frame >= lower_limit && physical_frame <= upper_limit) || physical_frame < (1024*1024*1024))
         return true;
     return false;
 }
@@ -305,15 +296,27 @@ bool check_physical_page_in_use(uint64_t physical_address)
         There are 8bytes/entry * 512 entries * 8bits/byte = 32768 bits in our bitmap
         each corresponding to a 2mb page.
     */
+
+
+
     uint64_t absolute_index = HUGEPGROUNDDOWN(physical_address) / (2*1024*1024);
     uint64_t inner_entry_index = absolute_index%64;  
     uint64_t entry_index = (absolute_index-inner_entry_index)/64;
-    
-    if (global_Settings.PMM.PhysicalPageBitmap[entry_index] & (1 << inner_entry_index))
+    //log_hexval("Absolute Index Check", absolute_index);
+    // bit=1 is in use
+    if (global_Settings.PMM.PhysicalPageBitmap[entry_index] & ((uint64_t)1 << inner_entry_index))
         return true;
-    
+    //log_hexval("inner_entry_index", inner_entry_index);
+    //log_hexval("entry_index", entry_index);
+    //log_hexval("check value", global_Settings.PMM.PhysicalPageBitmap[entry_index]);
+//
+
     return false;
 }
+
+
+
+
 
 
 /*
@@ -330,12 +333,13 @@ void physical_frame_checkin(uint64_t physical_address)
     uint64_t absolute_index = HUGEPGROUNDDOWN(physical_address) / (2*1024*1024);
     uint64_t inner_entry_index = absolute_index%64; 
     uint64_t entry_index = (absolute_index-inner_entry_index)/64;
-
-    //log_hexval("Absolute Index", absolute_index);
+    
+    //log_hexval("Setting to zero Absolute Index", absolute_index);
     //log_hexval("Entry Index:", entry_index);
     //log_hexval("Inner Entry Index", inner_entry_index);
-    
-    global_Settings.PMM.PhysicalPageBitmap[entry_index] |= (1 << inner_entry_index);
+
+    // setting the bit to zero marks the page available again
+    global_Settings.PMM.PhysicalPageBitmap[entry_index] &= ~((uint64_t)1 << inner_entry_index);
     global_Settings.PMM.free_framecount++;
     //log_hexval("Free Frame Count:", global_Settings.PMM.free_framecount);
 }
@@ -351,10 +355,18 @@ void physical_frame_checkout(uint64_t physical_address)
         There are 8bytes/entry * 512 entries * 8bits/byte = 32768 bits in our bitmap
         each corresponding to a 2mb page.
     */
+   //log_hexval("physical_frame_checkout", physical_address);
     uint64_t absolute_index = HUGEPGROUNDDOWN(physical_address) / (2*1024*1024);
     uint64_t inner_entry_index = absolute_index%64; 
     uint64_t entry_index = (absolute_index-inner_entry_index)/64;
-    global_Settings.PMM.PhysicalPageBitmap[entry_index] &= ~(1 << inner_entry_index);
+    
+    //log_hexval("Absolute Index", absolute_index);
+    //log_hexval("Entry Index:", entry_index);
+    //log_hexval("Inner Entry Index", inner_entry_index);
+
+
+    // setting the bit to 1 marks the page in use
+    global_Settings.PMM.PhysicalPageBitmap[entry_index] |= ((uint64_t)1 << inner_entry_index);
     global_Settings.PMM.free_framecount--;
 }
 
@@ -367,7 +379,7 @@ void physical_frame_checkout(uint64_t physical_address)
 */
 void physical_frame_free(char* frame)
 {
-    //log_hexval("Freed Frame address", frame);
+    //log_hexval("Freeing Frame address", frame);
 
     if ((uint64_t)frame % HUGEPGSIZE) // we should add some other bounds checking here to make sure memory address is valid
         panic("physical_frame_free() --> frame not page aligned.\n");
@@ -400,7 +412,7 @@ void physical_frame_free(char* frame)
 
     if (!check_physical_page_in_use((uint64_t)frame))
     {
-        log_hexval("Frame", frame);
+        //log_hexval("Frame", frame);
         panic("physical_frame_free() --> attempted to fee an unused frame\n");
     }        
 
@@ -413,7 +425,11 @@ void physical_frame_free(char* frame)
     /*
         NEED TO PUT SYNCHRONIZATION LOCKS AROUND THIS FUNCTION
     */
+   //log_hexval("checkin", frame);
+
     physical_frame_checkin((uint64_t)frame);
+    if (check_physical_page_in_use(frame))
+        panic("free failed");
     // free the free frame list lock 
 
 
@@ -438,7 +454,6 @@ void free_hugeframe_range(uint64_t start, uint64_t end)
     if (end - start < HUGEPGSIZE)
         return;
 
-    log_hexval("range:", end-start);
 
     PhysicalMemoryManager* pmm = &global_Settings.PMM;
     
