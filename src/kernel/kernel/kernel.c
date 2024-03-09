@@ -188,8 +188,8 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	// Linker symbols have addresses only
 	setup_global_data();
 	parse_multiboot_info(ptr_multiboot_info);
-	init_ioapic();
-	
+	parse_madt(global_Settings.madt);
+	log_hexval("Num CPUS", global_Settings.cpu_count);
 	log_to_serial("1\n");
 	
 	log_to_serial("2\n");

@@ -78,3 +78,5 @@ bool doRSDPChecksum(char *ptr_rsdp, size_t size);
 bool doSDTChecksum(ACPISDTHeader *tableHeader);
 MADT* retrieveMADT(bool use_xsdt, void* sdp);
 MADT_ITEM* madt_get_item(MADT* madt, uint32_t item_type, uint32_t item_index);
+
+void parse_madt(MADT *madt);

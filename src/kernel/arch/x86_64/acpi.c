@@ -6,6 +6,7 @@
 #include <pmm.h>
 #include <panic.h>
 
+extern KernelSettings global_Settings;
 
 bool doRSDPChecksum(char *ptr_rsdp, size_t size) {
     uint32_t sum = 0;
@@ -115,6 +116,65 @@ MADT_ITEM* madt_get_item(MADT* madt, uint32_t item_type, uint32_t item_index)
     return (void*)0x0;
 }
 
+
+
+void parse_madt(MADT* madt)
+{
+    if (madt == NULL)
+        panic("parse_madt() --> madt == nullptr.");
+
+    uint32_t total_length = madt->sdtHeader.Length;
+    MADT_ITEM* item = (MADT_ITEM*)madt->fields;
+    uint32_t curr_length = sizeof(ACPISDTHeader) + 2*sizeof(uint32_t);
+    uint32_t curr_index = 0;
+
+    while(curr_length < total_length)
+    {
+        switch (item->type)
+        {
+            case MADT_ITEM_PROC_LAPIC:
+            {
+                proc_lapic* localAPIC = (proc_lapic*)item;
+                if (localAPIC->flags & 0x3) // processor must be enabled
+                {
+                    global_Settings.cpu[global_Settings.cpu_count].id = localAPIC->acpi_procID;
+                    global_Settings.cpu[global_Settings.cpu_count].local_apic = localAPIC;
+                    global_Settings.cpu_count++;
+                }
+                
+
+                break;
+            }
+            case MADT_ITEM_IO_APIC:
+            {
+                global_Settings.pIoApic = (io_apic*)item;
+                break;
+            }
+            case MADT_ITEM_IO_APIC_SRCOVERRIDE:
+            {
+                io_apic_int_src_override* int_src_override = (io_apic_int_src_override*)item;
+		        global_Settings.settings_x8664.interrupt_overrides[int_src_override->global_sys_int] = int_src_override;
+		        global_Settings.settings_x8664.interrupt_override_count++;
+                break;
+            }
+            case MADT_ITEM_LAPIC_NMI:
+            {
+                break;
+            }
+            case MADT_ITEM_LAPIC_ADDROVERRIDE:
+            {
+                break;
+            }
+            default:
+                break;
+            
+        }
+        
+        item = (MADT_ITEM*)((uint64_t)item + (uint64_t)item->record_length);
+        curr_length += item->record_length;
+    }
+
+}
 
 void check_cpu()
 {
