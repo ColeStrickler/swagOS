@@ -23,18 +23,16 @@ void kheap_init()
 	global_Settings.KernelHeap.current = HUGEPGROUNDUP(KERNEL_HH_START + (HUGEPGSIZE * 512));
     if (is_frame_mapped_hugepages(global_Settings.KernelHeap.current, global_Settings.pml4t_kernel))
         panic("already mapped");
-    log_to_serial("here1\n");
+    log_to_serial("attempting to get free frame\n");
 	uint64_t free_frame = physical_frame_request();
+    log_to_serial("got free frame !\n");
     if (free_frame == UINT64_MAX)
         panic("kheap_init() --> could not find free frame for kernel heap initialization.\n");
-    log_to_serial("here2\n");
-	//physical_frame_checkout(free_frame);
-    log_to_serial("here3\n");
-    log_hexval("current heap", global_Settings.KernelHeap.current);
-    log_hexval("free_frame", free_frame);
+
 	map_kernel_page(global_Settings.KernelHeap.current, free_frame);
-    log_to_serial("here4\n");
+    log_to_serial("MAPPED FREE FRAME\n");
 	global_Settings.KernelHeap.top = UINT64_MAX;
+    log_to_serial("end kheap_init()\n");
 }
 
 /*

@@ -63,7 +63,6 @@ void clear_screen(uint8_t r, uint8_t g, uint8_t b)
             set_pixel(x, y, RGB_COLOR(r, g, b));
         }
     }
-    log_to_serial("done clearing");
 }
 
 
@@ -85,7 +84,6 @@ void draw_rect(uint32_t top_left_x, uint32_t top_left_y, uint32_t width, uint32_
             set_pixel(x, y, RGB_COLOR(r, g, b));
         }
     }
-    log_hexval("color",  RGB_COLOR(r, g, b));
 }
 
 
@@ -112,9 +110,7 @@ void video_init()
     for (int i = 0; i < 10; i++)
         log_to_serial("\n");
    uint64_t total_framebuffer_size = framebuffer->framebuffer_pitch*framebuffer->framebuffer_height;
-   log_hexval("framebuffer addr", framebuffer->framebuffer_addr);
    uint64_t framebuffer_addr = framebuffer->framebuffer_addr;
-   log_hexval("framebuffer size", total_framebuffer_size);
     uint64_t mapped = 0;
     while(mapped < total_framebuffer_size)
     {
@@ -126,6 +122,4 @@ void video_init()
         mapped += HUGEPGSIZE;
         framebuffer_addr += HUGEPGSIZE;
     }
-    log_hexval("total mapped", mapped);
-    
 }

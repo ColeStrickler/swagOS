@@ -55,5 +55,6 @@ void release_Spinlock(Spinlock* lock)
 
         this will allow a single thread to acquire multiple locks at once and not run into trouble
     */
+   
     sti();
 }

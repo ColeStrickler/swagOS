@@ -90,20 +90,6 @@ void parse_multiboot_info(uint64_t ptr_multiboot_info)
 	{
 		panic("MADT not found!\n");
 	}
-	log_to_serial("searching ioapic\n");
-	if (!(io_apic_madt = (io_apic*)madt_get_item(madt_header, MADT_ITEM_IO_APIC, 0)))
-	{
-		log_to_serial("Could not find IOAPIC entry in MADT.\n");
-	}
-	global_Settings.pIoApic = io_apic_madt;
-
-	int i = 0;
-	
-	while ((int_src_override = (io_apic_int_src_override*)madt_get_item(madt_header, MADT_ITEM_IO_APIC_SRCOVERRIDE, i)))
-	{
-		uint32_t count = global_Settings.settings_x8664.interrupt_override_count;
-		global_Settings.settings_x8664.interrupt_overrides[int_src_override->global_sys_int] = int_src_override;
-		global_Settings.settings_x8664.interrupt_override_count++;
-		i++;
-	}
+	global_Settings.madt= madt_header;
+	log_to_serial("parse_multiboot_info() end!\n");
 }

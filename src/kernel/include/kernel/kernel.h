@@ -25,6 +25,7 @@ typedef struct KernelSettings
     bool useXSDT;
     void* SystemDescriptorPointer;
     struct io_apic* pIoApic;
+    struct MADT* madt;
     struct multiboot_tag_framebuffer* framebuffer;
     PhysicalMemoryManager PMM;
     uint64_t* pml4t_kernel;

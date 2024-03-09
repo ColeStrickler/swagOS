@@ -15,7 +15,6 @@ extern KernelSettings global_Settings;
 
 void init_terminal()
 {
-    log_to_serial("init_terminal()\n");
     TerminalState* driver = &global_Settings.TerminalDriver;
     driver->current_x = 0;
     driver->current_y = 0;
@@ -30,8 +29,6 @@ void init_terminal()
     driver->terminal_buf_size = (driver->max_x * driver->max_y) /  (16*16);
     char* terminal_buf = (char*)kalloc(driver->terminal_buf_size);
     driver->buffer_write_location = 0;
-    log_hexval("terminal_buf", terminal_buf);
-    log_hexval("terminal_buf size", driver->terminal_buf_size);
     if (terminal_buf == NULL)
         panic("init_terminal() --> could not allocate memory for terminal driver buffer.");
     driver->terminal_buf = terminal_buf;
@@ -147,8 +144,6 @@ void terminal_write_char(char c, uint32_t color)
    // log_hexval("driver->terminal_buf_size", driver->terminal_buf_size);
     if (driver->buffer_write_location >= driver->terminal_buf_size)
     {
-        log_to_serial("Scroll_down()");
-        log_char_to_serial(driver->terminal_buf[0]);
         terminal_scroll_down();
         driver->terminal_buf[driver->buffer_write_location] = c;
         driver->buffer_write_location++;

@@ -175,6 +175,8 @@ uint64_t get_local_apic_pa();
 int apic_init();
 void apic_calibrate_timer();
 void apic_setup();
+uint32_t lapic_id();
+void init_ioapic();
 bool set_io_apic_redirect(io_apic *ioapic, uint32_t irq_num, uint32_t entry1_write, uint32_t entry2_write);
 bool get_io_apic_redirect(io_apic* ioapic, uint32_t irq_num, uint32_t* entry1_out, uint32_t* entry2_out);
 

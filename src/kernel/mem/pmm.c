@@ -190,9 +190,11 @@ void physical_frame_checkout(uint64_t physical_address)
 */
 uint64_t physical_frame_request()
 {
+    log_to_serial("spinlock acquire\n");
     acquire_Spinlock(&global_Settings.PMM.lock);
     if (global_Settings.PMM.free_framecount == 0)
     {
+        log_to_serial("spinlock release0\n");
         release_Spinlock(&global_Settings.PMM.lock);
         return UINT64_MAX; // -1
     }
@@ -207,12 +209,17 @@ uint64_t physical_frame_request()
                 // each uint64_t has 64 bits each accounting for 2mb each
                 uint64_t valid_frame =  (i*64*(HUGEPGSIZE))+(j*HUGEPGSIZE);
                 physical_frame_checkout(valid_frame);
+                log_to_serial("spinlock release1\n");
                 release_Spinlock(&global_Settings.PMM.lock);
+                log_to_serial("spinlock released!!!!!!!\n");
                 return valid_frame;
             }
         }
     }
+    log_to_serial("spinlock release2\n");
     release_Spinlock(&global_Settings.PMM.lock);
+    
+    log_to_serial("spinlock released!!!!!!!\n");
     return UINT64_MAX;
 }
 

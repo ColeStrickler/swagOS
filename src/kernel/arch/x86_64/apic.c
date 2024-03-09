@@ -1,9 +1,11 @@
 #include <apic.h>
+#include <acpi.h>
 #include <cpuid.h>
 #include <serial.h>
 #include <idt.h>
 #include <asm_routines.h>
 #include <kernel.h>
+#include <panic.h>
 
 
 
@@ -362,7 +364,41 @@ void apic_calibrate_timer() {
 
 void apic_setup()
 {
+    
     apic_init();
+   // init_ioapic(); // was in parse_multiboot_info, we need to make sure we are initializing the structures for the bootstrap cpu
 	sti();
 	apic_calibrate_timer();
+}
+
+uint32_t lapic_id()
+{
+    uint32_t id = apic_read_reg(APIC_REG_LOCAL_ID);
+    return global_Settings.settings_x8664.use_x2_apic ? id : id >> 24;
+}
+
+void init_ioapic()
+{
+    MADT* madt_header = global_Settings.madt;
+    io_apic_int_src_override* int_src_override;
+    io_apic* io_apic_madt;
+    log_to_serial("searching ioapic\n");
+   // log_hexval("lapic_id", lapic_id());
+	if (!(io_apic_madt = (io_apic*)madt_get_item(madt_header, MADT_ITEM_IO_APIC, 0)))
+	{
+		panic("Could not find IOAPIC entry in MADT.\n");
+	}
+
+    // will need to change this to a per cpu structure
+	global_Settings.pIoApic = io_apic_madt;
+
+	int i = 0;
+	
+	while ((int_src_override = (io_apic_int_src_override*)madt_get_item(madt_header, MADT_ITEM_IO_APIC_SRCOVERRIDE, i)))
+	{
+		uint32_t count = global_Settings.settings_x8664.interrupt_override_count;
+		global_Settings.settings_x8664.interrupt_overrides[int_src_override->global_sys_int] = int_src_override;
+		global_Settings.settings_x8664.interrupt_override_count++;
+		i++;
+	}
 }

@@ -99,8 +99,11 @@ MADT_ITEM* madt_get_item(MADT* madt, uint32_t item_type, uint32_t item_index)
 
     while(curr_length < total_length && curr_index <= item_index)
     {
+        log_hexval("item->type", item->type);
+        log_hexval("item_index", item_index);
         if (item->type == item_type)
         {
+            log_hexval("curr_index", curr_index);
             if (item_index == curr_index)
                 return item;
             curr_index++;
@@ -110,4 +113,10 @@ MADT_ITEM* madt_get_item(MADT* madt, uint32_t item_type, uint32_t item_index)
         curr_length += item->record_length;
     }
     return (void*)0x0;
+}
+
+
+void check_cpu()
+{
+
 }

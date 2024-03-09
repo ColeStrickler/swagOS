@@ -188,11 +188,19 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	// Linker symbols have addresses only
 	setup_global_data();
 	parse_multiboot_info(ptr_multiboot_info);
-
-	kheap_init();
+	init_ioapic();
+	
+	log_to_serial("1\n");
+	
+	log_to_serial("2\n");
 	idt_setup();
+	log_to_serial("3\n");
 	set_irq(0x02, 0x02, 0x22, 0, 0, true);
 	apic_setup();
+	
+	log_to_serial("apic setup finished\n");
+	kheap_init(); // we use spinlocks here and mess with interrupt flags so do this after we initialize interrupt stuff
+	
 	keyboard_driver_init();
 	
 	
@@ -200,6 +208,7 @@ void kernel_main(uint64_t ptr_multiboot_info)
 
 
 	init_terminal();
+	
 	uint8_t r = 0xae;
 	uint8_t g = 0x18;
 	uint8_t b = 0xed;

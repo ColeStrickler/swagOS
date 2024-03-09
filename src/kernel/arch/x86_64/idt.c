@@ -180,7 +180,7 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
             if (!global_Settings.bTimerCalibrated)
                 panic("isr_handler() --> APIC TIMER INTERRUPT BEFORE CALIBRATION.\n");
                 
-
+            
             apic_end_of_interrupt();
             break;
         }
