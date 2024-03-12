@@ -206,9 +206,11 @@ void printf(const char* fmt, ...)
     va_start(args, fmt);
     while (fmt[i])
     {
+        log_char_to_serial(fmt[i]);
+        log_to_serial("\n");
         char c = fmt[i];
-        log_char_to_serial(c);
-        log_to_serial("\n\n");
+        if (c == 0x0)
+            break;
         switch (c)
         {
             case '%':
@@ -245,17 +247,14 @@ void printf(const char* fmt, ...)
             }
             default:
             {
-                log_to_serial("default\n");
-                log_char_to_serial(c);
-                log_to_serial("\n");
+                //log_to_serial("default\n");
+                //log_char_to_serial(c);
+                //log_to_serial("\n");
                 terminal_write_char(c, RGB_COLOR(0xff, 0x00, 0x00));
                 i++;
                 break;
             }
         }
-
-
-
     }
 }
 

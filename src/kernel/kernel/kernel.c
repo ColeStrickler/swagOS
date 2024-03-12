@@ -219,13 +219,28 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	uint8_t b = 0xed;
 
 
-	int i = 0;
-	while ( i < 10)
+	char* swag = kalloc((1024*1024));
+	char* msg = "yolo yolo yolo yolo yolo yolo yolo yolo yolo";
+	if (swag != NULL)
 	{
-		printf("The number is: %d ",  i);
-		i++;
+		log_hexval("not null", swag);
+		
+		memcpy(swag, msg, strlen(msg));
+		swag[strlen(msg)-3] = 0x0;
 	}
-	
+	else
+	{
+		log_to_serial("returned null!");
+	}
+	printf(msg);printf(msg);
+	printf(msg);
+	printf(msg);
+	printf(msg);
+	printf(msg);
+
+
+	//printf(swag);
+
 	//clear_screen(0, 0, 0);
 	//char* label = "swag yolo";
 
