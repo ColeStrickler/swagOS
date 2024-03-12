@@ -107,10 +107,8 @@ void video_init()
         panic("video_init() --> we currently only support direct RGB mode frame buffering.");
     }
 
-    for (int i = 0; i < 10; i++)
-        log_to_serial("\n");
-   uint64_t total_framebuffer_size = framebuffer->framebuffer_pitch*framebuffer->framebuffer_height;
-   uint64_t framebuffer_addr = framebuffer->framebuffer_addr;
+    uint64_t total_framebuffer_size = framebuffer->framebuffer_pitch*framebuffer->framebuffer_height;
+    uint64_t framebuffer_addr = framebuffer->framebuffer_addr;
     uint64_t mapped = 0;
     while(mapped < total_framebuffer_size)
     {

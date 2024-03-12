@@ -13,7 +13,7 @@ typedef struct TerminalState
 
 void init_terminal();
 
-void terminal_print_char(char c, uint32_t color);
-void terminal_print_string(const char *str, uint32_t color);
 void terminal_write_char(char c, uint32_t color);
+void terminal_print_string(char *fmt, uint32_t color);
+void printf(const char *fmt, ...);
 #endif

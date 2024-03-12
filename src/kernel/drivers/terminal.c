@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <video.h>
+#include <stdarg.h>
 #include <kernel.h>
 #include "terminal.h"
 #include <serial.h>
@@ -28,6 +29,7 @@ void init_terminal()
     */
     driver->terminal_buf_size = (driver->max_x * driver->max_y) /  (16*16);
     char* terminal_buf = (char*)kalloc(driver->terminal_buf_size);
+    log_hexval("terminal buf", terminal_buf);
     driver->buffer_write_location = 0;
     if (terminal_buf == NULL)
         panic("init_terminal() --> could not allocate memory for terminal driver buffer.");
@@ -37,36 +39,6 @@ void init_terminal()
 uint8_t char_code_to_fontcode(char c)
 {
     return c - 32; 
-}
-
-
-void terminal_print_char(char c, uint32_t color)
-{
-    TerminalState* driver = &global_Settings.TerminalDriver;
-
-    if (driver->current_x + 16 > driver->max_x)
-    {
-        driver->current_y += 16;
-        driver->current_x = 0;
-    }
-    draw_character(driver->current_x, driver->current_y, color, char_code_to_fontcode(c));
-    if (driver->current_x + 16 > driver->max_x)
-    {
-        driver->current_y += 16;
-        driver->current_x = 0;
-    }
-    else
-        driver->current_x += 16;
-    
-}
-
-
-void terminal_print_string(const char* str, uint32_t color)
-{
-    for (int i = 0; i < strlen(str); i++)
-	{
-		terminal_print_char(str[i], color);
-	}
 }
 
 
@@ -108,8 +80,6 @@ uint32_t terminal_buf_location_to_xpixel()
     uint32_t x = (driver->buffer_write_location * 16) % driver->max_x;
     return x;
 }
-
-
 
 
 void terminal_print_buffer(uint32_t color)
@@ -159,3 +129,134 @@ void terminal_write_char(char c, uint32_t color)
     }
     
 }
+
+void terminal_print_string(char* str, uint32_t color)
+{
+    uint32_t i = 0;
+    while(str[i])
+    {
+        terminal_write_char(str[i], color);
+        i++;
+    }
+}
+
+
+
+
+void handle_format_int(int arg, uint32_t color)
+{
+    char buf[13];
+    bool use_negative = false;
+    buf[12] = 0x00;
+    uint16_t buf_write_loc = 0;
+    if (arg == 0)
+    {
+        terminal_write_char('0', color);
+        return;
+    }
+
+    if (arg < 0)
+    {
+        use_negative = true;
+        arg *= -1;
+    }
+
+    buf_write_loc = 11;
+    while (arg != 0) {
+        buf[buf_write_loc--] = (arg % 10) + '0';
+        arg /= 10;
+    }
+    if (use_negative)
+        buf[buf_write_loc] = '-';
+    else
+        buf_write_loc++;
+        
+    terminal_print_string(&buf[buf_write_loc], color);
+}
+
+void handle_format_long(long arg, uint32_t color)
+{
+    char buf[14];
+    bool use_negative = false;
+    buf[13] = 0x00;
+    uint16_t buf_write_loc = 0;
+    if (arg == 0)
+    {
+        terminal_write_char('0', color);
+        return;
+    }
+
+    buf_write_loc = 12;
+    while (arg != 0) {
+        buf[buf_write_loc--] = (arg % 10) + '0';
+        arg /= 10;
+    }
+
+        buf_write_loc++;
+        
+    terminal_print_string(&buf[buf_write_loc], color);
+}
+
+
+
+void printf(const char* fmt, ...)
+{
+    uint32_t i = 0;
+    va_list args;
+    va_start(args, fmt);
+    while (fmt[i])
+    {
+        char c = fmt[i];
+        log_char_to_serial(c);
+        log_to_serial("\n\n");
+        switch (c)
+        {
+            case '%':
+            {
+                i++;
+                c = fmt[i];
+                switch (c)
+                {
+                    case 'd':
+                    {
+                        int arg = va_arg(args, int);
+                        handle_format_int(arg, RGB_COLOR(0xff, 0x00, 0x00));
+                        i++;
+                        break;
+                    }
+                    case 'u':
+                    {
+                        long arg = va_arg(args, long);
+                        handle_format_long(arg, RGB_COLOR(0xff, 0x00, 0x00));
+                        i++;
+                        break;
+                    }
+                    case 's':
+                    {
+                        char* arg = va_arg(args, char*);
+                        terminal_print_string(arg, RGB_COLOR(0xff, 0x00, 0x00));
+                        i++;
+                        break;
+                    }
+                    default:
+                        break;
+                }
+                break;
+            }
+            default:
+            {
+                log_to_serial("default\n");
+                log_char_to_serial(c);
+                log_to_serial("\n");
+                terminal_write_char(c, RGB_COLOR(0xff, 0x00, 0x00));
+                i++;
+                break;
+            }
+        }
+
+
+
+    }
+}
+
+

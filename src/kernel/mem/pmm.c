@@ -190,11 +190,11 @@ void physical_frame_checkout(uint64_t physical_address)
 */
 uint64_t physical_frame_request()
 {
-    log_to_serial("spinlock acquire\n");
+   // log_to_serial("spinlock acquire\n");
     acquire_Spinlock(&global_Settings.PMM.lock);
     if (global_Settings.PMM.free_framecount == 0)
     {
-        log_to_serial("spinlock release0\n");
+       // log_to_serial("spinlock release0\n");
         release_Spinlock(&global_Settings.PMM.lock);
         return UINT64_MAX; // -1
     }
@@ -209,14 +209,14 @@ uint64_t physical_frame_request()
                 // each uint64_t has 64 bits each accounting for 2mb each
                 uint64_t valid_frame =  (i*64*(HUGEPGSIZE))+(j*HUGEPGSIZE);
                 physical_frame_checkout(valid_frame);
-                log_to_serial("spinlock release1\n");
+                //log_to_serial("spinlock release1\n");
                 release_Spinlock(&global_Settings.PMM.lock);
-                log_to_serial("spinlock released!!!!!!!\n");
+                //log_to_serial("spinlock released!!!!!!!\n");
                 return valid_frame;
             }
         }
     }
-    log_to_serial("spinlock release2\n");
+   // log_to_serial("spinlock release2\n");
     release_Spinlock(&global_Settings.PMM.lock);
     
     log_to_serial("spinlock released!!!!!!!\n");
@@ -292,21 +292,21 @@ bool is_frame_mapped_hugepages(uint64_t virtual_address, uint64_t* pml4t_addr)
     uint64_t* pdpt = (uint64_t*)((pml4t_addr[pml4t_index] & PTADDRMASK)); 
     if (pdpt == NULL)
     {
-        log_to_serial("pdpt null\n");
+        //log_to_serial("pdpt null\n");
         return false;
     }
     pdpt = (uint64_t*)((char*)&*global_Settings.pdpt_kernel);
     uint64_t* pdt = (uint64_t*)((pdpt[pdpt_index] & PTADDRMASK));
     if (pdt == NULL)
     {
-        log_to_serial("pdt null\n");
+        //log_to_serial("pdt null\n");
         return false;
     }
     pdt = (uint64_t*)((char*)pdt + KERNEL_HH_START);
     
     if (pdt[pdt_index] == NULL)
     {
-        log_to_serial("is_frame_mapped_hugepages pdt entry null\n");
+        //log_to_serial("is_frame_mapped_hugepages pdt entry null\n");
         return false;
     }
     return true;

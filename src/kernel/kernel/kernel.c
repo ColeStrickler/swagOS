@@ -73,7 +73,7 @@ void __higherhalf_stubentry(uint64_t ptr_multiboot_info)
 	uint64_t* pdt_addr = (uint64_t*)((uint64_t)global_Settings.pdt_kernel[0] & ~KERNEL_HH_START);
 
 	pml4t_addr[pml4t_index] = ((uint64_t)pdpt_addr) | (PAGE_PRESENT | PAGE_WRITE);
-	pml4t_addr[510] = ((uint64_t)pml4t_addr) | (PAGE_PRESENT | PAGE_WRITE);
+	//pml4t_addr[510] = ((uint64_t)pml4t_addr) | (PAGE_PRESENT | PAGE_WRITE);
 	pdpt_addr[pdpt_index] = ((uint64_t)pdt_addr) | (PAGE_PRESENT | PAGE_WRITE); 
 
 
@@ -189,7 +189,10 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	setup_global_data();
 	parse_multiboot_info(ptr_multiboot_info);
 	parse_madt(global_Settings.madt);
-	log_hexval("Num CPUS", global_Settings.cpu_count);
+	for (int i = 0; i < global_Settings.cpu_count; i++)
+	{
+		log_hexval("cpu lapic", global_Settings.cpu[i].local_apic);
+	}
 	log_to_serial("1\n");
 	
 	log_to_serial("2\n");
@@ -200,14 +203,16 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	
 	log_to_serial("apic setup finished\n");
 	kheap_init(); // we use spinlocks here and mess with interrupt flags so do this after we initialize interrupt stuff
-	
+	log_to_serial("kheap_init() finished\n");
 	keyboard_driver_init();
-	
+	log_to_serial("keyboard driver init finished\n");
 	
 	video_init();
+	log_to_serial("video init finished\n");
 
 
 	init_terminal();
+	log_to_serial("terminal init finished!\n");
 	
 	uint8_t r = 0xae;
 	uint8_t g = 0x18;
@@ -215,32 +220,16 @@ void kernel_main(uint64_t ptr_multiboot_info)
 
 
 	int i = 0;
-	while(i < global_Settings.TerminalDriver.terminal_buf_size-1)
+	while ( i < 10)
 	{
-		log_hexval("write", i);
-		terminal_write_char('l', RGB_COLOR(r | i, g - i, b & i));
+		printf("The number is: %d ",  i);
 		i++;
 	}
+	
 	//clear_screen(0, 0, 0);
 	//char* label = "swag yolo";
 
 	
-	
-	
-	//draw_character(400, 400, , FONT_BITMAP_LATIN_CAPITAL_LETTER_S);
-	//draw_character(416, 400, RGB_COLOR(0x00, 0xff, 0xff), FONT_BITMAP_LATIN_CAPITAL_LETTER_W);
-	//draw_character(432, 400, RGB_COLOR(0x00, 0xff, 0xff), FONT_BITMAP_LATIN_CAPITAL_LETTER_A);
-	//draw_character(448, 400, RGB_COLOR(0x00, 0xff, 0xff), FONT_BITMAP_LATIN_CAPITAL_LETTER_G);
-	//draw_character(464, 400, RGB_COLOR(0x00, 0xff, 0xff), FONT_BITMAP_SPACE);
-	//draw_character(480, 400, RGB_COLOR(0x00, 0xff, 0xff), FONT_BITMAP_LATIN_CAPITAL_LETTER_Y);
-	//draw_character(496, 400, RGB_COLOR(0x00, 0xff, 0xff), FONT_BITMAP_LATIN_CAPITAL_LETTER_O);
-	//draw_character(512, 400, RGB_COLOR(0x00, 0xff, 0xff), FONT_BITMAP_LATIN_CAPITAL_LETTER_L);
-	//draw_character(528, 400, RGB_COLOR(0x00, 0xff, 0xff), FONT_BITMAP_LATIN_CAPITAL_LETTER_O);
-	//set_pixel(0, 0, 100, 100, 100);
-	
-	
-	
-	// test page fault exception
 
 
 	log_to_serial("end\n");

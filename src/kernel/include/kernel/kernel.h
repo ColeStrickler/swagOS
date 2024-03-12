@@ -24,7 +24,7 @@ typedef struct KernelSettings
     struct x8664_Settings settings_x8664;
     struct KeyboardDriverSettings KeyboardDriver;
     struct TerminalState TerminalDriver;
-    struct Heap KernelHeap;
+    struct KernelHeap kernel_heap;
     bool bTimerCalibrated;
     uint64_t tickCount;
     bool useXSDT;

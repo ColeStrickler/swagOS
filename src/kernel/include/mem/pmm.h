@@ -13,8 +13,8 @@
 
 #define PGSIZE 4096 // 4*1024b
 #define HUGEPGSIZE (2*1024*1024) // 2mb
-#define HUGEPGROUNDUP(sz)  ((sz+HUGEPGSIZE) - ((sz+HUGEPGSIZE)%HUGEPGSIZE))
-#define HUGEPGROUNDDOWN(sz) (sz - (sz%HUGEPGSIZE))
+#define HUGEPGROUNDUP(sz)  (((sz)+HUGEPGSIZE) - (((sz)+HUGEPGSIZE)%HUGEPGSIZE))
+#define HUGEPGROUNDDOWN(sz) ((sz) - ((sz)%HUGEPGSIZE))
 #define PGROUNDUP(sz)  ((sz+PGSIZE) - ((sz+PGSIZE)%PGSIZE))
 #define PGROUNDDOWN(sz) (sz - (sz%PGSIZE))
 #define PTADDRMASK 0xFFFFFFFFFFFFF000
