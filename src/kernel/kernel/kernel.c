@@ -14,7 +14,13 @@
 #include <panic.h>
 #include <ps2_keyboard.h>
 #include <terminal.h>
+#include <cpu.h>
 
+/*
+	This global variable holds our smp stub, we must move it later on to physical address 0x2000
+*/
+extern uint64_t smp_init;
+extern uint64_t smp_init_end;
 /*
 	These global variables are created in boot.asm
 */
@@ -82,6 +88,9 @@ void __higherhalf_stubentry(uint64_t ptr_multiboot_info)
 	{
 		pdt_addr[i] = ((i*pg_size)) | (PAGE_PRESENT | PAGE_WRITE | PAGE_HUGE);
 	}
+
+	
+
 
 	/*
 		Now that we have mapped our kernel into the higher half we need to update our stack mapping and gdt so that they use the new
@@ -162,6 +171,18 @@ void setup_global_data()
 	global_Settings.PMM.kernel_phystop = &KERNEL_END;
 	global_Settings.pml4t_kernel = &pml4t;
 	global_Settings.pdpt_kernel = &pdpt;
+	log_hexval("smp_init_end", &smp_init_end);
+	log_hexval("smp_init", &smp_init);
+
+	unsigned char* smp_stub_transfer_addr = (char*)(KERNEL_HH_START + (uint64_t)0x2000);
+
+	log_hexval("transfer size", &smp_init_end - &smp_init);
+	for (uint32_t i = 0; i < &smp_init_end - &smp_init; i++)
+	{
+		log_hexval("i", i);
+		smp_stub_transfer_addr[i] = ((char*)&smp_init)[i];
+	}
+
 }
 
 
@@ -238,14 +259,23 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	printf(msg);
 	printf(msg);
 
+	log_hexval("gdt", global_gdt_ptr_high);
 
 	//printf(swag);
 
 	//clear_screen(0, 0, 0);
 	//char* label = "swag yolo";
 
+	for (int i = 0; i < global_Settings.cpu_count; i++)
+	{
+		uint16_t id = global_Settings.cpu[i].id;
+		if (id != get_current_cpu()->id)
+		{
+			log_hexval("Attempting to init", id);
+			InitCPUByID(id);
+		}
+	}
 	
-
 
 	log_to_serial("end\n");
 	while(1);

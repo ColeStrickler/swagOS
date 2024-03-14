@@ -7,7 +7,15 @@
 #include <kernel.h>
 #include <panic.h>
 
+uint64_t ReadBase() {
+    uint64_t low;
+    uint64_t high;
+    asm("rdmsr" : "=a"(low), "=d"(high) : "c"(0x1B));
 
+    return (high << 32) | low;
+}
+
+#define APIC_WRITE(off, val) (*((volatile uint32_t*)(ReadBase() + off)) = val)
 
 extern KernelSettings global_Settings;
 uint64_t apic_read_reg(uint32_t reg_offset);
@@ -24,15 +32,19 @@ int apic_init()
     int apic_available = edx & CPUID_PROC_FEAT_ID_EDX_APIC; 
 
     if (!apic_available)
-    {
-
-    }
+        panic("apic_init() --> apic is not available\n");
+    
 
     uint32_t apic_msr_lo, apic_msr_hi;
     cpuGetMSR(IA32_APIC_BASE_MSR, &apic_msr_lo, &apic_msr_hi);
 
     int apic_globally_enabled = (apic_msr_lo & IA32_APIC_BASE_MSR_ENABLE);
 
+    uint64_t lapic_base = ReadBase();
+    if (!is_frame_mapped_hugepages(lapic_base, global_Settings.pml4t_kernel))
+    {
+        map_kernel_page(HUGEPGROUNDDOWN(lapic_base), HUGEPGROUNDDOWN(lapic_base));
+    }
 
     /*
         Local apic must be enabled to enable X2APIC
@@ -46,8 +58,6 @@ int apic_init()
         cpuSetMSR(IA32_APIC_BASE_MSR, apic_msr_lo, apic_msr_hi);
     }
 
-
-    
     if (x2_apic_available)
     {
         //apic_msr_lo
@@ -61,6 +71,7 @@ int apic_init()
     }
     else if (apic_available)    // add support for regular APIC later
     {
+        panic("apic_init() --> X2APIC not available and alternative modes are not yet implemented.\n");
         log_to_serial("Proceeding Regular APIC DMA mode.\n");
         global_Settings.settings_x8664.use_x2_apic = false;
         return -1;
@@ -71,8 +82,6 @@ int apic_init()
         log_to_serial("Proceeding with 8259 PIC legacy mode.\n");
     }
 
-
-    
     return 0;
 }
 
@@ -134,7 +143,7 @@ uint64_t apic_read_reg(uint32_t reg_offset)
 {
     if (global_Settings.settings_x8664.use_x2_apic)
     {
-        log_to_serial("apic_read_reg()\n");
+        //log_to_serial("apic_read_reg()\n");
         uint32_t eax, edx;
         // we tinker with the offset so we can use the same values for both DMA in APIC and MSR access in X2APIC
         cpuGetMSR((reg_offset >> 4) + 0x800, &eax, &edx);
@@ -152,7 +161,9 @@ void apic_write_reg(uint32_t reg_offset, uint32_t eax, uint32_t edx)
     if (global_Settings.settings_x8664.use_x2_apic)
     {
         // we tinker with the offset so we can use the same values for both DMA in APIC and MSR access in X2APIC
+        //log_to_serial("apic_write_reg begion!\n");
         cpuSetMSR((reg_offset >> 4) + 0x800, eax, edx);
+        //log_to_serial("apic_write_reg end!\n");
     }
     else
     {
@@ -199,7 +210,7 @@ static uint64_t dm_ioapic_address(io_apic* ioapic)
 {
     if (!ioapic)
         return 0x0;
-    log_int_to_serial(ioapic->io_apic_address);
+    //log_int_to_serial(ioapic->io_apic_address);
 
     /*
         For these direct mapped devices we will just direct map their addresses into the kernel page table
@@ -341,7 +352,7 @@ void apic_calibrate_timer() {
     // Set APIC init counter to -1
     apic_write_reg(APIC_REG_TIMER_INITCNT, 0xFFFFFFFF, 0);
 
-    log_to_serial("sleeping for 10ms\n");
+    //log_to_serial("sleeping for 10ms\n");
     set_irq_mask(0x2, false);
     // Perform PIT-supported sleep for 10ms
     pit_perform_sleep(10);
@@ -351,7 +362,7 @@ void apic_calibrate_timer() {
     // Now we know how often the APIC timer has ticked in 10ms
     uint32_t ticksIn10ms = (uint32_t)0xFFFFFFFF - (uint32_t)apic_read_reg(APIC_REG_TIMER_CURRCNT);
     set_irq_mask(0x2, true);
-    log_to_serial("calibration done!\n");
+   // log_to_serial("calibration done!\n");
     
     // Start timer as periodic on IRQ 0, divider 16, with the number of ticks we counted
     apic_write_reg(APIC_REG_TIMER_DIV, 0x3, 0x00);
@@ -377,12 +388,28 @@ uint32_t lapic_id()
     return global_Settings.settings_x8664.use_x2_apic ? id : id >> 24;
 }
 
+void apic_send_ipi(uint8_t dest_cpu, uint32_t dsh, uint32_t type, uint8_t vector)
+{
+    uint32_t high = ((uint32_t)dest_cpu) << 24;
+    uint32_t low = dsh | type | (vector & 0xff);
+
+    //log_hexval("APIC_BASE", ReadBase());
+    //apic_write_reg(APIC_REG_ICR_HIGH, high, 0x00);
+    APIC_WRITE(APIC_REG_ICR_HIGH, high);
+    //log_to_serial("apic_send_ipi() --> 1\n");
+    APIC_WRITE(APIC_REG_ICR_LOW, low);
+    //apic_write_reg(APIC_REG_ICR_LOW, low, 0x00);
+     
+    
+    log_to_serial("apic_send_ipi() --> done\n");
+}
+
+
 void init_ioapic()
 {
     MADT* madt_header = global_Settings.madt;
     io_apic_int_src_override* int_src_override;
     io_apic* io_apic_madt;
-    log_to_serial("searching ioapic\n");
    // log_hexval("lapic_id", lapic_id());
 	if (!(io_apic_madt = (io_apic*)madt_get_item(madt_header, MADT_ITEM_IO_APIC, 0)))
 	{

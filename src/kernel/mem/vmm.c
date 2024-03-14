@@ -107,14 +107,14 @@ uint64_t find_heap_frame(struct KernelHeap* heap, uint64_t size, uint32_t index)
     if (size > curr_section.size || (curr_section.flags&HEAP_FLAG_OCCUPIED))
         return UINT64_MAX;
 
-    log_hexval("curr_section.size", curr_section.size);
-    log_hexval("size needed", size);
+    //log_hexval("curr_section.size", curr_section.size);
+    //log_hexval("size needed", size);
     /*
         use first fit
     */
     if (curr_section.size >= size && (curr_section.size/2 < size || curr_section.size == KERNEL_HEAP_MINBLOCK) && !curr_section.in_use)
     {
-        log_hexval("found frame --> size", curr_section.size);
+        //log_hexval("found frame --> size", curr_section.size);
         curr_section.flags = HEAP_FLAG_OCCUPIED;
         curr_section.in_use = true;
         return curr_section.offset + heap->va_start;
@@ -166,7 +166,7 @@ uint64_t kheap_request(uint64_t size)
 */
 void* kalloc(uint64_t size)
 {
-    log_hexval("kalloc with size", size);
+    //log_hexval("kalloc with size", size);
     // retrieve the address of an open frame
     uint64_t kheap_memory = kheap_request(size);
     if (kheap_memory == UINT64_MAX)

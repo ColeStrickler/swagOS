@@ -206,8 +206,8 @@ void printf(const char* fmt, ...)
     va_start(args, fmt);
     while (fmt[i])
     {
-        log_char_to_serial(fmt[i]);
-        log_to_serial("\n");
+        //char_to_serial(fmt[i]);
+        //log_to_serial("\n");
         char c = fmt[i];
         if (c == 0x0)
             break;

@@ -1,6 +1,7 @@
 #include <asm_routines.h>
-#include "spinlock.h"
+#include <spinlock.h>
 #include <panic.h>
+#include <cpu.h>
 
 
 /*
@@ -23,7 +24,7 @@ void acquire_Spinlock(Spinlock* lock)
 
         this will allow a single thread to acquire multiple locks at once and not run into trouble
     */
-    cli();
+    inc_cli();
     if (spinlock_check_held(lock))
         panic("acquire_Spinlock() --> encountered deadlock situation.");
 
@@ -56,5 +57,5 @@ void release_Spinlock(Spinlock* lock)
         this will allow a single thread to acquire multiple locks at once and not run into trouble
     */
    
-    sti();
+    dec_cli();
 }

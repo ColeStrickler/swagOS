@@ -49,3 +49,11 @@ static inline void io_wait(void)
 {
     outb(0x80, 0);
 }
+
+static inline uint64_t
+read_rflags(void)
+{
+  uint64_t rflags;
+  asm volatile("pushfq; popq %0" : "=r" (rflags));
+  return rflags;
+}

@@ -4,24 +4,12 @@ global pml4t
 global pdpt
 global pdt
 global global_gdt_ptr_high
+global global_gdt_ptr_low
 global global_stack_top
 global ptr_multiboot_info
+global global_jump_here_smp
 global start
-section .bss
-align 4096
-; since we are going to do 2mb mapping initially, we will not need a PT and our page tables will only be 3 levels
-pml4t:
-    resb 4096
-pdpt:
-    resb 4096
-pdt:
-    resb 4096
 
-stack_bottom:
-    resb 1024*1024
-stack_top:
-
-section .rodata
 ; Higher half virtual address
 HH_VA equ 0xFFFFFFFF80000000 
 ; Access bits
@@ -36,7 +24,35 @@ ACCESSED       equ 1 << 0
 GRAN_4K       equ 1 << 7
 SZ_32         equ 1 << 6
 LONG_MODE     equ 1 << 5
- 
+
+
+section .bss
+align 4096
+; since we are going to do 2mb mapping initially, we will not need a PT and our page tables will only be 3 levels
+pml4t:
+    resb 4096
+pdpt:
+    resb 4096
+pdt:
+    resb 4096
+
+stack_bottom:
+    resb 1024*1024
+stack_top:
+
+
+
+section .data
+global_gdt_ptr_high:
+    dq gdt_ptr_high
+global_gdt_ptr:
+    dq gdt_ptr
+global_stack_top:
+    dq stack_top
+ptr_multiboot_info:
+    dq HH_VA    ; we will add a value to this
+
+section .rodata
 GDT:
     .Null: equ $ - GDT
         dq 0
@@ -61,15 +77,6 @@ gdt_ptr:
 gdt_ptr_high:
         dw gdt_ptr - GDT - 1
         dq GDT
-
-section .data
-global_gdt_ptr_high:
-    dq gdt_ptr_high
-global_stack_top:
-    dq stack_top
-ptr_multiboot_info:
-    dq HH_VA    ; we will add a value to this
-
 
 
 
@@ -152,6 +159,9 @@ start:
     call check_cpuid
     call check_longmode
     
+    
+
+
 
     ; using 2mb pages for our direct mapping will allow us to direct map the first 1gb of the kernel
 pagetable_setup:
@@ -179,6 +189,7 @@ direct_map_pdte:
     jne direct_map_pdte
 
 ; now that pages are created we move the top level directory to cr3
+
     mov eax, pml4t-HH_VA
     mov cr3, eax
     
@@ -217,11 +228,6 @@ enter_longmode_success:
     mov gs, ax                    
     mov ss, ax                    
     mov rax, 0x2f592f412f4b2f4f
-
-bp_test:
-    mov qword [0xb8000], rax
-    
-
 setup_higher_half:
 
     mov rdi, [ptr_multiboot_info-HH_VA]

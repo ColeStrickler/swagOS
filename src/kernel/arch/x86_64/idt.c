@@ -167,6 +167,8 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         case 13:
         {
             log_to_serial("General Protection fault interrupt.\n");
+            log_hexval("General Protection fault on CPU", get_current_cpu()->id);
+            panic("\n");
             break;
         }
         case 14:
@@ -179,8 +181,9 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
             
             if (!global_Settings.bTimerCalibrated)
                 panic("isr_handler() --> APIC TIMER INTERRUPT BEFORE CALIBRATION.\n");
-                
             
+            
+            global_Settings.tick_counter += 10;
             apic_end_of_interrupt();
             break;
         }

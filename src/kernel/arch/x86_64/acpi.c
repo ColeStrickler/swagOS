@@ -142,7 +142,6 @@ void parse_madt(MADT* madt)
                     global_Settings.cpu_count++;
                 }
                 
-
                 break;
             }
             case MADT_ITEM_IO_APIC:

@@ -13,12 +13,15 @@
 #include <terminal.h>
 #include <vmm.h>
 #include <cpu.h>
+#include <proc.h>
 
 #define KERNEL_HH_START 0xffffffff80000000
 typedef struct KernelSettings
 {
     struct CPU cpu[256];
     uint16_t cpu_count;
+
+    struct GlobalThreadTable threads;
 
 
     struct x8664_Settings settings_x8664;
@@ -33,9 +36,11 @@ typedef struct KernelSettings
     struct MADT* madt;
     struct multiboot_tag_framebuffer* framebuffer;
     PhysicalMemoryManager PMM;
+    uint64_t gdt;
     uint64_t* pml4t_kernel;
     uint64_t* pdpt_kernel;
     uint64_t pdt_kernel[512][512]__attribute__((aligned(0x1000)));
+    uint64_t tick_counter;
 
 } KernelSettings;
 

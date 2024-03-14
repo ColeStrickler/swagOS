@@ -27,6 +27,26 @@
 #define ICW4_SFNM	        0x10		/* Special fully nested (not) */
 
 #define PIC_EOI		        0x20	    /* End of interrupt command code */
+
+
+#define IPI_VECTOR(x) (x & 0xFF)
+#define IPI_MESSAGE_TYPE_FIXED 0
+#define IPI_MESSAGE_TYPE_LOW_PRIORITY (1 << 8)
+#define IPI_MESSAGE_TYPE_SMI (2 << 8)
+#define IPI_MESSAGE_TYPE_REMOTE_READ (3 << 8)
+#define IPI_MESSAGE_TYPE_NMI (4 << 8)
+#define IPI_MESSAGE_TYPE_INIT (5 << 8)
+#define IPI_MESSAGE_TYPE_STARTUP (6 << 8)
+#define IPI_MESSAGE_TYPE_EXTERNAL (7 << 8)
+
+
+#define IPI_DSH_DEST 0          // Use destination field
+#define IPI_DSH_SELF (1 << 18)  // Send to self
+#define IPI_DSH_ALL (2 << 18)   // Send to ALL APICs
+#define IPI_DSH_OTHER (3 << 18) // Send to all OTHER APICs 
+
+
+
 /*
     APIC register offsets
 
@@ -37,6 +57,8 @@
 #define APIC_REG_VERSION        0x30 /* defines APIC version */
 #define APIC_REG_EOI            0xB0
 #define APIC_REG_SPURIOUS_INT   0xF0
+#define APIC_REG_ICR_LOW        0x300
+#define APIC_REG_ICR_HIGH       0x310
 #define APIC_REG_TIMER_LVT      0x320
 #define APIC_REG_TIMER_INITCNT  0x380
 #define APIC_REG_TIMER_CURRCNT  0x390    
@@ -176,6 +198,7 @@ int apic_init();
 void apic_calibrate_timer();
 void apic_setup();
 uint32_t lapic_id();
+void apic_send_ipi(uint8_t dest_cpu, uint32_t dsh, uint32_t type, uint8_t vector);
 void init_ioapic();
 bool set_io_apic_redirect(io_apic *ioapic, uint32_t irq_num, uint32_t entry1_write, uint32_t entry2_write);
 bool get_io_apic_redirect(io_apic* ioapic, uint32_t irq_num, uint32_t* entry1_out, uint32_t* entry2_out);

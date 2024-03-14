@@ -4,13 +4,22 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <linked_list.h>
+#include <spinlock.h>
 
+#define MAX_NUM_THREADS 256
 
 typedef enum {
+    PROCESS_STATE_NOT_INITIALIZED,
     PROCESS_STATE_READY,
     PROCESS_STATE_RUNNING,
     PROCESS_STATE_KILLED
 } PROCESS_STATE;
+
+typedef enum {
+    KERNEL_THREAD,
+    USER_THREAD
+} THREAD_RUN_MODE;
+
 
 typedef struct cpu_context_t
 {
@@ -50,13 +59,17 @@ typedef struct cpu_context_t
 */
 typedef struct Thread
 {
-    struct dll_Entry list_entry;
     PROCESS_STATE status;
+    THREAD_RUN_MODE run_mode;
     uint32_t id;
     uint64_t* pml4t;
     cpu_context_t execution_context;
 } Thread;
 
 
+typedef struct GlobalThreadTable{
+    struct Spinlock lock;
+    struct Thread thread_table[MAX_NUM_THREADS];
+} GlobalThreadTable;
 
 #endif
