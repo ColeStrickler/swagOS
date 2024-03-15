@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <apic.h>
 
-#define SMP_INFO_STRUCT_PA 0x1000
+#define SMP_INFO_STRUCT_PA 0x7000
 
 
 
@@ -41,7 +41,7 @@ typedef struct SMP_INFO_STRUCT
     uint32_t magic;
     uint32_t smp_32bit_init_addr;
     uint32_t smp_64bit_init_addr;
-} SMP_INFO_STRUCT;
+}__attribute__((packed)) SMP_INFO_STRUCT;
 
 
 #endif CPU_H

@@ -21,6 +21,7 @@ void write_to_smp_info_struct(struct SMP_INFO_STRUCT smp_info)
     write_struct->gdt_ptr_pa = smp_info.gdt_ptr_pa;
     write_struct->kstack_va = smp_info.kstack_va;
     write_struct->pml4t_pa = smp_info.pml4t_pa;
+    log_hexval("check 2", &write_struct->pml4t_pa);
     write_struct->magic = 0x1111;
     write_struct->smp_32bit_init_addr = smp_info.smp_32bit_init_addr;
     write_struct->smp_64bit_init_addr = smp_info.smp_64bit_init_addr;
@@ -39,29 +40,28 @@ void sleep(uint32_t ms)
     global_Settings.tick_counter = 0;
     while(global_Settings.tick_counter < ms){};
 }
-
+extern uint64_t* pml4t;
 
 void InitCPUByID(uint16_t id)
 {
     struct SMP_INFO_STRUCT smp_info;
     smp_info.entry = init_smp;
-    log_hexval("gdt", global_Settings.gdt);
+    //log_hexval("gdt", global_Settings.gdt);
     smp_info.gdt_ptr_pa = global_Settings.gdt - KERNEL_HH_START;
-    log_hexval("gdt", smp_info.gdt_ptr_pa);
+    //log_hexval("gdt", smp_info.gdt_ptr_pa);
     uint64_t stack_alloc = (uint64_t)kalloc(0x10000);
     if (stack_alloc == NULL)
         panic("InitCPUByID() --> could not allocate a kernel stack\n");
+    log_hexval("pml4t", pml4t);
     smp_info.kstack_va = stack_alloc;
-    smp_info.pml4t_pa = ((uint64_t*)((uint64_t)&pml4t & ~KERNEL_HH_START));
-    smp_info.smp_32bit_init_addr = (uint64_t)&smp_32bit_init-(uint64_t)&smp_init + 0x2000;
+    log_hexval("kstack", smp_info.kstack_va);
+    smp_info.pml4t_pa = ((uint32_t)((uint64_t)global_Settings.pml4t_kernel & ~KERNEL_HH_START));
     smp_info.smp_64bit_init_addr = (uint64_t)&smp_64bit_init-(uint64_t)&smp_init + 0x2000;
 
-    map_4kb_page_kernel(0x1000, 0x1000);
+    map_4kb_page_kernel(0x7000, 0x7000);
     write_to_smp_info_struct(smp_info);
-    log_to_serial("Mapping...\n");
     map_4kb_page_kernel(0x2000, 0x2000);
     unsigned char* smp_stub_transfer_addr = (char*)(0x2000);
-     log_to_serial("Done Mapping...\n");
 	unsigned char* read_addr = (unsigned char*)((uint64_t)&smp_init);
 	memcpy((void*)smp_stub_transfer_addr, read_addr, 0x1000);
     
@@ -107,7 +107,7 @@ void microdelay(int us)
 void init_smp()
 {
     log_hexval("HERE CPU:", lapic_id());
-    panic("done!\n");
+    panic("INITSMPdone!\n");
 }
 
 
