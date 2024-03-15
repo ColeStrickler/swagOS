@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define APIC_BASE_SEL 0xFFFFFFFFFF000
+
 /*
     We must disable the legacy PIC to enable the APIC. We use these values for that purpose
 */
@@ -187,13 +189,15 @@ typedef union io_apic_redirect_entry_t {
 
     PIT runs at a fixed frequency of 1.19318MHz and we use it to calibrate the APIC timer
 */
-
+#define APIC_WRITE(off, val) (*((volatile uint32_t*)((ReadBase() & APIC_BASE_SEL) + off)) = val)
+#define APIC_READ(off) *((volatile uint32_t*)((ReadBase() & APIC_BASE_SEL) + (uint64_t)off))
 void apic_end_of_interrupt();
 void apic_start_timer();
 bool is_local_apic_available();
 bool is_x2_apic_available();
 void disable_pic_legacy();
 uint64_t get_local_apic_pa();
+uint64_t ReadBase();
 int apic_init();
 void apic_calibrate_timer();
 void apic_setup();
@@ -202,7 +206,7 @@ void apic_send_ipi(uint8_t dest_cpu, uint32_t dsh, uint32_t type, uint8_t vector
 void init_ioapic();
 bool set_io_apic_redirect(io_apic *ioapic, uint32_t irq_num, uint32_t entry1_write, uint32_t entry2_write);
 bool get_io_apic_redirect(io_apic* ioapic, uint32_t irq_num, uint32_t* entry1_out, uint32_t* entry2_out);
-
+uint64_t apic_read_reg(uint32_t reg_offset);
 void set_irq(uint8_t irq_type, uint8_t redirect_table_pos, uint8_t idt_entry, uint8_t destination_field, uint32_t flags, bool masked);
 
 void set_irq_mask(uint8_t redirect_table_pos, bool masked);

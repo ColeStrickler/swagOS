@@ -269,6 +269,28 @@ bool map_kernel_page(uint64_t va, uint64_t pa)
 }
 
 
+void map_4kb_page_kernel(uint64_t virtual_address, uint64_t physical_address)
+{
+    uint64_t pml4t_index = (virtual_address >> 39) & 0x1FF; 
+    uint64_t pdpt_index = (virtual_address >> 30) & 0x1FF; 
+    uint64_t pdt_index = (virtual_address >> 21) & 0x1FF; 
+    uint64_t pt_index = (virtual_address >> 12) & 0x1FF;
+
+
+    // table physical addresses
+    uint64_t* pml4t_addr = ((uint64_t*)((uint64_t)global_Settings.pml4t_kernel & ~KERNEL_HH_START));
+	uint64_t* pdpt_addr = ((uint64_t*)((uint64_t)global_Settings.pdpt_kernel & ~KERNEL_HH_START));
+	uint64_t* pdt_addr = (uint64_t*)((uint64_t)global_Settings.smp_pdt & ~KERNEL_HH_START);
+    uint64_t* pt_addr = ((uint64_t*)((uint64_t)global_Settings.smp_pt & ~KERNEL_HH_START));
+
+
+    global_Settings.pml4t_kernel[pml4t_index] = ((uint64_t)pdpt_addr) | (PAGE_PRESENT | PAGE_WRITE);
+	global_Settings.pdpt_kernel[pdpt_index] = ((uint64_t)pdt_addr) | (PAGE_PRESENT | PAGE_WRITE); 
+    global_Settings.smp_pdt[pdt_index] = ((uint64_t)pt_addr) | (PAGE_PRESENT | PAGE_WRITE);
+    global_Settings.smp_pt[pt_index] = physical_address | (PAGE_PRESENT | PAGE_WRITE);
+
+    return;
+}
 
 
 

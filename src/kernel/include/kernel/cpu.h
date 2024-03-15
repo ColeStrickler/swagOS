@@ -17,6 +17,7 @@ typedef struct CPU
     uint16_t id;    // we get this from the local apic id
     proc_lapic* local_apic;
     uint32_t cli_count;
+    uint64_t lapic_base;
 } CPU;
 
 void InitCPUByID(uint16_t id);
@@ -38,6 +39,8 @@ typedef struct SMP_INFO_STRUCT
     uint64_t kstack_va;
     uint64_t entry;
     uint32_t magic;
+    uint32_t smp_32bit_init_addr;
+    uint32_t smp_64bit_init_addr;
 } SMP_INFO_STRUCT;
 
 

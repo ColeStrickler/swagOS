@@ -64,6 +64,7 @@ build/%.c.o: src/%.c
 	$(CC) $(CC_FLAGS) $(KERNEL_INCLUDES) $< -c -o $@ 
 
 
+
 # -g is add debug symbols
 build/%.asm.o : src/%.asm
 	mkdir -p "$(@D)"	# this nifty command will create the directory we need in the build folder
@@ -90,7 +91,7 @@ qemu: clean myos.iso
 	qemu-system-x86_64 -enable-kvm -cpu host -serial file:out.log -m 8G -smp 8 -cdrom myos.iso
 
 debug: clean myos.iso
-	qemu-system-x86_64 -enable-kvm -cpu host -s -S -serial file:out.log -m 8G -smp 8 -cdrom myos.iso
+	qemu-system-x86_64 -enable-kvm -cpu qemu64 -s -S -serial file:out.log -m 8G -smp 8 -cdrom myos.iso
 
 clean:
 	# beginning line with a hyphen tells make to ignore errors

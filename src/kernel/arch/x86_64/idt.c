@@ -182,7 +182,6 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
             if (!global_Settings.bTimerCalibrated)
                 panic("isr_handler() --> APIC TIMER INTERRUPT BEFORE CALIBRATION.\n");
             
-            
             global_Settings.tick_counter += 10;
             apic_end_of_interrupt();
             break;
@@ -196,7 +195,8 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         case IDT_PIT_INT:
         {
             global_Settings.tickCount++;
-            outb(0x20,0x20); outb(0xa0,0x20);
+            log_hexval("tick count", global_Settings.tickCount);
+            outb(0x20,0x20); outb(0xa0,0x20);    
             apic_end_of_interrupt();
             break;
         }

@@ -45,6 +45,8 @@ stack_top:
 section .data
 global_gdt_ptr_high:
     dq gdt_ptr_high
+global_gdt_ptr_low:
+    dq gdt_ptr
 global_gdt_ptr:
     dq gdt_ptr
 global_stack_top:

@@ -7,24 +7,29 @@
 
 extern KernelSettings global_Settings;
 extern uint64_t smp_init;
-
+extern uint64_t smp_32bit_init;
+extern uint64_t smp_64bit_init;
+extern uint64_t smp_init_end;
+extern uint64_t* pml4t;
 
 
 void write_to_smp_info_struct(struct SMP_INFO_STRUCT smp_info)
 {
     // we have the first 1gb direct mapped
-    struct SMP_INFO_STRUCT* write_struct = (KERNEL_HH_START + SMP_INFO_STRUCT_PA);
+    struct SMP_INFO_STRUCT* write_struct = (struct SMP_INFO_STRUCT*)((uint64_t)SMP_INFO_STRUCT_PA);
     write_struct->entry = smp_info.entry;
     write_struct->gdt_ptr_pa = smp_info.gdt_ptr_pa;
     write_struct->kstack_va = smp_info.kstack_va;
     write_struct->pml4t_pa = smp_info.pml4t_pa;
-    write_struct->magic = 0x0;
+    write_struct->magic = 0x1111;
+    write_struct->smp_32bit_init_addr = smp_info.smp_32bit_init_addr;
+    write_struct->smp_64bit_init_addr = smp_info.smp_64bit_init_addr;
 }
 
 
 struct SMP_INFO_STRUCT* get_smp_info_struct()
 {
-    struct SMP_INFO_STRUCT* read_struct = (KERNEL_HH_START + SMP_INFO_STRUCT_PA);
+    struct SMP_INFO_STRUCT* read_struct = (struct SMP_INFO_STRUCT*)(KERNEL_HH_START + (uint64_t)SMP_INFO_STRUCT_PA);
     return read_struct;
 }
 
@@ -40,30 +45,62 @@ void InitCPUByID(uint16_t id)
 {
     struct SMP_INFO_STRUCT smp_info;
     smp_info.entry = init_smp;
+    log_hexval("gdt", global_Settings.gdt);
     smp_info.gdt_ptr_pa = global_Settings.gdt - KERNEL_HH_START;
+    log_hexval("gdt", smp_info.gdt_ptr_pa);
     uint64_t stack_alloc = (uint64_t)kalloc(0x10000);
     if (stack_alloc == NULL)
         panic("InitCPUByID() --> could not allocate a kernel stack\n");
     smp_info.kstack_va = stack_alloc;
-    smp_info.pml4t_pa = global_Settings.pml4t_kernel;
+    smp_info.pml4t_pa = ((uint64_t*)((uint64_t)&pml4t & ~KERNEL_HH_START));
+    smp_info.smp_32bit_init_addr = (uint64_t)&smp_32bit_init-(uint64_t)&smp_init + 0x2000;
+    smp_info.smp_64bit_init_addr = (uint64_t)&smp_64bit_init-(uint64_t)&smp_init + 0x2000;
+
+    map_4kb_page_kernel(0x1000, 0x1000);
     write_to_smp_info_struct(smp_info);
-
-    log_to_serial("InitCPUByID() --> here\n");
-    apic_send_ipi(id, IPI_DSH_DEST, IPI_MESSAGE_TYPE_INIT, 0);
+    log_to_serial("Mapping...\n");
+    map_4kb_page_kernel(0x2000, 0x2000);
+    unsigned char* smp_stub_transfer_addr = (char*)(0x2000);
+     log_to_serial("Done Mapping...\n");
+	unsigned char* read_addr = (unsigned char*)((uint64_t)&smp_init);
+	memcpy((void*)smp_stub_transfer_addr, read_addr, 0x1000);
     
-    sleep(10);
 
+    
+    APIC_WRITE(0x280, 0);   // clear errors
+    APIC_WRITE(APIC_REG_ICR_HIGH, /*(APIC_READ(APIC_REG_ICR_HIGH) & 0x00ffffff) |*/ id << 24);
+    APIC_WRITE(APIC_REG_ICR_LOW, /*(APIC_READ(APIC_REG_ICR_LOW) & 0xfff00000) |*/ 0x00C500);
+    do { __asm__ __volatile__ ("pause" : : : "memory");} while(APIC_READ(APIC_REG_ICR_LOW)&(1<<12));
+    microdelay(100);
+    APIC_WRITE(APIC_REG_ICR_HIGH, /*(APIC_READ(APIC_REG_ICR_HIGH) & 0x00ffffff) |*/ id << 24);
+    APIC_WRITE(APIC_REG_ICR_LOW, /*(APIC_READ(APIC_REG_ICR_LOW) & 0xfff00000) |*/ 0x008500);
+    do { __asm__ __volatile__ ("pause" : : : "memory");} while(APIC_READ(APIC_REG_ICR_LOW)&(1<<12));
+    microdelay(100);
+    uint32_t err;
+    for (int i = 0; i < 2; i++)
+    {
+        APIC_WRITE(0x280, 0);   // clear errors
+        APIC_WRITE(APIC_REG_ICR_HIGH, /*(APIC_READ(APIC_REG_ICR_HIGH) & 0x00ffffff) |*/ id << 24);
+        APIC_WRITE(APIC_REG_ICR_LOW, /*(APIC_READ(APIC_REG_ICR_LOW) & 0xfff0f800)*/ (uint32_t)0x0004602);
+        microdelay(300);
+        do { __asm__ __volatile__ ("pause" : : : "memory");} while(APIC_READ(APIC_REG_ICR_LOW)&(1<<12));
+        
+        //err = APIC_READ(0x280);
+       // if (err)
+        //{
+        //    log_hexval("Encountered Error in smp_init", err);
+        //    panic("\n");
+       // }
+        
+    }
 
-    log_to_serial("InitCPUByID() --> here\n");
-    /*
-        WE NEED TO MAKE SURE WE SET THIS VECTOR ARGUMENT CORRECTLY IT IS WHERE IT IS MESSING UP
-    */
-    apic_send_ipi(id, IPI_DSH_DEST, IPI_MESSAGE_TYPE_STARTUP, (0x2000 >> 12));
-    sleep(10);
-
+done:
     while(get_smp_info_struct()->magic != 0x6969){};
-    log_to_serial("GOT BACK MAGIC VALUE!\n");
+    return;
 
+}
+void microdelay(int us)
+{
 
 }
 

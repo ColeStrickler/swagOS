@@ -19,8 +19,7 @@
 /*
 	This global variable holds our smp stub, we must move it later on to physical address 0x2000
 */
-extern uint64_t smp_init;
-extern uint64_t smp_init_end;
+
 /*
 	These global variables are created in boot.asm
 */
@@ -32,9 +31,8 @@ extern uint64_t pdt[512] __attribute__((aligned(0x1000)));
 
 
 
-
-
 extern uint64_t global_gdt_ptr_high;
+extern uint64_t global_gdt_ptr_low;
 extern uint64_t global_stack_top;
 
 
@@ -171,18 +169,15 @@ void setup_global_data()
 	global_Settings.PMM.kernel_phystop = &KERNEL_END;
 	global_Settings.pml4t_kernel = &pml4t;
 	global_Settings.pdpt_kernel = &pdpt;
-	log_hexval("smp_init_end", &smp_init_end);
-	log_hexval("smp_init", &smp_init);
-
-	unsigned char* smp_stub_transfer_addr = (char*)(KERNEL_HH_START + (uint64_t)0x2000);
-
-	log_hexval("transfer size", &smp_init_end - &smp_init);
-	for (uint32_t i = 0; i < &smp_init_end - &smp_init; i++)
-	{
-		log_hexval("i", i);
-		smp_stub_transfer_addr[i] = ((char*)&smp_init)[i];
-	}
-
+	global_Settings.gdt = global_gdt_ptr_low;
+	uint64_t* pml4t_addr = ((uint64_t*)((uint64_t)&pml4t & ~KERNEL_HH_START));
+	log_hexval("pml4t address", pml4t_addr);
+	log_to_serial("Transfered smp stub\n");
+	log_hexval("gdt_ptr_low", global_gdt_ptr_low);
+	uint16_t* read_gdt = (uint32_t*)global_gdt_ptr_low;
+	log_hexval("dd", *read_gdt);
+	log_hexval("dq", *(uint64_t*)(read_gdt + 2));
+	
 }
 
 
@@ -205,6 +200,7 @@ void setup_global_data()
 void kernel_main(uint64_t ptr_multiboot_info)
 {
 	log_to_serial("[kernel_main()]: Entered.\n");
+
 
 	// Linker symbols have addresses only
 	setup_global_data();
@@ -259,7 +255,6 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	printf(msg);
 	printf(msg);
 
-	log_hexval("gdt", global_gdt_ptr_high);
 
 	//printf(swag);
 

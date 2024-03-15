@@ -71,4 +71,6 @@ uint64_t physical_frame_request();
 
 bool map_kernel_page(uint64_t va, uint64_t pa);
 
+void map_4kb_page_kernel(uint64_t virtual_address, uint64_t physical_address);
+
 bool is_frame_mapped_hugepages(uint64_t virtual_address, uint64_t *pml4t_addr);
