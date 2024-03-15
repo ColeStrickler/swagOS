@@ -6,6 +6,7 @@
 
 
 extern KernelSettings global_Settings;
+extern uint64_t global_gdt_ptr_high;
 extern uint64_t smp_init;
 extern uint64_t smp_32bit_init;
 extern uint64_t smp_64bit_init;
@@ -25,6 +26,13 @@ void write_to_smp_info_struct(struct SMP_INFO_STRUCT smp_info)
     write_struct->magic = 0x1111;
     write_struct->smp_32bit_init_addr = smp_info.smp_32bit_init_addr;
     write_struct->smp_64bit_init_addr = smp_info.smp_64bit_init_addr;
+}
+
+
+void write_magic_smp_info(uint32_t magic)
+{
+    struct SMP_INFO_STRUCT* write_struct = (struct SMP_INFO_STRUCT*)((uint64_t)SMP_INFO_STRUCT_PA);
+    write_struct->magic = magic;
 }
 
 
@@ -52,9 +60,9 @@ void InitCPUByID(uint16_t id)
     uint64_t stack_alloc = (uint64_t)kalloc(0x10000);
     if (stack_alloc == NULL)
         panic("InitCPUByID() --> could not allocate a kernel stack\n");
-    log_hexval("pml4t", pml4t);
+   // log_hexval("pml4t", pml4t);
     smp_info.kstack_va = stack_alloc;
-    log_hexval("kstack", smp_info.kstack_va);
+   // log_hexval("kstack", smp_info.kstack_va);
     smp_info.pml4t_pa = ((uint32_t)((uint64_t)global_Settings.pml4t_kernel & ~KERNEL_HH_START));
     smp_info.smp_64bit_init_addr = (uint64_t)&smp_64bit_init-(uint64_t)&smp_init + 0x2000;
 
@@ -84,18 +92,9 @@ void InitCPUByID(uint16_t id)
         APIC_WRITE(APIC_REG_ICR_LOW, /*(APIC_READ(APIC_REG_ICR_LOW) & 0xfff0f800)*/ (uint32_t)0x0004602);
         microdelay(300);
         do { __asm__ __volatile__ ("pause" : : : "memory");} while(APIC_READ(APIC_REG_ICR_LOW)&(1<<12));
-        
-        //err = APIC_READ(0x280);
-       // if (err)
-        //{
-        //    log_hexval("Encountered Error in smp_init", err);
-        //    panic("\n");
-       // }
-        
     }
 
-done:
-    while(get_smp_info_struct()->magic != 0x6969){};
+    while(get_smp_info_struct()->magic != SMP_INFO_MAGIC){}; // do not init the next CPU until it is safe
     return;
 
 }
@@ -107,7 +106,32 @@ void microdelay(int us)
 void init_smp()
 {
     log_hexval("HERE CPU:", lapic_id());
-    panic("INITSMPdone!\n");
+
+    
+    __asm__ __volatile__(
+		"lgdt (%0)\n\t"
+		"mov %%cr3, %%rax\n\t"
+        "mov %%rax, %%cr3\n\t"
+		"cpuid"
+        :
+        : "r" (global_gdt_ptr_high)
+		: "%eax", "memory"
+    );
+    
+    
+
+    smp_apic_init();
+    
+    
+    lidt();
+    
+    sti();
+    
+    smp_init_timer();
+    write_magic_smp_info(SMP_INFO_MAGIC); 
+    while(1);
+    while(1);
+    panic("\n");
 }
 
 

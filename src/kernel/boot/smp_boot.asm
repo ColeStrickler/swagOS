@@ -11,6 +11,7 @@ OFFSET_ENTRY    equ             0x10
 OFFSET_MAGIC    equ             0x18
 OFFSET_32       equ             0x1C
 OFFSET_64       equ             0x20
+SMP_INFO_MAGIC  equ             0x6969
 global smp_init
 global smp_init_end
 global smp_32bit_init
@@ -31,7 +32,7 @@ smp_init:
     cld
     ; we need to set up a stack here
 
-    mov dword [SMP_INFO_STRUCT + OFFSET_MAGIC], 0x6969  
+    ;mov dword [SMP_INFO_STRUCT + OFFSET_MAGIC], SMP_INFO_MAGIC  
     mov eax, cr4
     or eax, 1 << 5  ; Set PAE bit
     mov cr4, eax

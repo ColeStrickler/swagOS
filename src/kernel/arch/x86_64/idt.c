@@ -167,12 +167,13 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         case 13:
         {
             log_to_serial("General Protection fault interrupt.\n");
-            log_hexval("General Protection fault on CPU", get_current_cpu()->id);
+            log_hexval("General Protection fault on CPU", lapic_id());
             panic("\n");
             break;
         }
         case 14:
         {
+            log_hexval("Page Fault Interrupt on CPU", lapic_id());
             panic("Page Fault Interrupt");
             break;
         }
@@ -181,8 +182,9 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
             
             if (!global_Settings.bTimerCalibrated)
                 panic("isr_handler() --> APIC TIMER INTERRUPT BEFORE CALIBRATION.\n");
-            
-            global_Settings.tick_counter += 10;
+            //global_Settings.tick_counter += 10;
+            if (lapic_id() >= 2)
+                log_hexval("APIC_TIMER_INT ID", lapic_id());
             apic_end_of_interrupt();
             break;
         }
@@ -195,7 +197,8 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         case IDT_PIT_INT:
         {
             global_Settings.tickCount++;
-            log_hexval("tick count", global_Settings.tickCount);
+            if (lapic_id())
+                log_hexval("PID id", lapic_id());
             outb(0x20,0x20); outb(0xa0,0x20);    
             apic_end_of_interrupt();
             break;
@@ -210,6 +213,8 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
             if (tf->isr_id < 32)
                 log_to_serial((char*)exception_names[tf->isr_id]);
             log_hexval("\nExperienced unexpected interrupt.", tf->isr_id);
+            log_hexval("CPU ID", lapic_id());
+
             __asm__ __volatile__ ("hlt");
         }
     }

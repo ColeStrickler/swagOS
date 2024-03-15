@@ -6,6 +6,8 @@
 #include <asm_routines.h>
 #include <kernel.h>
 #include <panic.h>
+#include <spinlock.h>
+
 
 uint64_t ReadBase() {
     uint64_t low;
@@ -84,6 +86,38 @@ int apic_init()
 
     
     return 0;
+}
+
+/*
+    We must proceed slightly differently for SMP initialization
+*/
+void smp_apic_init()
+{
+    uint32_t apic_msr_lo, apic_msr_hi;
+    uint64_t lapic_base = ReadBase() & APIC_BASE_SEL;
+    if (!is_frame_mapped_hugepages(lapic_base, global_Settings.pml4t_kernel))
+    {
+        map_kernel_page(HUGEPGROUNDDOWN(lapic_base), HUGEPGROUNDDOWN(lapic_base));
+    }
+    cpuGetMSR(IA32_APIC_BASE_MSR, &apic_msr_lo, &apic_msr_hi);
+    int apic_globally_enabled = (apic_msr_lo & IA32_APIC_BASE_MSR_ENABLE);
+    if (!apic_globally_enabled)
+    {
+        apic_msr_lo |= IA32_APIC_BASE_MSR_ENABLE;
+        cpuSetMSR(IA32_APIC_BASE_MSR, apic_msr_lo, apic_msr_hi);
+    }
+    if (global_Settings.settings_x8664.use_x2_apic)
+    {
+        apic_msr_lo |= IA32_APIC_BASE_MSR_X2ENABLE;
+        cpuSetMSR(IA32_APIC_BASE_MSR, apic_msr_lo, apic_msr_hi);
+        apic_write_reg(APIC_REG_SPURIOUS_INT,  IDT_APIC_SPURIOUS_INT | APIC_SOFTWARE_ENABLE, 0);
+        log_to_serial("Proceeding with X2APIC.\n");
+    }
+    else 
+    {
+        log_to_serial("Proceeding Regular APIC DMA mode.\n");
+        apic_write_reg(APIC_REG_SPURIOUS_INT,  IDT_APIC_SPURIOUS_INT | APIC_SOFTWARE_ENABLE, 0);
+    }
 }
 
 
@@ -193,7 +227,8 @@ void set_pit_periodic(uint16_t count) {
 */
 void pit_perform_sleep(uint32_t milliseconds)
 {
-    uint64_t target_count = global_Settings.tickCount + milliseconds;
+    global_Settings.tickCount = 0;
+    uint64_t target_count = milliseconds;
     /*
         PIT runs at a fixed frequency of 1.19318MHz,
 
@@ -346,7 +381,6 @@ void set_irq_mask(uint8_t redirect_table_pos, bool masked)
     This method calibrates the APIC Timer to go off every 10ms
 */
 void apic_calibrate_timer() {
-
     // stop the APIC to begin the calibration
     //log_hexval("later later base", ReadBase());
     apic_write_reg(APIC_REG_TIMER_INITCNT, 0x00, 0x00);
@@ -356,7 +390,7 @@ void apic_calibrate_timer() {
     // Set APIC init counter to -1
     apic_write_reg(APIC_REG_TIMER_INITCNT, 0xFFFFFFFF, 0);
 
-   // log_to_serial("sleeping for 10ms\n");
+    log_to_serial("sleeping for 10ms\n");
     set_irq_mask(0x2, false);
     // Perform PIT-supported sleep for 10ms
     pit_perform_sleep(10);
@@ -364,23 +398,35 @@ void apic_calibrate_timer() {
     // Stop the APIC timer
     apic_write_reg(APIC_REG_TIMER_LVT, APIC_LVT_INT_MASKED, 0x00);
     // Now we know how often the APIC timer has ticked in 10ms
-    uint32_t ticksIn10ms = (uint32_t)0xFFFFFFFF - (uint32_t)apic_read_reg(APIC_REG_TIMER_CURRCNT);
+    global_Settings.ticksIn10ms = (uint32_t)0xFFFFFFFF - (uint32_t)apic_read_reg(APIC_REG_TIMER_CURRCNT);
     set_irq_mask(0x2, true);
-  //  log_to_serial("calibration done!\n");
+    log_to_serial("calibration done!\n");
     
     // Start timer as periodic on IRQ 0, divider 16, with the number of ticks we counted
     apic_write_reg(APIC_REG_TIMER_DIV, 0x3, 0x00);
     apic_write_reg(APIC_REG_TIMER_LVT, 32 | APIC_LVT_TIMER_MODE_PERIODIC, 0x00);
     
-    apic_write_reg(APIC_REG_TIMER_INITCNT, ticksIn10ms, 0x00);
+    apic_write_reg(APIC_REG_TIMER_INITCNT, global_Settings.ticksIn10ms, 0x00);
     global_Settings.bTimerCalibrated = true;
+}
+
+
+void smp_init_timer()
+{
+     apic_write_reg(APIC_REG_TIMER_INITCNT, 0x00, 0x00);
+    // Tell APIC timer to use divider 16
+
     
+    // Start timer as periodic on IRQ 0, divider 16, with the number of ticks we counted
+    apic_write_reg(APIC_REG_TIMER_DIV, 0x3, 0x00);
+    apic_write_reg(APIC_REG_TIMER_LVT, 32 | APIC_LVT_TIMER_MODE_PERIODIC, 0x00);
+    
+    apic_write_reg(APIC_REG_TIMER_INITCNT, global_Settings.ticksIn10ms, 0x00);
 }
 
 
 void apic_setup()
 {
-    
     apic_init();
     
    // init_ioapic(); // was in parse_multiboot_info, we need to make sure we are initializing the structures for the bootstrap cpu

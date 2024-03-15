@@ -6,7 +6,7 @@
 #include <apic.h>
 
 #define SMP_INFO_STRUCT_PA 0x7000
-
+#define SMP_INFO_MAGIC 0x6969
 
 
 #define CPU_FLAG_IF (1 << 9)

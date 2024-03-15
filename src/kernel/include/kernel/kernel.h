@@ -23,7 +23,7 @@ typedef struct KernelSettings
 
     struct GlobalThreadTable threads;
 
-
+    uint32_t ticksIn10ms;
     struct x8664_Settings settings_x8664;
     struct KeyboardDriverSettings KeyboardDriver;
     struct TerminalState TerminalDriver;

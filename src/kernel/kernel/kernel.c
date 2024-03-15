@@ -215,7 +215,7 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	log_to_serial("2\n");
 	idt_setup();
 	log_to_serial("3\n");
-	set_irq(0x02, 0x02, 0x22, 0, 0, true);
+	set_irq(0x02, 0x02, 0x22, 0, 0x0, true);
 	apic_setup();
 	
 	log_to_serial("apic setup finished\n");
@@ -269,6 +269,7 @@ void kernel_main(uint64_t ptr_multiboot_info)
 			log_hexval("Attempting to init", id);
 			InitCPUByID(id);
 		}
+
 	}
 	
 
