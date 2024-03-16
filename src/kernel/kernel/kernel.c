@@ -154,6 +154,7 @@ void higher_half_entry(uint64_t ptr_multiboot_info)
 		: "%eax", "memory"
     );
 	log_to_serial("[higher_half_entry()]: Successfully entered higher half.\n");
+	log_hexval("PML4T PROPER", pml4t_addr);
 
 	/*
 		We will never return from here
@@ -172,12 +173,7 @@ void setup_global_data()
 	global_Settings.pdpt_kernel = &pdpt;
 	global_Settings.gdt = global_gdt_ptr_low;
 
-	// Initialize kernel main thread
-	global_Settings.threads.thread_count = 1;
-	struct Thread* kthread = &global_Settings.threads.thread_table[0];
-	kthread.id = 0;
-	kthread->pml4t = &pml4t;
-	kthread->status = PROCESS_STATE_RUNNING;
+	
 
 	init_Spinlock(&global_Settings.PMM.lock);
 	init_Spinlock(&global_Settings.serial_lock);
@@ -185,6 +181,27 @@ void setup_global_data()
 }
 
 
+/*
+	This function must be called after the CPU information of the MADT is parsed because
+	get_current_cpu() traverses the CPU data structure that is populated with info from the MADT
+*/
+void kthread_setup()
+{
+	// Initialize kernel main thread
+	global_Settings.threads.thread_count = 1;
+	struct Thread* kthread = &global_Settings.threads.thread_table[0];
+	kthread->id = 0;
+	kthread->pml4t = KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel);
+	kthread->status = PROCESS_STATE_RUNNING;
+	get_current_cpu()->current_thread = kthread;
+}
+
+
+
+void IdleThread()
+{
+	while(1) {__asm__ __volatile__("pause");}
+}
 
 
 /*
@@ -221,6 +238,7 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	log_to_serial("3\n");
 	set_irq(0x02, 0x02, 0x22, 0, 0x0, true);
 	apic_setup();
+	kthread_setup();
 	
 	log_to_serial("apic setup finished\n");
 	kheap_init(); // we use spinlocks here and mess with interrupt flags so do this after we initialize interrupt stuff
@@ -258,7 +276,7 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	printf(msg);
 	printf(msg);
 	printf(msg);
-
+	log_hexval("IdleThread Address", IdleThread);
 
 	//printf(swag);
 
@@ -273,12 +291,12 @@ void kernel_main(uint64_t ptr_multiboot_info)
 			log_hexval("Attempting to init", id);
 			InitCPUByID(id);
 		}
-
 	}
 	
+	CreateThread(IdleThread, 1, true);
 
-	log_to_serial("end\n");
-	while(1);
+	
+	while(1){};
 
 }
 

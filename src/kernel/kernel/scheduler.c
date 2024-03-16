@@ -1,8 +1,9 @@
 #include <scheduler.h>
 #include <proc.h>
+#include <apic.h>
 #include <kernel.h>
 #include <cpu.h>
-
+#include <panic.h>
 
 extern KernelSettings global_Settings;
 
@@ -14,51 +15,67 @@ void InvokeScheduler(struct cpu_context_t* ctx)
     struct CPU* current_cpu = get_current_cpu();
     struct Thread* old_thread = current_cpu->current_thread;
     acquire_Spinlock(&global_Settings.threads.lock);
+    //log_to_serial("Invoke Scheduler!\n");
     for (uint32_t i = 0; i < MAX_NUM_THREADS; i++)
     {
+        if (i == 0)
+        {
+            log_hexval("status", thread_table[i].status);
+        }
+
+
         if (thread_table[i].id == old_thread->id && old_thread->status != PROCESS_STATE_RUNNING)
             panic("InvokeScheduler() --> old_thread was in unexpected state.\n");
         if (thread_table[i].status != PROCESS_STATE_READY)
+        {   
             continue;
-
+        }
+        log_hexval("Doing process", i);
         old_thread->execution_context = ctx;
         old_thread->status = PROCESS_STATE_READY;
         schedule(current_cpu, &thread_table[i]);
         
     }
     release_Spinlock(&global_Settings.threads.lock);
+    apic_end_of_interrupt();
 }
 
 
 void schedule(struct CPU* cpu, struct Thread* thread)
 {
+    
     cpu->current_thread = thread;
     thread->status = PROCESS_STATE_RUNNING;
+    release_Spinlock(&global_Settings.threads.lock);
+    apic_end_of_interrupt(); // move this back to idt?
+    log_hexval("Got rip", thread->execution_context->i_rip);
+    log_hexval("Stack", thread->execution_context->i_rsp);
+    log_hexval("PML4T", thread->pml4t);
 
     /*
         thread->execution_context is a pointer to the top of the saved stack
     */
     __asm__ __volatile__(
-        "(mov %0, %%rsp;
-        mov %1, %%rax;
-        pop %%r15;
-        pop %%r14;
-        pop %%r13;
-        pop %%r12;
-        pop %%r11;
-        pop %%r10;
-        pop %%r9;
-        pop %%r8;
-        pop %%rbp;
-        pop %%rdi;
-        pop %%rsi;
-        pop %%rdx;
-        pop %%rcx;
-        pop %%rbx;
-        mov %%rax, %%cr3
-        pop %%rax
-        add $16, %%rsp 
-        iretq)" ::"r" (thread->execution_context),     
+        "mov %0, %%rsp\n\t"
+        "mov %1, %%rax\n\t"
+        "pop %%r15\n\t"
+        "pop %%r14\n\t"
+        "pop %%r13\n\t"
+        "pop %%r12\n\t"
+        "pop %%r11\n\t"
+        "pop %%r10\n\t"
+        "pop %%r9\n\t"
+        "pop %%r8\n\t"
+        "pop %%rdi\n\t"
+        "pop %%rsi\n\t"
+        "pop %%rbp\n\t"
+        "pop %%rdx\n\t"
+        "pop %%rcx\n\t"
+        "pop %%rbx\n\t"
+        "mov %%rax, %%cr3\n\t"
+        "pop %%rax\n\t"
+        "add $16, %%rsp\n\t"
+        "iretq\n\t" ::"r" (thread->execution_context),     
         "r"(thread->pml4t));
 }
 

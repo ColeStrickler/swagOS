@@ -73,4 +73,8 @@ typedef struct GlobalThreadTable{
     uint32_t thread_count;
 } GlobalThreadTable;
 
+void CreateThread(void (*entry)(void *), uint32_t pid, bool kthread);
+
+
 #endif
+

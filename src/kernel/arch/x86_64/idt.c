@@ -5,6 +5,7 @@
 #include <kernel.h>
 #include <panic.h>
 #include <ps2_keyboard.h>
+#include <scheduler.h>
 
 extern KernelSettings global_Settings;
 
@@ -183,8 +184,8 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
             if (!global_Settings.bTimerCalibrated)
                 panic("isr_handler() --> APIC TIMER INTERRUPT BEFORE CALIBRATION.\n");
             global_Settings.tick_counter += 1;
-
-            apic_end_of_interrupt();
+            log_to_serial("Timer!\n");
+            InvokeScheduler((cpu_context_t*)tf);
             break;
         }
         case IDT_KEYBOARD_INT:

@@ -16,6 +16,9 @@
 #include <proc.h>
 
 #define KERNEL_HH_START 0xffffffff80000000
+#define KERNEL_PML4T_PHYS(pml4t) ((uint64_t)pml4t & ~KERNEL_HH_START) // call on the global_Settings.pml4t_kernel value
+
+
 typedef struct KernelSettings
 {
     struct CPU cpu[256];
