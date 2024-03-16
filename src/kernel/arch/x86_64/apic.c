@@ -115,7 +115,7 @@ void smp_apic_init()
     }
     else 
     {
-        log_to_serial("Proceeding Regular APIC DMA mode.\n");
+       // log_to_serial("Proceeding Regular APIC DMA mode.\n");
         apic_write_reg(APIC_REG_SPURIOUS_INT,  IDT_APIC_SPURIOUS_INT | APIC_SOFTWARE_ENABLE, 0);
     }
 }

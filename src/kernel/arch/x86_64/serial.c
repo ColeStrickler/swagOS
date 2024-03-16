@@ -1,8 +1,10 @@
 #include <string.h>
 #include <serial.h>
 #include <stdint.h>
+#include <kernel.h>
+#include <serial.h>
 
- 
+
 unsigned char inb(int portnum)
 {
   unsigned char data=0;

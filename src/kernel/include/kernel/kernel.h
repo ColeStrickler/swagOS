@@ -43,6 +43,7 @@ typedef struct KernelSettings
     uint64_t smp_pdt[512]__attribute__((aligned(0x1000))); // we just need this for smp, we use huge pages elsewhere
     uint64_t smp_pt[512]__attribute__((aligned(0x1000))); // we just need this for smp, we use huge pages elsewhere
     uint64_t tick_counter;
+    Spinlock serial_lock;
 } KernelSettings;
 
 #endif

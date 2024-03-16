@@ -11,6 +11,7 @@ typedef struct Spinlock
 
 } Spinlock;
 
+void init_Spinlock(Spinlock *lock);
 
 void acquire_Spinlock(Spinlock *lock);
 void release_Spinlock(Spinlock *lock);

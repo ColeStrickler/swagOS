@@ -10,9 +10,15 @@
 bool spinlock_check_held(Spinlock* lock)
 {
     // Once we have per cpu structures we can check if the same CPU holds the lock
-    if (lock->is_locked) //&& lock->owner_cpu == 655454342)
+    if (lock->is_locked && lock->owner_cpu == get_current_cpu()->id) //&& lock->owner_cpu == 655454342)
         return true;
     return false;
+}
+
+void init_Spinlock(Spinlock* lock)
+{
+    lock->is_locked = false;
+    lock->owner_cpu = -1;
 }
 
 
@@ -33,8 +39,7 @@ void acquire_Spinlock(Spinlock* lock)
     // use gcc intrinsic to implement a memory barrier so no loads or stores are issued before the lock is acquired
     __sync_synchronize();
 
-    //lock->owner_cpu = this_cpu();
-
+    lock->owner_cpu = get_current_cpu()->id;
 }
 
 

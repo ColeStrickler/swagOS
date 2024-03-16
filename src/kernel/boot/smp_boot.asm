@@ -69,6 +69,7 @@ smp_64bit_init:
     mov ss, ax
 
     mov rsp, [SMP_INFO_STRUCT + OFFSET_KSTACK]
+    cli
     call [HH_VA + SMP_INFO_STRUCT + OFFSET_ENTRY] ; SMP entry point
     hlt
     jmp $

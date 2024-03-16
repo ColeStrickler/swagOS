@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <apic.h>
+#include <proc.h>
 
 #define SMP_INFO_STRUCT_PA 0x7000
 #define SMP_INFO_MAGIC 0x6969
@@ -18,6 +19,7 @@ typedef struct CPU
     proc_lapic* local_apic;
     uint32_t cli_count;
     uint64_t lapic_base;
+    struct Thread* current_thread;
 } CPU;
 
 void InitCPUByID(uint16_t id);

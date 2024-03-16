@@ -63,13 +63,14 @@ typedef struct Thread
     THREAD_RUN_MODE run_mode;
     uint32_t id;
     uint64_t* pml4t;
-    cpu_context_t execution_context;
+    cpu_context_t* execution_context;
 } Thread;
 
 
 typedef struct GlobalThreadTable{
     struct Spinlock lock;
     struct Thread thread_table[MAX_NUM_THREADS];
+    uint32_t thread_count;
 } GlobalThreadTable;
 
 #endif

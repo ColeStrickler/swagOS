@@ -15,6 +15,7 @@
 #include <ps2_keyboard.h>
 #include <terminal.h>
 #include <cpu.h>
+#include <spinlock.h>
 
 /*
 	This global variable holds our smp stub, we must move it later on to physical address 0x2000
@@ -170,14 +171,17 @@ void setup_global_data()
 	global_Settings.pml4t_kernel = &pml4t;
 	global_Settings.pdpt_kernel = &pdpt;
 	global_Settings.gdt = global_gdt_ptr_low;
-	uint64_t* pml4t_addr = ((uint64_t*)((uint64_t)&pml4t & ~KERNEL_HH_START));
-	log_hexval("pml4t address", pml4t_addr);
-	log_to_serial("Transfered smp stub\n");
-	log_hexval("gdt_ptr_low", global_gdt_ptr_low);
-	uint16_t* read_gdt = (uint32_t*)global_gdt_ptr_low;
-	log_hexval("dd", *read_gdt);
-	log_hexval("dq", *(uint64_t*)(read_gdt + 2));
-	
+
+	// Initialize kernel main thread
+	global_Settings.threads.thread_count = 1;
+	struct Thread* kthread = &global_Settings.threads.thread_table[0];
+	kthread.id = 0;
+	kthread->pml4t = &pml4t;
+	kthread->status = PROCESS_STATE_RUNNING;
+
+	init_Spinlock(&global_Settings.PMM.lock);
+	init_Spinlock(&global_Settings.serial_lock);
+	init_Spinlock(&global_Settings.threads.lock);
 }
 
 

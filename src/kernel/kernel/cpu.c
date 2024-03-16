@@ -57,7 +57,7 @@ void InitCPUByID(uint16_t id)
     //log_hexval("gdt", global_Settings.gdt);
     smp_info.gdt_ptr_pa = global_Settings.gdt - KERNEL_HH_START;
     //log_hexval("gdt", smp_info.gdt_ptr_pa);
-    uint64_t stack_alloc = (uint64_t)kalloc(0x10000);
+    uint64_t stack_alloc = (uint64_t)kalloc(0x10000) + (uint64_t)0x10000;
     if (stack_alloc == NULL)
         panic("InitCPUByID() --> could not allocate a kernel stack\n");
    // log_hexval("pml4t", pml4t);
@@ -105,9 +105,7 @@ void microdelay(int us)
 
 void init_smp()
 {
-    log_hexval("HERE CPU:", lapic_id());
-
-    
+     
     __asm__ __volatile__(
 		"lgdt (%0)\n\t"
 		"mov %%cr3, %%rax\n\t"
@@ -117,21 +115,14 @@ void init_smp()
         : "r" (global_gdt_ptr_high)
 		: "%eax", "memory"
     );
-    
-    
-
+    //log_hexval("HERE CPU:", lapic_id()); 
     smp_apic_init();
-    
-    
     lidt();
-    
     sti();
-    
     smp_init_timer();
     write_magic_smp_info(SMP_INFO_MAGIC); 
-    while(1);
-    while(1);
-    panic("\n");
+    for (;;)
+         __asm__ __volatile__("hlt");
 }
 
 

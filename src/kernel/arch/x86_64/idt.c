@@ -182,9 +182,8 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
             
             if (!global_Settings.bTimerCalibrated)
                 panic("isr_handler() --> APIC TIMER INTERRUPT BEFORE CALIBRATION.\n");
-            //global_Settings.tick_counter += 10;
-            if (lapic_id() >= 2)
-                log_hexval("APIC_TIMER_INT ID", lapic_id());
+            global_Settings.tick_counter += 1;
+
             apic_end_of_interrupt();
             break;
         }
