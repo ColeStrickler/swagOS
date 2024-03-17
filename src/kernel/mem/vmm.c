@@ -103,8 +103,8 @@ uint64_t find_heap_frame(struct KernelHeap* heap, uint64_t size, uint32_t index)
     if (index >= KERNEL_HEAP_LEN)
         return UINT64_MAX;
 
-    struct HeapSection curr_section = heap->heap_tree[index];
-    if (size > curr_section.size || (curr_section.flags&HEAP_FLAG_OCCUPIED))
+    struct HeapSection* curr_section = &heap->heap_tree[index];
+    if (size > curr_section->size || (curr_section->flags&HEAP_FLAG_OCCUPIED))
         return UINT64_MAX;
 
     //log_hexval("curr_section.size", curr_section.size);
@@ -112,12 +112,13 @@ uint64_t find_heap_frame(struct KernelHeap* heap, uint64_t size, uint32_t index)
     /*
         use first fit
     */
-    if (curr_section.size >= size && (curr_section.size/2 < size || curr_section.size == KERNEL_HEAP_MINBLOCK) && !curr_section.in_use)
+    if (curr_section->size >= size && (curr_section->size/2 < size || curr_section->size == KERNEL_HEAP_MINBLOCK) && !curr_section->in_use)
     {
         //log_hexval("found frame --> size", curr_section.size);
-        curr_section.flags = HEAP_FLAG_OCCUPIED;
-        curr_section.in_use = true;
-        return curr_section.offset + heap->va_start;
+        log_hexval("Found Index", index);
+        curr_section->flags = HEAP_FLAG_OCCUPIED;
+        curr_section->in_use = true;
+        return curr_section->offset + heap->va_start;
     }
 
 
@@ -126,7 +127,7 @@ uint64_t find_heap_frame(struct KernelHeap* heap, uint64_t size, uint32_t index)
         uint64_t left_search = find_heap_frame(heap, size, index*2);
         if (left_search != UINT64_MAX)
         {
-            curr_section.in_use = true;
+            curr_section->in_use = true;
             return left_search;
         }
     }
@@ -135,7 +136,7 @@ uint64_t find_heap_frame(struct KernelHeap* heap, uint64_t size, uint32_t index)
     uint64_t right_search = find_heap_frame(heap, size, index*2 + 1);
     if (right_search != UINT64_MAX)
     {
-        curr_section.in_use = true;
+        curr_section->in_use = true;
         return right_search;
     }
 }

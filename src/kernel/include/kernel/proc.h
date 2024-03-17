@@ -7,6 +7,7 @@
 #include <spinlock.h>
 
 #define MAX_NUM_THREADS 256
+#define IDLE_THREAD MAX_NUM_THREADS
 
 typedef enum {
     PROCESS_STATE_NOT_INITIALIZED,
@@ -69,12 +70,13 @@ typedef struct Thread
 
 typedef struct GlobalThreadTable{
     struct Spinlock lock;
-    struct Thread thread_table[MAX_NUM_THREADS];
+    struct Thread thread_table[MAX_NUM_THREADS+1]; // +1 so we can use MAX_NUM_THREADS to select IDLE_THREAD
     uint32_t thread_count;
 } GlobalThreadTable;
 
-void CreateThread(void (*entry)(void *), uint32_t pid, bool kthread);
+void CreateIdleThread(void (*entry)(void *));
 
+void CreateThread(void (*entry)(void *), uint32_t pid, bool kthread);
 
 #endif
 

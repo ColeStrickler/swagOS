@@ -204,6 +204,9 @@ void IdleThread()
 }
 
 
+
+
+
 /*
 	In kernel_main() is where we set up our various kernel functionality.
 
@@ -240,8 +243,10 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	apic_setup();
 	kthread_setup();
 	
+	
 	log_to_serial("apic setup finished\n");
 	kheap_init(); // we use spinlocks here and mess with interrupt flags so do this after we initialize interrupt stuff
+	
 	log_to_serial("kheap_init() finished\n");
 	keyboard_driver_init();
 	log_to_serial("keyboard driver init finished\n");
@@ -278,6 +283,7 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	printf(msg);
 	log_hexval("IdleThread Address", IdleThread);
 
+	CreateIdleThread(IdleThread); // do this before smp initialization and after kheap_init()
 	//printf(swag);
 
 	//clear_screen(0, 0, 0);
@@ -293,9 +299,9 @@ void kernel_main(uint64_t ptr_multiboot_info)
 		}
 	}
 	
-	CreateThread(IdleThread, 1, true);
-
 	
+
+
 	while(1){};
 
 }
