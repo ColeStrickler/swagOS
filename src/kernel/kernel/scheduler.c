@@ -15,24 +15,21 @@ void InvokeScheduler(struct cpu_context_t* ctx)
     struct CPU* current_cpu = get_current_cpu();
     struct Thread* old_thread = current_cpu->current_thread;
     acquire_Spinlock(&global_Settings.threads.lock);
-    //log_to_serial("Invoke Scheduler!\n");
+    log_to_serial("Invoke Scheduler!\n");
+    log_hexval("InvokeScheduler() CPU", lapic_id());
     for (uint32_t i = 0; i < MAX_NUM_THREADS; i++)
     {
-        if (i == 0)
-        {
-            log_hexval("status", thread_table[i].status);
-        }
-
-
-        if (thread_table[i].id == old_thread->id && old_thread->status != PROCESS_STATE_RUNNING)
-            panic("InvokeScheduler() --> old_thread was in unexpected state.\n");
         if (thread_table[i].status != PROCESS_STATE_READY)
-        {   
             continue;
+        
+        if (old_thread != NULL)
+        {
+            if (thread_table[i].id == old_thread->id && old_thread->status != PROCESS_STATE_RUNNING)
+                panic("InvokeScheduler() --> old_thread was in unexpected state.\n");
+            old_thread->execution_context = ctx;
+            old_thread->status = PROCESS_STATE_READY;
         }
         log_hexval("Doing process", i);
-        old_thread->execution_context = ctx;
-        old_thread->status = PROCESS_STATE_READY;
         schedule(current_cpu, &thread_table[i]);
         
     }
@@ -48,9 +45,9 @@ void schedule(struct CPU* cpu, struct Thread* thread)
     thread->status = PROCESS_STATE_RUNNING;
     release_Spinlock(&global_Settings.threads.lock);
     apic_end_of_interrupt(); // move this back to idt?
-    log_hexval("Got rip", thread->execution_context->i_rip);
-    log_hexval("Stack", thread->execution_context->i_rsp);
-    log_hexval("PML4T", thread->pml4t);
+   // log_hexval("Got rip", thread->execution_context->i_rip);
+   // log_hexval("Stack", thread->execution_context->i_rsp);
+   // log_hexval("PML4T", thread->pml4t);
 
     /*
         thread->execution_context is a pointer to the top of the saved stack

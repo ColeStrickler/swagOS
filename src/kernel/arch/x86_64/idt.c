@@ -184,7 +184,7 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
             if (!global_Settings.bTimerCalibrated)
                 panic("isr_handler() --> APIC TIMER INTERRUPT BEFORE CALIBRATION.\n");
             global_Settings.tick_counter += 1;
-            log_to_serial("Timer!\n");
+            //log_to_serial("Timer!\n");
             InvokeScheduler((cpu_context_t*)tf);
             break;
         }
