@@ -55,7 +55,7 @@ void InvokeScheduler(struct cpu_context_t* ctx)
     /*
         These two for loops are just round-robin
     */
-    for (uint32_t i = old_thread_id; i < MAX_NUM_THREADS; i++)
+    for (uint32_t i = old_thread_id+1; i < MAX_NUM_THREADS; i++)
     {
         if (thread_table[i].status != PROCESS_STATE_READY)
             continue;
@@ -71,7 +71,7 @@ void InvokeScheduler(struct cpu_context_t* ctx)
             continue;
         
         SaveThreadContext(old_thread, ctx);
-        log_hexval("Doing process", i);
+        //log_hexval("Doing process", i);
         schedule(current_cpu, &thread_table[i], PROCESS_STATE_RUNNING);
     }
 

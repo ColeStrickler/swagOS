@@ -16,7 +16,7 @@
 #include <terminal.h>
 #include <cpu.h>
 #include <spinlock.h>
-
+#include <cpuid.h>
 /*
 	This global variable holds our smp stub, we must move it later on to physical address 0x2000
 */
@@ -205,8 +205,6 @@ void IdleThread()
 
 
 
-
-
 /*
 	In kernel_main() is where we set up our various kernel functionality.
 
@@ -217,6 +215,16 @@ void IdleThread()
 	4.
 	5.
 */
+
+void enable_supervisor_mem_protections()
+{
+	uint32_t eax, ebx, ecx, edx;
+	__cpuid_count(7, 0, eax, ebx, ecx, edx);
+	if (ebx & (1 << 7)) 	// CHECK SMEP AVAILABLE
+		set_cr4_bit(CPU_CR4_SMEP_ENABLE);		
+	if (ebx & (1 << 20))	// CHECK SMAP AVAILABLE
+		set_cr4_bit(CPU_CR4_SMAP_ENABLE);
+}
 
 
 
@@ -285,7 +293,7 @@ void kernel_main(uint64_t ptr_multiboot_info)
 
 	CreateIdleThread(IdleThread); // do this before smp initialization and after kheap_init()
 	//printf(swag);
-
+	enable_supervisor_mem_protections();
 	//clear_screen(0, 0, 0);
 	//char* label = "swag yolo";
 
@@ -300,7 +308,6 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	}
 	
 	
-
 
 	while(1){};
 

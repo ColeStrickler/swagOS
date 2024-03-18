@@ -56,4 +56,12 @@ typedef struct x8664_Settings
 #define IA32_APIC_BASE_MSR_ENABLE       1 << 11 
 #define IA32_APIC_BASE_ADDRESS          0xFFFFFFFFFF000ULL
 
+
+/*
+    CR4 BIT SELECTORS
+*/
+#define CPU_CR4_SMEP_ENABLE (1 << 20)
+#define CPU_CR4_SMAP_ENABLE (1 << 21)
+
+
 #endif

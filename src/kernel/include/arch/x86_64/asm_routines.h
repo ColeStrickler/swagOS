@@ -57,3 +57,33 @@ read_rflags(void)
   asm volatile("pushfq; popq %0" : "=r" (rflags));
   return rflags;
 }
+
+
+static inline void 
+rflags_set_ac(void) {
+    // Set AC bit in RFLAGS register. --> DISABLE SMAP
+    __asm__ volatile ("stac" ::: "cc");
+}
+ 
+static inline void 
+rflags_clear_ac(void) {
+    // Clear AC bit in RFLAGS register. --> ENABLE SMAP
+    __asm__ volatile ("clac" ::: "cc");
+}
+
+static inline void 
+set_cr4_bit(unsigned int bit) {
+    unsigned long cr4;
+    asm volatile ("mov %%cr4, %0" : "=r" (cr4));
+    cr4 |= bit;
+    asm volatile ("mov %0, %%cr4" : : "r" (cr4));
+}
+ 
+
+static inline void 
+clear_cr4_bit(unsigned int bit) {
+    unsigned long cr4;
+    asm volatile ("mov %%cr4, %0" : "=r" (cr4));
+    cr4 &= ~bit;
+    asm volatile ("mov %0, %%cr4" : : "r" (cr4));
+}
