@@ -5,7 +5,6 @@
 #include <string.h>
 #include <paging.h>
 #include <idt.h> 
-#include "tty.h"
 #include <asm_routines.h>
 #include <apic.h>
 #include <kernel.h>
