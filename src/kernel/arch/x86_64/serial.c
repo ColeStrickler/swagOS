@@ -5,17 +5,29 @@
 #include <serial.h>
 
 
-unsigned char inb(int portnum)
+inline unsigned char inb(int portnum)
 {
   unsigned char data=0;
   __asm__ __volatile__ ("inb %%dx, %%al" : "=a" (data) : "d" (portnum));
   return data;
 }
 
-void outb(int portnum, unsigned char data)
+inline void outb(int portnum, unsigned char data)
 {
   __asm__ __volatile__ ("outb %%al, %%dx" :: "a" (data),"d" (portnum));
 }
+
+inline void outportl(uint16_t port, uint32_t value) {
+   __asm__ __volatile__ ("outl %1, %0" : : "d"(port), "a"(value)); 
+}
+
+inline uint32_t inportl(uint16_t port) {
+    uint32_t value;
+     __asm__ __volatile__ ("inl %1, %0" : "=a"(value) : "dN"(port));
+    return value;
+}
+
+
 
 
 void log_hexval(char* label, uint64_t hexval)

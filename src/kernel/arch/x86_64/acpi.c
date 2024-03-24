@@ -39,7 +39,6 @@ MADT* retrieveMADT(bool use_xsdt, void* sdp)
 
     XSDT* xsdt = (XSDT*)(a1);
     RSDT* rsdt = (RSDT*)(a2);
-    log_hexval("rsdt", rsdt);
     if (a1 > 0x40000000 || a2 > 0x40000000)
     {
         /*
@@ -100,11 +99,8 @@ MADT_ITEM* madt_get_item(MADT* madt, uint32_t item_type, uint32_t item_index)
 
     while(curr_length < total_length && curr_index <= item_index)
     {
-        log_hexval("item->type", item->type);
-        log_hexval("item_index", item_index);
         if (item->type == item_type)
         {
-            log_hexval("curr_index", curr_index);
             if (item_index == curr_index)
                 return item;
             curr_index++;

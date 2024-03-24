@@ -16,6 +16,7 @@
 #include <cpu.h>
 #include <spinlock.h>
 #include <cpuid.h>
+#include <pci.h>
 /*
 	This global variable holds our smp stub, we must move it later on to physical address 0x2000
 */
@@ -305,6 +306,9 @@ void kernel_main(uint64_t ptr_multiboot_info)
 			InitCPUByID(id);
 		}
 	}
+	
+
+	PCI_EnumBuses();
 	
 	
 

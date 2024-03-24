@@ -86,12 +86,15 @@ myos.iso: myos.bin
 	grub-mkrescue -o myos.iso src/kernel/isodir
 
 
+build-disk : clean myos.iso
+	./scripts/mkdisk.sh
 
-qemu: clean myos.iso
-	qemu-system-x86_64 -enable-kvm -cpu host -serial file:out.log -m 4G -smp 1 -cdrom myos.iso
 
-debug: clean myos.iso
-	qemu-system-x86_64 -enable-kvm -cpu host -s -S -serial file:out.log -m 4G -smp 2 -cdrom myos.iso
+qemu: build-disk
+	sudo qemu-system-x86_64 -enable-kvm -cpu host -serial file:out.log -m 4G -smp 2 -drive format=raw,file=./build/disk.img
+
+debug: build-disk
+	qemu-system-x86_64 -enable-kvm -cpu host -s -S -serial file:out.log -m 4G -smp 2 -drive format=raw,file=./build/disk.img
 
 clean:
 	# beginning line with a hyphen tells make to ignore errors
