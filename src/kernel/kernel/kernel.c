@@ -233,7 +233,7 @@ void kernel_main(uint64_t ptr_multiboot_info)
 {
 	log_to_serial("[kernel_main()]: Entered.\n");
 
-
+	
 	// Linker symbols have addresses only
 	setup_global_data();
 	parse_multiboot_info(ptr_multiboot_info);
@@ -309,6 +309,7 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	
 
 	PCI_EnumBuses();
+	log_hexval("Dev Count:", global_Settings.PCI_Driver.device_count);
 	
 	
 

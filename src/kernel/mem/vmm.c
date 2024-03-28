@@ -78,11 +78,9 @@ void kheap_init()
     uint32_t i = 0;
     while(i < 512)
     {
-        //log_hexval("i", i);
-        //log_hexval("va", HUGEPGROUNDDOWN(global_Settings.kernel_heap.va_start + (i*HUGEPGSIZE)));
         if (is_frame_mapped_hugepages(HUGEPGROUNDDOWN(global_Settings.kernel_heap.va_start + (i*HUGEPGSIZE)), global_Settings.pml4t_kernel))
         {
-            //log_hexval("Frame", global_Settings.kernel_heap.va_start + (i*HUGEPGSIZE));
+            log_hexval("Frame", global_Settings.kernel_heap.va_start + (i*HUGEPGSIZE));
             panic("kheap_init() --> heap frame already mapped.\n");
         }
         uint64_t free_frame = physical_frame_request();

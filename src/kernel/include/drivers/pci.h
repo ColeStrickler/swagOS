@@ -1,5 +1,34 @@
 #ifndef PCI_H
 #define PCI_H
+#include <linked_list.h>
+#include <spinlock.h>
+
+
+#define PCI_DATA_PORT 	0xCFC
+#define PCI_COM_PORT	0xCF8
+
+#define PCI_DEV_ENTRY(entry) (struct PCI_DEVICE*)(entry) // pass in &PCI_DEVICE.entry
+
+typedef struct PCI_DEVICE
+{
+	struct dll_Entry entry;
+	uint32_t vendor_id;
+	uint32_t device_id;
+	uint8_t bus;
+	uint8_t slot;
+	uint8_t func;
+	uint8_t class_code;
+	uint8_t subclass;
+	uint8_t progIf;
+} PCI_DEVICE;
+
+typedef struct PCI_DRIVER
+{
+	uint32_t device_count;
+	Spinlock device_list_lock;
+	struct dll_Head device_list; // first entry is just a poiu
+}PCI_DRIVER;
+
 
 
 enum PCIConfigRegisters{
@@ -34,7 +63,8 @@ enum PCIConfigRegisters{
 
 
 
+void PCI_EnumBuses();
 
 #endif
 
-void PCI_EnumBuses();
+

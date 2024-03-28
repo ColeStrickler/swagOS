@@ -14,6 +14,7 @@
 #include <vmm.h>
 #include <cpu.h>
 #include <proc.h>
+#include <pci.h>
 
 #define KERNEL_HH_START 0xffffffff80000000
 #define KERNEL_PML4T_PHYS(pml4t) ((uint64_t)pml4t & ~KERNEL_HH_START) // call on the global_Settings.pml4t_kernel value
@@ -31,6 +32,7 @@ typedef struct KernelSettings
     struct KeyboardDriverSettings KeyboardDriver;
     struct TerminalState TerminalDriver;
     struct KernelHeap kernel_heap;
+    struct PCI_DRIVER PCI_Driver;
     bool bTimerCalibrated;
     uint64_t tickCount;
     bool useXSDT;

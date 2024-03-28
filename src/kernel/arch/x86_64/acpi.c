@@ -44,6 +44,8 @@ MADT* retrieveMADT(bool use_xsdt, void* sdp)
         /*
             We will just direct map these frames into the kernel since they are reserved memory anyways
         */
+        log_hexval("xsdt", xsdt);
+        log_hexval("rsdt", rsdt);
         if (use_xsdt)
             map_kernel_page(HUGEPGROUNDDOWN((uint64_t)xsdt), HUGEPGROUNDDOWN((uint64_t)xsdt));
         else
@@ -67,7 +69,7 @@ MADT* retrieveMADT(bool use_xsdt, void* sdp)
         log_to_serial("Could not validate rsdt checksum!\n");
         return (void*)0x0;
     }
-    
+    MADT* ret = NULL;
     for (int i = 0; i < number_of_items; i++)
     {
         log_hex_to_serial(i);
@@ -83,11 +85,19 @@ MADT* retrieveMADT(bool use_xsdt, void* sdp)
 
         if (!memcmp(madt->Signature, "APIC", 4) && doSDTChecksum(madt)) // look for MADT signature
         {
-            return (MADT*)madt;
+            ret = (MADT*)madt;
+            return ret;
         }
+
+        if (!memcmp(madt->Signature, "MCFG", 4) && doSDTChecksum(madt)) // look for MADT signature
+        {
+            //ret = (MADT*)madt;
+            //panic("FOUND");
+        }
+
     }
     
-    return (void*)0x0;
+    return ret;
 }
 
 MADT_ITEM* madt_get_item(MADT* madt, uint32_t item_type, uint32_t item_index)

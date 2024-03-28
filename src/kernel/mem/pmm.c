@@ -219,7 +219,7 @@ uint64_t physical_frame_request()
    // log_to_serial("spinlock release2\n");
     release_Spinlock(&global_Settings.PMM.lock);
     
-    log_to_serial("spinlock released!!!!!!!\n");
+    //log_to_serial("spinlock released!!!!!!!\n");
     return UINT64_MAX;
 }
 
@@ -227,11 +227,12 @@ uint64_t physical_frame_request()
 /*
     Since we reserve of our page tables at compile time, 
 */
-uint32_t find_proper_pdt_table(uint64_t pa)
+uint32_t find_proper_pdt_table(uint64_t va)
 {
+    va &= (0xFFFFFFFFF);
     // each pdt has (512 entries/pdt) * (2mb/entry) = 1GB/pdt
     // Math formula is to just round down
-    uint32_t table_selector = (pa - (pa%(1*1024*1024*1024)))/(1*1024*1024*1024);
+    uint32_t table_selector = (va - (va%(1*1024*1024*1024)))/(1*1024*1024*1024);
     return table_selector;
 }
 
@@ -249,22 +250,31 @@ uint32_t find_proper_pdt_table(uint64_t pa)
 */
 bool map_kernel_page(uint64_t va, uint64_t pa)
 {
+
     uint64_t pml4t_index =  (va >> 39) & 0x1FF; 
 	uint64_t pdpt_index =   (va >> 30) & 0x1FF; 
 	uint64_t pdt_index =    (va >> 21) & 0x1FF; 
 
+    /*
+        WE WILL NEED TO FIX FIND_PROPER_PDT_TABLE IF WE WANT TO USE IT FOR CERTAIN ALLOCATIONS,
 
-    uint32_t proper_pdt_table = find_proper_pdt_table(pa);
+        WE ARE CURRENTLY EXTRACTING FIRST 36 BITS(allows 64Gb) FROM THE VIRTUAL ADDRESS TO INDEX
+        INTO THE PDT TABLES. WE WILL NEED TO BE CAREFUL WITH THIS LATER ON AND THINK ABOUT
+        IMPLEMENTING SOMETHING MORE ELEGANT
+    */
+    uint32_t proper_pdt_table = find_proper_pdt_table(va);
+    
 
     // table physical addresses
     uint64_t* pml4t_addr = ((uint64_t*)((uint64_t)global_Settings.pml4t_kernel & ~KERNEL_HH_START));
 	uint64_t* pdpt_addr = ((uint64_t*)((uint64_t)global_Settings.pdpt_kernel & ~KERNEL_HH_START));
-	uint64_t* pdt_addr = (uint64_t*)((uint64_t)global_Settings.pdt_kernel[proper_pdt_table] & ~KERNEL_HH_START);
+	uint64_t* pdt_addr = (uint64_t*)((uint64_t)&global_Settings.pdt_kernel[proper_pdt_table] & ~KERNEL_HH_START);
 
     // access via virtual addresses
     global_Settings.pml4t_kernel[pml4t_index] = ((uint64_t)pdpt_addr) | (PAGE_PRESENT | PAGE_WRITE);
 	global_Settings.pdpt_kernel[pdpt_index] = ((uint64_t)pdt_addr) | (PAGE_PRESENT | PAGE_WRITE); 
     global_Settings.pdt_kernel[proper_pdt_table][pdt_index] = pa | (PAGE_PRESENT | PAGE_WRITE | PAGE_HUGE);
+    
     return true;
 }
 
@@ -310,7 +320,11 @@ bool is_frame_mapped_hugepages(uint64_t virtual_address, uint64_t* pml4t_addr)
 {
     uint64_t pml4t_index = (virtual_address >> 39) & 0x1FF; 
 	uint64_t pdpt_index = (virtual_address >> 30) & 0x1FF; 
-	uint64_t pdt_index = (virtual_address >> 21) & 0x1FF; 
+	uint64_t pdt_index = (virtual_address >> 21) & 0x1FF;
+
+    //log_hexval("pml4t index",   pml4t_index);
+    //log_hexval("ppdpt index",   pdpt_index);
+    //log_hexval("pdt index",     pdt_index);
     uint64_t* pdpt = (uint64_t*)((pml4t_addr[pml4t_index] & PTADDRMASK)); 
     if (pdpt == NULL)
     {
@@ -331,6 +345,7 @@ bool is_frame_mapped_hugepages(uint64_t virtual_address, uint64_t* pml4t_addr)
         //log_to_serial("is_frame_mapped_hugepages pdt entry null\n");
         return false;
     }
+    //log_hexval("pdt[pdt_index]", pdt[pdt_index]);
     return true;
 }
 
