@@ -61,6 +61,74 @@ bool PCI_CheckDevice(uint8_t bus, uint8_t device, uint8_t func) {
 }
 
 
+bool PCI_GenericDeviceExists(uint16_t classCode, uint16_t subClass)
+{
+    
+    struct PCI_DEVICE* dev = PCI_DEV_ENTRY(global_Settings.PCI_Driver.device_list.first);
+    void* head = (void*)&global_Settings.PCI_Driver.device_list;
+
+    acquire_Spinlock(&global_Settings.PCI_Driver.device_list_lock);
+    while(dev != head)
+    {
+        if (dev->class_code == classCode && dev->subclass == subClass)
+        {
+            release_Spinlock(&global_Settings.PCI_Driver.device_list_lock);
+            return true;
+        }
+        dev = PCI_DEV_ENTRY(dev->entry.next);
+    }
+    release_Spinlock(&global_Settings.PCI_Driver.device_list_lock);
+    return false;
+}
+
+/*
+    Get the nth device that matches the classCode and subclass passed in.
+
+    Return NULL on failure
+*/
+struct PCI_DEVICE* PCI_GetGenericDevice(uint16_t classCode, uint16_t subClass, uint32_t index)
+{
+    struct PCI_DEVICE* dev = PCI_DEV_ENTRY(global_Settings.PCI_Driver.device_list.first);
+    void* head = (void*)&global_Settings.PCI_Driver.device_list;
+    uint32_t curr_index = 0;
+    acquire_Spinlock(&global_Settings.PCI_Driver.device_list_lock);
+    while(dev != head)
+    {
+        if (dev->class_code == classCode && dev->subclass == subClass)
+        {
+            if (curr_index != index)
+            {
+                curr_index++;
+                continue;
+            }
+            release_Spinlock(&global_Settings.PCI_Driver.device_list_lock);
+            return dev;
+        }
+        dev = PCI_DEV_ENTRY(dev->entry.next);
+    }
+    release_Spinlock(&global_Settings.PCI_Driver.device_list_lock);
+    return (struct PCI_DEVICE*)NULL;
+}
+
+struct PCI_DEVICE* PCI_GetDevice(uint16_t deviceID, uint16_t vendorID)
+{
+    struct PCI_DEVICE* dev = PCI_DEV_ENTRY(global_Settings.PCI_Driver.device_list.first);
+    void* head = (void*)&global_Settings.PCI_Driver.device_list;
+    acquire_Spinlock(&global_Settings.PCI_Driver.device_list_lock);
+    while(dev != head)
+    {
+        if (dev->device_id == deviceID && dev->vendor_id == vendorID)
+        {
+            release_Spinlock(&global_Settings.PCI_Driver.device_list_lock);
+            return dev;
+        }
+        dev = PCI_DEV_ENTRY(dev->entry.next);
+    }
+    release_Spinlock(&global_Settings.PCI_Driver.device_list_lock);
+    return (struct PCI_DEVICE*)NULL;
+}
+
+
 void PCI_AddDevice(uint16_t bus, uint16_t slot, uint16_t function)
 {
     acquire_Spinlock(&global_Settings.PCI_Driver.device_list_lock);
@@ -68,18 +136,13 @@ void PCI_AddDevice(uint16_t bus, uint16_t slot, uint16_t function)
     if (dev == NULL)
         panic("PCI_AddDevice() --> unable to allocate memory for PCI_DEVICE.");
     
-    dev->bus = bus;
-    dev->slot = slot;
-    dev->func = function;
+    dev->bus =          bus;
+    dev->slot =         slot;
+    dev->func =         function;
+    dev->class_code =   PCI_ConfigReadByte(bus, slot, function, PCI_ConfigClassCode);
+    dev->subclass =     PCI_ConfigReadByte(bus, slot, function, PCI_ConfigSubclass);
+    dev->progIf =       PCI_ConfigReadByte(bus, slot, function, PCI_ConfigProgIF);
     
-    
-    /*
-        dev->class_code = GetClassCode(bus, slot, func);
-        dev->subclass = GetSubClass(bus, slot, func);
-        dev->progIf = GetProgIf(bus, slot, func);
-    */
-
-
     insert_dll_entry_tail(&global_Settings.PCI_Driver.device_list, &dev->entry);
 
     global_Settings.PCI_Driver.device_count++;

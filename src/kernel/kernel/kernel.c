@@ -17,14 +17,12 @@
 #include <spinlock.h>
 #include <cpuid.h>
 #include <pci.h>
-/*
-	This global variable holds our smp stub, we must move it later on to physical address 0x2000
-*/
+#include <ahci.h>
+
 
 /*
 	These global variables are created in boot.asm
 */
-
 // these initial page tables are the direct mapped page tables
 extern uint64_t pml4t[512] __attribute__((aligned(0x1000))); 
 extern uint64_t pdpt[512] __attribute__((aligned(0x1000)));
@@ -311,7 +309,7 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	PCI_EnumBuses();
 	log_hexval("Dev Count:", global_Settings.PCI_Driver.device_count);
 	
-	
+	AHCI_init();
 
 	while(1){};
 

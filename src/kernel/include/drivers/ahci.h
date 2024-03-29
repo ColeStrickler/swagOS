@@ -166,5 +166,7 @@ typedef struct tagFIS_DMA_SETUP
  
 } FIS_DMA_SETUP;
 
+void AHCI_init();
 
 #endif
+

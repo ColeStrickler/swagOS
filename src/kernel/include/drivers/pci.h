@@ -61,7 +61,11 @@ enum PCIConfigRegisters{
 	PCI_ConfigInterruptLine = 0x3C,
 };
 
+bool PCI_GenericDeviceExists(uint16_t classCode, uint16_t subClass);
 
+PCI_DEVICE *PCI_GetGenericDevice(uint16_t classCode, uint16_t subClass, uint32_t index);
+
+PCI_DEVICE *PCI_GetDevice(uint16_t deviceID, uint16_t vendorID);
 
 void PCI_EnumBuses();
 
