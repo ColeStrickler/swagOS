@@ -24,6 +24,12 @@
 
 
 
+typedef enum PAGE_ALLOC_TYPE
+{
+    ALLOC_TYPE_KERNEL_BINARY,
+    ALLOC_TYPE_KERNEL_HEAP,
+    ALLOC_TYPE_DM_IO
+}PAGE_ALLOC_TYPE;
 
 
 
@@ -66,7 +72,8 @@ bool retrieve_multiboot_mem_basicinfo(uint64_t addr);
 
 uint64_t physical_frame_request();
 
-bool map_kernel_page(uint64_t va, uint64_t pa);
+
+bool map_kernel_page(uint64_t va, uint64_t pa, PAGE_ALLOC_TYPE type);
 
 void map_4kb_page_kernel(uint64_t virtual_address, uint64_t physical_address);
 

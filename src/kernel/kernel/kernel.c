@@ -17,9 +17,11 @@
 #include <spinlock.h>
 #include <cpuid.h>
 #include <pci.h>
-#include <ahci.h>
-
-
+//#include <ahci.h>
+//#include <ata.h>
+#include <ide.h>
+#include <buffered_io.h>
+#include <scheduler.h>
 /*
 	These global variables are created in boot.asm
 */
@@ -203,6 +205,7 @@ void IdleThread()
 
 
 
+
 /*
 	In kernel_main() is where we set up our various kernel functionality.
 
@@ -236,15 +239,11 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	setup_global_data();
 	parse_multiboot_info(ptr_multiboot_info);
 	parse_madt(global_Settings.madt);
-	for (int i = 0; i < global_Settings.cpu_count; i++)
-	{
-		log_hexval("cpu lapic", global_Settings.cpu[i].local_apic);
-	}
-	log_to_serial("1\n");
+	//log_to_serial("1\n");
 	
-	log_to_serial("2\n");
+	//log_to_serial("2\n");
 	idt_setup();
-	log_to_serial("3\n");
+	//log_to_serial("3\n");
 	set_irq(0x02, 0x02, 0x22, 0, 0x0, true);
 	apic_setup();
 	kthread_setup();
@@ -269,25 +268,12 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	uint8_t b = 0xed;
 
 
-	char* swag = kalloc((1024*1024));
 	char* msg = "yolo yolo yolo yolo yolo yolo yolo yolo yolo";
-	if (swag != NULL)
-	{
-		log_hexval("not null", swag);
-		
-		memcpy(swag, msg, strlen(msg));
-		swag[strlen(msg)-3] = 0x0;
-	}
-	else
-	{
-		log_to_serial("returned null!");
-	}
 	printf(msg);printf(msg);
 	printf(msg);
 	printf(msg);
 	printf(msg);
 	printf(msg);
-	log_hexval("IdleThread Address", IdleThread);
 
 	CreateIdleThread(IdleThread); // do this before smp initialization and after kheap_init()
 	//printf(swag);
@@ -304,14 +290,23 @@ void kernel_main(uint64_t ptr_multiboot_info)
 			InitCPUByID(id);
 		}
 	}
+	GetCurrentThread()->status = PROCESS_STATE_SLEEPING;
+	__asm__ __volatile__("int3");
 	
-
+	/*
 	PCI_EnumBuses();
 	log_hexval("Dev Count:", global_Settings.PCI_Driver.device_count);
+	binit();
+	ideinit();
 	
-	AHCI_init();
+	iobuf* bb = bread(0, 0);
+	
+	log_hexval("bb", bb);
+	for (int i = 0; i < 512; i++)
+		log_hex_to_serial(bb->data[i]);
+	*/
 
+	log_to_serial("\nKERNEL END\n");
 	while(1){};
-
 }
 

@@ -33,10 +33,10 @@ void SaveThreadContext(struct Thread* old_thread, struct cpu_context_t* ctx)
     */
     if (old_thread == idle_thread) 
         return;
-    if (old_thread->status != PROCESS_STATE_RUNNING)
+    if (old_thread->status != PROCESS_STATE_RUNNING && old_thread->status != PROCESS_STATE_SLEEPING)
         panic("InvokeScheduler() --> old_thread was in unexpected state.\n");
     old_thread->execution_context = ctx;
-    old_thread->status = PROCESS_STATE_READY;
+    old_thread->status =(old_thread->status == PROCESS_STATE_SLEEPING ? PROCESS_STATE_SLEEPING : PROCESS_STATE_READY);
 }
 
 
@@ -48,7 +48,7 @@ void InvokeScheduler(struct cpu_context_t* ctx)
     
     acquire_Spinlock(&global_Settings.threads.lock);
     //log_to_serial("Invoke Scheduler!\n");
-    //log_hexval("InvokeScheduler() CPU", lapic_id());
+   // log_hexval("InvokeScheduler() CPU", lapic_id());
     //log_hexval("Old thread", old_thread);
     uint32_t old_thread_id  = (old_thread == NULL ? 0 : old_thread->id);
 
@@ -75,7 +75,7 @@ void InvokeScheduler(struct cpu_context_t* ctx)
         schedule(current_cpu, &thread_table[i], PROCESS_STATE_RUNNING);
     }
 
-    if (old_thread == NULL) // If we already hold the Idle thread we can avoid this overhead
+    if (old_thread == NULL || old_thread->status == PROCESS_STATE_SLEEPING) // If we already hold the Idle thread we can avoid this overhead
     {
         log_hexval("Scheduling Idle Thread on CPU", lapic_id());
         ScheduleIdleThread(old_thread, ctx);

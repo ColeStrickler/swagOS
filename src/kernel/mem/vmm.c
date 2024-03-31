@@ -86,7 +86,7 @@ void kheap_init()
         uint64_t free_frame = physical_frame_request();
         if (free_frame == UINT64_MAX)
             panic("kheap_init() --> could not find free frame for kernel heap initialization.\n");
-        map_kernel_page(HUGEPGROUNDDOWN(global_Settings.kernel_heap.va_start + (i*HUGEPGSIZE)), free_frame);
+        map_kernel_page(HUGEPGROUNDDOWN(global_Settings.kernel_heap.va_start + (i*HUGEPGSIZE)), free_frame, ALLOC_TYPE_KERNEL_HEAP);
         i++;
     }
 
@@ -113,7 +113,7 @@ uint64_t find_heap_frame(struct KernelHeap* heap, uint64_t size, uint32_t index)
     if (curr_section->size >= size && (curr_section->size/2 < size || curr_section->size == KERNEL_HEAP_MINBLOCK) && !curr_section->in_use)
     {
         //log_hexval("found frame --> size", curr_section.size);
-        log_hexval("Found Index", index);
+        //log_hexval("Found Index", index);
         curr_section->flags = HEAP_FLAG_OCCUPIED;
         curr_section->in_use = true;
         return curr_section->offset + heap->va_start;

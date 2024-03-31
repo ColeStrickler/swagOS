@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <linked_list.h>
 #include <spinlock.h>
-
+#include <sleeplock.h>
 #define MAX_NUM_THREADS 256
 #define IDLE_THREAD MAX_NUM_THREADS
 
@@ -13,7 +13,8 @@ typedef enum {
     PROCESS_STATE_NOT_INITIALIZED,
     PROCESS_STATE_READY,
     PROCESS_STATE_RUNNING,
-    PROCESS_STATE_KILLED
+    PROCESS_STATE_KILLED,
+    PROCESS_STATE_SLEEPING
 } PROCESS_STATE;
 
 typedef enum {
@@ -65,6 +66,7 @@ typedef struct Thread
     uint32_t id;
     uint64_t* pml4t;
     cpu_context_t* execution_context;
+    Sleeplock* current_sleep_lock;  // will be NULL if process is not sleeping
 } Thread;
 
 
@@ -74,9 +76,14 @@ typedef struct GlobalThreadTable{
     uint32_t thread_count;
 } GlobalThreadTable;
 
+Thread *GetCurrentThread();
+
 void CreateIdleThread(void (*entry)(void *));
 
 void CreateThread(void (*entry)(void *), uint32_t pid, bool kthread);
+
+
+void ThreadSleep(Sleeplock *sleep_lock, Spinlock *spin_lock);
 
 #endif
 

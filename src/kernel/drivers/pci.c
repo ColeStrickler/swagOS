@@ -40,6 +40,31 @@ uint8_t PCI_ConfigReadByte(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offs
 }
 
 
+void PCI_ConfigWriteDword(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, uint16_t data) {
+    uint32_t address = (uint32_t)((bus << 16) | (slot << 11) | (func << 8) | (offset & 0xfc) | 0x80000000);
+
+    outportl(0xCF8, address);
+    outportl(0xCFC, data);
+}
+
+
+void PCI_ConfigWriteWord(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, uint16_t data) {
+    uint32_t address = (uint32_t)((bus << 16) | (slot << 11) | (func << 8) | (offset & 0xfc) | 0x80000000);
+
+    outportl(0xCF8, address);
+    outportl(0xCFC, (inportl(0xCFC) & (~(0xFFFF << ((offset & 2) * 8)))) |
+                        (((uint32_t)(data)) << ((offset & 2) * 8)));
+}
+
+
+void PCI_ConfigWriteByte(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, uint8_t data) {
+    uint32_t address = (uint32_t)((bus << 16) | (slot << 11) | (func << 8) | (offset & 0xfc) | 0x80000000);
+
+    outportl(0xCF8, address);
+    outb(0xCFC,
+             (inportl(0xCFC) & (~(0xFF << ((offset & 3) * 8)))) | (((uint32_t)(data)) << ((offset & 3) * 8)));
+}
+
 
 uint16_t PCI_GetVendor(uint8_t bus, uint8_t slot, uint8_t func) {
     uint16_t vendor;
@@ -148,6 +173,38 @@ void PCI_AddDevice(uint16_t bus, uint16_t slot, uint16_t function)
     global_Settings.PCI_Driver.device_count++;
     release_Spinlock(&global_Settings.PCI_Driver.device_list_lock);
 }
+
+
+void PCI_DeviceSetBusMaster(struct PCI_DEVICE* dev)
+{
+    PCI_ConfigWriteWord(dev->bus, dev->slot, dev->func, PCI_ConfigCommand, \
+        PCI_ConfigReadWord(dev->bus, dev->slot, dev->func, PCI_ConfigCommand) | PCI_CMD_BUS_MASTER);
+}
+
+void PCI_DeviceEnableInterrupts(struct PCI_DEVICE* dev)
+{
+    PCI_ConfigWriteWord(dev->bus, dev->slot, dev->func, PCI_ConfigCommand, \
+        PCI_ConfigReadWord(dev->bus, dev->slot, dev->func, PCI_ConfigCommand) | (~PCI_CMD_INTERRUPT_DISABLE));
+}
+
+void PCI_DeviceEnableMemorySpace(struct PCI_DEVICE* dev)
+{
+    PCI_ConfigWriteWord(dev->bus, dev->slot, dev->func, PCI_ConfigCommand, \
+        PCI_ConfigReadWord(dev->bus, dev->slot, dev->func, PCI_ConfigCommand) | PCI_CMD_MEMORY_SPACE);
+}
+
+
+inline uintptr_t PCI_DeviceRegGetBaseAddr(struct PCI_DEVICE* dev, uint8_t idx) {
+		if (!(idx >= 0 && idx <= 5))
+            panic("PCI_DeviceRegGetBaseAddr() --> bad idx value.\n");
+
+		uintptr_t bar = PCI_ConfigReadDword(dev->bus, dev->slot, dev->func, PCI_ConfigBAR0 + (idx * sizeof(uint32_t)));
+		if(!(bar & 0x1) /* Not IO */ && bar & 0x4 /* 64-bit */ && idx < 5){
+			bar |= (uintptr_t)(PCI_ConfigReadDword(dev->bus, dev->slot, dev->func, PCI_ConfigBAR0 + ((bar + 1) * sizeof(uint32_t)))) << 32;
+		}
+
+		return (bar & 0x1) ? (bar & 0xFFFFFFFFFFFFFFFC) : (bar & 0xFFFFFFFFFFFFFFF0);
+	}
 
 
 

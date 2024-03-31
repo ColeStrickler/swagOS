@@ -47,9 +47,9 @@ MADT* retrieveMADT(bool use_xsdt, void* sdp)
         log_hexval("xsdt", xsdt);
         log_hexval("rsdt", rsdt);
         if (use_xsdt)
-            map_kernel_page(HUGEPGROUNDDOWN((uint64_t)xsdt), HUGEPGROUNDDOWN((uint64_t)xsdt));
+            map_kernel_page(HUGEPGROUNDDOWN((uint64_t)xsdt), HUGEPGROUNDDOWN((uint64_t)xsdt), ALLOC_TYPE_DM_IO);
         else
-            map_kernel_page(HUGEPGROUNDDOWN((uint64_t)rsdt), HUGEPGROUNDDOWN((uint64_t)rsdt));
+            map_kernel_page(HUGEPGROUNDDOWN((uint64_t)rsdt), HUGEPGROUNDDOWN((uint64_t)rsdt), ALLOC_TYPE_DM_IO);
 
     }
     if (!is_frame_mapped_hugepages(rsdt, pml4t))
@@ -80,7 +80,7 @@ MADT* retrieveMADT(bool use_xsdt, void* sdp)
         */
         if (!is_frame_mapped_hugepages(PGROUNDDOWN((uint64_t)madt), pml4t))
         {
-            map_kernel_page(PGROUNDDOWN((uint64_t)madt), PGROUNDDOWN((uint64_t)madt));
+            map_kernel_page(PGROUNDDOWN((uint64_t)madt), PGROUNDDOWN((uint64_t)madt), ALLOC_TYPE_DM_IO);
         }
 
         if (!memcmp(madt->Signature, "APIC", 4) && doSDTChecksum(madt)) // look for MADT signature

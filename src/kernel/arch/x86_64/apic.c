@@ -44,7 +44,7 @@ int apic_init()
     uint64_t lapic_base = ReadBase() & APIC_BASE_SEL;
     if (!is_frame_mapped_hugepages(lapic_base, global_Settings.pml4t_kernel))
     {
-        map_kernel_page(HUGEPGROUNDDOWN(lapic_base), HUGEPGROUNDDOWN(lapic_base));
+        map_kernel_page(HUGEPGROUNDDOWN(lapic_base), HUGEPGROUNDDOWN(lapic_base), ALLOC_TYPE_DM_IO);
     }
 
     /*
@@ -97,7 +97,7 @@ void smp_apic_init()
     uint64_t lapic_base = ReadBase() & APIC_BASE_SEL;
     if (!is_frame_mapped_hugepages(lapic_base, global_Settings.pml4t_kernel))
     {
-        map_kernel_page(HUGEPGROUNDDOWN(lapic_base), HUGEPGROUNDDOWN(lapic_base));
+        map_kernel_page(HUGEPGROUNDDOWN(lapic_base), HUGEPGROUNDDOWN(lapic_base), ALLOC_TYPE_DM_IO);
     }
     cpuGetMSR(IA32_APIC_BASE_MSR, &apic_msr_lo, &apic_msr_hi);
     int apic_globally_enabled = (apic_msr_lo & IA32_APIC_BASE_MSR_ENABLE);
@@ -255,7 +255,7 @@ static uint64_t dm_ioapic_address(io_apic* ioapic)
     */
     if (!is_frame_mapped_hugepages(ioapic->io_apic_address, global_Settings.pml4t_kernel))
     {
-        map_kernel_page(HUGEPGROUNDDOWN(ioapic->io_apic_address), HUGEPGROUNDDOWN(ioapic->io_apic_address));
+        map_kernel_page(HUGEPGROUNDDOWN(ioapic->io_apic_address), HUGEPGROUNDDOWN(ioapic->io_apic_address), ALLOC_TYPE_DM_IO);
     }
     return ioapic->io_apic_address;
 }
@@ -276,6 +276,13 @@ bool io_apic_write(io_apic* ioapic, uint8_t offset, uint32_t write_value)
     *ioregwin = write_value;
     return true;
 }
+
+void io_apic_enable(int irq)
+{
+    
+}
+
+
 
 bool io_apic_read(io_apic* ioapic, uint8_t offset, uint32_t* read_out)
 {

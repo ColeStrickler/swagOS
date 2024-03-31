@@ -15,6 +15,9 @@
 #include <cpu.h>
 #include <proc.h>
 #include <pci.h>
+//#include <ahci.h>
+#include <ata.h>
+
 
 #define KERNEL_HH_START 0xffffffff80000000
 #define KERNEL_PML4T_PHYS(pml4t) ((uint64_t)pml4t & ~KERNEL_HH_START) // call on the global_Settings.pml4t_kernel value
@@ -33,6 +36,7 @@ typedef struct KernelSettings
     struct TerminalState TerminalDriver;
     struct KernelHeap kernel_heap;
     struct PCI_DRIVER PCI_Driver;
+    //struct AHCI_DRIVER AHCI_Driver;
     bool bTimerCalibrated;
     uint64_t tickCount;
     bool useXSDT;
@@ -44,7 +48,7 @@ typedef struct KernelSettings
     uint64_t gdt;
     uint64_t* pml4t_kernel;
     uint64_t* pdpt_kernel;
-    uint64_t pdt_kernel[512][512]__attribute__((aligned(0x1000)));
+    uint64_t pdt_kernel[3][512]__attribute__((aligned(0x1000))); // 3 pdt, one for Kernel Code&Data, one for Kernel Heap, one for DM I/O
     uint64_t smp_pdt[512]__attribute__((aligned(0x1000))); // we just need this for smp, we use huge pages elsewhere
     uint64_t smp_pt[512]__attribute__((aligned(0x1000))); // we just need this for smp, we use huge pages elsewhere
     uint64_t tick_counter;

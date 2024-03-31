@@ -42,6 +42,7 @@ KERNEL_INCLUDES=\
 -I./src/kernel/include/data_structures/ \
 -I./src/kernel/include/drivers/ \
 -I./src/kernel/include/kernel/ \
+-I./src/kernel/include/fs/ \
 
 
 
@@ -91,7 +92,7 @@ build-disk : clean myos.iso
 
 
 qemu: build-disk
-	sudo qemu-system-x86_64 -enable-kvm -cpu host -serial file:out.log -M q35 -m 4G -smp 2 -drive format=raw,file=./build/disk.img
+	sudo qemu-system-x86_64 -enable-kvm -cpu host -serial file:out.log -m 4G -smp 2 -drive format=raw,file=./build/disk.img
 
 debug: build-disk
 	qemu-system-x86_64 -enable-kvm -cpu host -s -S -serial file:out.log -m 4G -smp 2 -drive format=raw,file=./build/disk.img

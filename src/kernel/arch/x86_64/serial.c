@@ -17,6 +17,12 @@ inline void outb(int portnum, unsigned char data)
   __asm__ __volatile__ ("outb %%al, %%dx" :: "a" (data),"d" (portnum));
 }
 
+inline void outportw(uint16_t portid, uint16_t value)
+{
+	__asm__ __volatile__ ("outw %%ax, %%dx": :"d" (portid), "a" (value));
+}
+
+
 inline void outportl(uint16_t port, uint32_t value) {
    __asm__ __volatile__ ("outl %1, %0" : : "d"(port), "a"(value)); 
 }
@@ -27,8 +33,20 @@ inline uint32_t inportl(uint16_t port) {
     return value;
 }
 
+inline uint16_t inportw(uint16_t port) {
+    uint16_t value;
+    __asm__ __volatile__ ("inw %1, %0" : "=a"(value) : "dN"(port));
+    return value;
+}
 
-
+inline void
+outsl(int port, const void *addr, int cnt)
+{
+  __asm__ __volatile__ ("cld; rep outsl" :
+               "=S" (addr), "=c" (cnt) :
+               "d" (port), "0" (addr), "1" (cnt) :
+               "cc");
+}
 
 void log_hexval(char* label, uint64_t hexval)
 {

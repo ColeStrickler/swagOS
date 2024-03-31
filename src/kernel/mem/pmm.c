@@ -248,7 +248,7 @@ uint32_t find_proper_pdt_table(uint64_t va)
 
     NOTE: this function does not alter the available page bitmap and should not be used to map MULTIBOOT_MEMORY_AVAILABLE regions
 */
-bool map_kernel_page(uint64_t va, uint64_t pa)
+bool map_kernel_page(uint64_t va, uint64_t pa, PAGE_ALLOC_TYPE type)
 {
 
     uint64_t pml4t_index =  (va >> 39) & 0x1FF; 
@@ -262,18 +262,20 @@ bool map_kernel_page(uint64_t va, uint64_t pa)
         INTO THE PDT TABLES. WE WILL NEED TO BE CAREFUL WITH THIS LATER ON AND THINK ABOUT
         IMPLEMENTING SOMETHING MORE ELEGANT
     */
-    uint32_t proper_pdt_table = find_proper_pdt_table(va);
-    
+    //uint32_t proper_pdt_table = find_proper_pdt_table(va);
+    uint64_t page_flags = (PAGE_PRESENT | PAGE_WRITE | PAGE_HUGE);
+    if (type == ALLOC_TYPE_DM_IO)
+        page_flags |= PAGE_CACHEDISABLE;
 
     // table physical addresses
     uint64_t* pml4t_addr = ((uint64_t*)((uint64_t)global_Settings.pml4t_kernel & ~KERNEL_HH_START));
 	uint64_t* pdpt_addr = ((uint64_t*)((uint64_t)global_Settings.pdpt_kernel & ~KERNEL_HH_START));
-	uint64_t* pdt_addr = (uint64_t*)((uint64_t)&global_Settings.pdt_kernel[proper_pdt_table] & ~KERNEL_HH_START);
+	uint64_t* pdt_addr = (uint64_t*)((uint64_t)&global_Settings.pdt_kernel[(int)type] & ~KERNEL_HH_START);
 
     // access via virtual addresses
     global_Settings.pml4t_kernel[pml4t_index] = ((uint64_t)pdpt_addr) | (PAGE_PRESENT | PAGE_WRITE);
 	global_Settings.pdpt_kernel[pdpt_index] = ((uint64_t)pdt_addr) | (PAGE_PRESENT | PAGE_WRITE); 
-    global_Settings.pdt_kernel[proper_pdt_table][pdt_index] = pa | (PAGE_PRESENT | PAGE_WRITE | PAGE_HUGE);
+    global_Settings.pdt_kernel[(int)type][pdt_index] = pa | page_flags;
     
     return true;
 }

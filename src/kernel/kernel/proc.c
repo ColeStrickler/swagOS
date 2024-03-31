@@ -4,7 +4,14 @@
 #include <vmm.h>
 #include <serial.h>
 #include <panic.h>
+#include <scheduler.h>
 extern KernelSettings global_Settings;
+
+
+struct Thread* GetCurrentThread()
+{
+    return get_current_cpu()->current_thread;
+}
 
 
 void CreateIdleThread(void(*entry)(void*))
@@ -90,4 +97,37 @@ void CreateThread(void(*entry)(void*), uint32_t pid, bool kthread)
     }
 
     release_Spinlock(&global_Settings.threads.lock);
+}
+
+
+
+void ThreadSleep(struct Sleeplock* sleep_lock, struct Spinlock* spin_lock)
+{
+    struct Thread* thread = GetCurrentThread();
+    if (spin_lock == NULL || sleep_lock == NULL || thread == NULL)
+        panic("ThreadSleep() --> got NULL.");
+
+
+    thread->current_sleep_lock = sleep_lock;
+    thread->status = PROCESS_STATE_SLEEPING;
+    if (spin_lock != &global_Settings.threads.lock)
+        release_Spinlock(spin_lock);
+
+    // We currently have this set up to sleep if thread->status is PROCESS_STATE_SLEEPING
+    // If we want to add software debugging in the future we will need to edit this
+    __asm__ __volatile__("int3"); 
+
+    thread->current_sleep_lock = NULL;
+
+
+    if (spin_lock != &global_Settings.threads.lock)
+        acquire_Spinlock(spin_lock);
+    
+
+    // We release spinlock because we will acquire the process table lock
+    // In the call to Invoke Scheduler
+    //cpu_context_t* ctx = ;
+    //InvokeScheduler();
+    //thread->
+    
 }

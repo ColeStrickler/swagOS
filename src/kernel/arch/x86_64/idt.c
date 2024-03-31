@@ -165,6 +165,14 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
 {
     switch(tf->isr_id)
     {
+        case 3:
+        {
+            // INT3
+            log_to_serial("INT3\n");
+            if (GetCurrentThread()->run_mode == PROCESS_STATE_SLEEPING || true)
+                InvokeScheduler(tf);
+            break;
+        }
         case 13:
         {
             log_to_serial("General Protection fault interrupt.\n");
@@ -201,6 +209,11 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
                 log_hexval("PID id", lapic_id());
             outb(0x20,0x20); outb(0xa0,0x20);    
             apic_end_of_interrupt();
+            break;
+        }
+        case 46:
+        {
+            log_to_serial("INT46 --> IDE INT");
             break;
         }
         case IDT_APIC_SPURIOUS_INT:
