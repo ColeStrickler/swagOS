@@ -203,7 +203,17 @@ void IdleThread()
 	while(1) {__asm__ __volatile__("pause");}
 }
 
+void TestThread()
+{
+	for (uint32_t i = 0; i < UINT32_MAX; i++)
+	{
 
+	}
+	while(1)
+	{
+		Wakeup(1);
+	}
+}
 
 
 /*
@@ -276,6 +286,7 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	printf(msg);
 
 	CreateIdleThread(IdleThread); // do this before smp initialization and after kheap_init()
+	CreateThread(TestThread, 69, true);
 	//printf(swag);
 	enable_supervisor_mem_protections();
 	//clear_screen(0, 0, 0);
@@ -290,9 +301,13 @@ void kernel_main(uint64_t ptr_multiboot_info)
 			InitCPUByID(id);
 		}
 	}
+	GetCurrentThread()->sleep_channel = 0x1;
 	GetCurrentThread()->status = PROCESS_STATE_SLEEPING;
 	__asm__ __volatile__("int3");
 	
+
+
+
 	/*
 	PCI_EnumBuses();
 	log_hexval("Dev Count:", global_Settings.PCI_Driver.device_count);

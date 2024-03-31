@@ -7,7 +7,7 @@
 struct dll_Entry* remove_dll_entry(struct dll_Entry* to_rm)
 {
     struct dll_Entry* prev = to_rm->prev;
-    struct dll_Entry* next = to_rm->prev;
+    struct dll_Entry* next = to_rm->next;
 
     if (prev != NULL)
         prev->next = next;
@@ -18,20 +18,19 @@ struct dll_Entry* remove_dll_entry(struct dll_Entry* to_rm)
 
 
 
-void insert_dll_entry_after(struct dll_Entry* insert_after, struct dll_Entry* to_insert)
+
+struct dll_Entry* remove_dll_entry_head(struct dll_Head* header)
 {
-    if (insert_after == NULL)
-        panic("insert_dll_entry_after() --> insert_after == NULL.\n");
+    if (header == NULL)
+        panic("remove_dll_from_head() --> received NULL header!\n");
 
-    struct dll_Entry* old_next = insert_after->next;
-    
-    insert_after->next = to_insert;
-    to_insert->prev = insert_after;
-    to_insert->next = old_next;
-
-    if (old_next != NULL)
-        old_next->prev = to_insert;
+    if (header->first == NULL || header->first == header || header->entry_count == 0)
+        return NULL;
+    header->entry_count--;
+    return remove_dll_entry(header->first);
 }
+
+
 
 
 void insert_dll_entry_head(struct dll_Head* header, struct dll_Entry* to_insert)
@@ -53,6 +52,7 @@ void insert_dll_entry_head(struct dll_Head* header, struct dll_Entry* to_insert)
         to_insert->prev = (struct dll_Entry* )header;
         to_insert->next = old_next;
     }
+    header->entry_count++;
 }
 
 void insert_dll_entry_tail(struct dll_Head* header, struct dll_Entry* to_insert)
@@ -75,4 +75,5 @@ void insert_dll_entry_tail(struct dll_Head* header, struct dll_Entry* to_insert)
         to_insert->prev = old_last;
         old_last->next = to_insert;
     }
+    header->entry_count++;
 }

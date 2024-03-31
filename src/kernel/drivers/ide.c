@@ -1,9 +1,12 @@
 
 #include <buffered_io.h>
 #include <kernel.h>
-#include "ide.h"
+#include <linked_list.h>
+#include <ide.h>
 #include <asm_routines.h>
 #include <panic.h>
+
+#include <serial.h>
 #define SECTOR_SIZE   512
 #define FSSIZE       1000  // size of file system in blocks
 #define IDE_BSY       0x80
@@ -16,9 +19,7 @@
 #define IDE_CMD_RDMUL 0xc4
 #define IDE_CMD_WRMUL 0xc5
 
-
-Spinlock ide_lock;
-struct iobuf* idequeue;
+struct ide_queue ide_request_queue;
 
 // Wait for IDE disk to become ready.
 static int
@@ -39,13 +40,69 @@ ideinit(void)
 {
   int i;
 
-  init_Spinlock(&ide_lock);
+  init_Spinlock(&ide_request_queue.ide_lock);
   set_irq_mask(0x14, false);
   idewait(0);
 
   // Switch back to disk 0.
   outb(0x1f6, 0xe0 | (0<<4));
 }
+
+
+
+// Interrupt handler.
+void
+ideintr(void)
+{
+  struct iobuf *b;
+
+  // First queued buffer is the active request.
+  acquire_Spinlock(&ide_request_queue.ide_lock);
+
+  /*
+     if((b = ide_queue) == NULL){
+      release(&idelock);
+      return;
+    }
+  */
+
+  if (ide_request_queue.queue.entry_count == 0)
+  {
+    release_Spinlock(&ide_request_queue.ide_lock);
+    return;
+  }
+  struct dll_Entry* entry = remove_dll_entry_head(&ide_request_queue.queue);
+  if (entry == NULL)
+    panic("ideintr() --> got NULL dll_Entry! Condition should not exist.\n");
+
+  struct ide_request* req = IDE_QUEUE_ITEM(entry);
+  b = req->buf;
+  //idequeue = b->qnext;
+
+  // Read data if needed.
+  if(!(b->flags & B_DIRTY) && idewait(1) >= 0)
+    insl(0x1f0, b->data, BSIZE/4);
+
+  // Wake process waiting for this buf.
+  b->flags |= B_VALID;
+  b->flags &= ~B_DIRTY;
+
+  /*
+    RESUME HERE
+    RESUME HERE
+  */
+
+  //wakeup(b);
+
+  // Start disk on next buf in queue.
+ // if(idequeue != 0)
+  //  idestart(idequeue);
+
+ // release(&idelock);
+}
+
+
+
 
 
 
@@ -95,25 +152,31 @@ iderw(struct iobuf *b)
   if(b->dev != 0)
     panic("iderw: only disk 0 is supported");
 
-  acquire_Spinlock(&ide_lock);  //DOC:acquire-lock
+  struct ide_request* req = (struct ide_request*)kalloc(sizeof(struct ide_request));
+  if (req == NULL)
+    panic("iderw() --> kalloc returned NULL!\n");
+  acquire_Spinlock(&ide_request_queue.ide_lock);  //DOC:acquire-lock
 
-  // Append b to idequeue.
-  b->qnext = 0;
-  for(pp=&idequeue; *pp; pp=&(*pp)->qnext)  //DOC:insert-queue
-    ;
-  *pp = b;
+  req->buf = b;
+  insert_dll_entry_tail(&ide_request_queue.queue, &req->entry);
 
-  // Start disk if necessary.
-  if(idequeue == b)
+  /*
+    // Append b to idequeue.
+    b->qnext = NULL;
+    for(pp=&idequeue; *pp; pp=&(*pp)->qnext)  //DOC:insert-queue
+      ;
+    *pp = b;
+  */
+
+  // Start disk if new request is front of the queue
+  if((IDE_QUEUE_ITEM(ide_request_queue.queue.first))->buf == b)
     idestart(b);
 
   // Wait for request to finish.
   while((b->flags & (B_VALID|B_DIRTY)) != B_VALID){
-    //sleep(b, &ide_lock);
-    io_wait(); // NEED TO IMPLEMENT SLEEP
-    log_to_serial("Wait\n");
+    ThreadSleep(b, &ide_request_queue.ide_lock);
   }
 
 
-  release_Spinlock(&ide_lock);
+  release_Spinlock(&ide_request_queue.ide_lock);
 }

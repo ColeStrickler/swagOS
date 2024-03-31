@@ -1,3 +1,5 @@
+#ifndef SERIAL_H
+#define SERIAL_H
 #include <stdint.h>
 
 #define PORT_COM1 0x3f8          // COM1
@@ -14,4 +16,7 @@ void log_char_to_serial(char c);
 uint32_t inportl(uint16_t port);
 uint16_t inportw(uint16_t port);
 void outsl(int port, const void *addr, int cnt);
+void insl(int port, void *addr, int cnt);
 void log_hexval(char *label, uint64_t hexval);
+
+#endif

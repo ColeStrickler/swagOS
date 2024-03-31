@@ -48,6 +48,16 @@ outsl(int port, const void *addr, int cnt)
                "cc");
 }
 
+inline void
+insl(int port, void *addr, int cnt)
+{
+  __asm__ __volatile__("cld; rep insl" :
+               "=D" (addr), "=c" (cnt) :
+               "d" (port), "0" (addr), "1" (cnt) :
+               "memory", "cc");
+}
+
+
 void log_hexval(char* label, uint64_t hexval)
 {
   log_to_serial(label);

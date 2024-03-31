@@ -101,14 +101,14 @@ void CreateThread(void(*entry)(void*), uint32_t pid, bool kthread)
 
 
 
-void ThreadSleep(struct Sleeplock* sleep_lock, struct Spinlock* spin_lock)
+void ThreadSleep(void* sleep_channel, struct Spinlock* spin_lock)
 {
     struct Thread* thread = GetCurrentThread();
-    if (spin_lock == NULL || sleep_lock == NULL || thread == NULL)
+    if (spin_lock == NULL || sleep_channel== NULL || thread == NULL)
         panic("ThreadSleep() --> got NULL.");
 
 
-    thread->current_sleep_lock = sleep_lock;
+    thread->sleep_channel = sleep_channel;
     thread->status = PROCESS_STATE_SLEEPING;
     if (spin_lock != &global_Settings.threads.lock)
         release_Spinlock(spin_lock);
@@ -117,7 +117,7 @@ void ThreadSleep(struct Sleeplock* sleep_lock, struct Spinlock* spin_lock)
     // If we want to add software debugging in the future we will need to edit this
     __asm__ __volatile__("int3"); 
 
-    thread->current_sleep_lock = NULL;
+    thread->sleep_channel = NULL;
 
 
     if (spin_lock != &global_Settings.threads.lock)
@@ -131,3 +131,17 @@ void ThreadSleep(struct Sleeplock* sleep_lock, struct Spinlock* spin_lock)
     //thread->
     
 }
+
+void Wakeup(void* channel)
+{
+    struct Thread* thread_table = &global_Settings.threads.thread_table[0];
+    acquire_Spinlock(&global_Settings.threads.lock);
+    for (uint32_t i = 0; i < MAX_NUM_THREADS; i++)
+    {
+        Thread* t =  &thread_table[i];
+        if (t->status == PROCESS_STATE_SLEEPING && t->sleep_channel == channel)
+            t->status = PROCESS_STATE_READY;
+    }
+    release_Spinlock(&global_Settings.threads.lock);
+}
+

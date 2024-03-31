@@ -66,7 +66,7 @@ typedef struct Thread
     uint32_t id;
     uint64_t* pml4t;
     cpu_context_t* execution_context;
-    Sleeplock* current_sleep_lock;  // will be NULL if process is not sleeping
+    void* sleep_channel;  // will be NULL if process is not sleeping
 } Thread;
 
 
@@ -83,7 +83,9 @@ void CreateIdleThread(void (*entry)(void *));
 void CreateThread(void (*entry)(void *), uint32_t pid, bool kthread);
 
 
-void ThreadSleep(Sleeplock *sleep_lock, Spinlock *spin_lock);
+void ThreadSleep(void* sleep_channel, Spinlock *spin_lock);
+
+void Wakeup(void *channel);
 
 #endif
 

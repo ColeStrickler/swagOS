@@ -16,7 +16,7 @@
 #include <proc.h>
 #include <pci.h>
 //#include <ahci.h>
-#include <ata.h>
+
 
 
 #define KERNEL_HH_START 0xffffffff80000000
