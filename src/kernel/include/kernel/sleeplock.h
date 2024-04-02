@@ -11,4 +11,15 @@ typedef struct Sleeplock {
     uint32_t owner_tid;
 }Sleeplock;
 
+
+void init_Sleeplock(Sleeplock *lock);
+
+void acquire_Sleeplock(Sleeplock *lock);
+
+void release_Sleeplock(Sleeplock *lock);
+
+bool holdingsleep(Sleeplock *lock);
+
+
 #endif
+

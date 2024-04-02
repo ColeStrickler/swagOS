@@ -207,7 +207,8 @@ uint32_t lapic_id();
 void apic_send_ipi(uint8_t dest_cpu, uint32_t dsh, uint32_t type, uint8_t vector);
 void init_ioapic();
 bool set_io_apic_redirect(io_apic *ioapic, uint32_t irq_num, uint32_t entry1_write, uint32_t entry2_write);
-bool get_io_apic_redirect(io_apic* ioapic, uint32_t irq_num, uint32_t* entry1_out, uint32_t* entry2_out);
+void io_apic_enable(uint32_t irq, uint32_t cpu);
+bool get_io_apic_redirect(io_apic *ioapic, uint32_t irq_num, uint32_t *entry1_out, uint32_t *entry2_out);
 uint64_t apic_read_reg(uint32_t reg_offset);
 void set_irq(uint8_t irq_type, uint8_t redirect_table_pos, uint8_t idt_entry, uint8_t destination_field, uint32_t flags, bool masked);
 

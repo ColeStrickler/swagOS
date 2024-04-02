@@ -38,7 +38,7 @@ binit(void)
     for(b = bcache.buf; b < bcache.buf+NBUF; b++){
         b->next = bcache.head.next;
         b->prev = &bcache.head;
-        init_Spinlock(&b->lock);
+        init_Sleeplock(&b->lock);
         bcache.head.next->prev = b;
         bcache.head.next = b;
     }
@@ -59,7 +59,7 @@ bget(uint32_t dev, uint32_t blockno)
     if(b->dev == dev && b->blockno == blockno){
       b->refcnt++;
       release_Spinlock(&bcache.lock);
-      acquire_Spinlock(&b->lock);
+      acquire_Sleeplock(&b->lock);
       return b;
     }
   }
@@ -74,7 +74,7 @@ bget(uint32_t dev, uint32_t blockno)
       b->flags = 0;
       b->refcnt = 1;
       release_Spinlock(&bcache.lock);
-      acquire_Spinlock(&b->lock);
+      acquire_Sleeplock(&b->lock);
       return b;
     }
   }
@@ -88,6 +88,7 @@ bread(uint32_t dev, uint32_t blockno)
   struct iobuf *b;
 
   b = bget(dev, blockno);
+  log_hexval("Found block, starting rw", b);
   if((b->flags & B_VALID) == 0) {
     iderw(b);
   }
@@ -98,7 +99,7 @@ bread(uint32_t dev, uint32_t blockno)
 void
 bwrite(struct iobuf *b)
 {
-  if(!spinlock_check_held(&b->lock))
+  if(!holdingsleep(&b->lock))
     panic("bwrite() --> spinlock not held");
   b->flags |= B_DIRTY;
   iderw(b);
@@ -109,7 +110,9 @@ bwrite(struct iobuf *b)
 void
 brelse(struct iobuf *b)
 {
-  release_Spinlock(&b->lock);
+  if (!holdingsleep(&b->lock))
+    panic("brelse() --> not holding iobuf sleeplock.");
+  release_Sleeplock(&b->lock);
 
   acquire_Spinlock(&bcache.lock);
   b->refcnt--;

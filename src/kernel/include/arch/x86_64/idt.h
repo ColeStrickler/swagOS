@@ -136,4 +136,5 @@ extern void isr_31();
 extern void isr_32();
 extern void isr_33();
 extern void isr_34();
+extern void isr_46();
 extern void isr_255();

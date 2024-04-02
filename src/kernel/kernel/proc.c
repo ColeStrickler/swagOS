@@ -107,12 +107,13 @@ void ThreadSleep(void* sleep_channel, struct Spinlock* spin_lock)
     if (spin_lock == NULL || sleep_channel== NULL || thread == NULL)
         panic("ThreadSleep() --> got NULL.");
 
+    uint32_t sleeping_cpu = get_current_cpu()->id;
 
     thread->sleep_channel = sleep_channel;
     thread->status = PROCESS_STATE_SLEEPING;
     if (spin_lock != &global_Settings.threads.lock)
         release_Spinlock(spin_lock);
-
+    log_hexval("CLI", get_current_cpu()->cli_count);
     // We currently have this set up to sleep if thread->status is PROCESS_STATE_SLEEPING
     // If we want to add software debugging in the future we will need to edit this
     __asm__ __volatile__("int3"); 

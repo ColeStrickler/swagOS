@@ -6,7 +6,7 @@
 #include <panic.h>
 #include <ps2_keyboard.h>
 #include <scheduler.h>
-
+#include <ide.h>
 extern KernelSettings global_Settings;
 
 __attribute__((aligned(0x10)))
@@ -149,6 +149,7 @@ void build_IDT(void)
     SetIDT_Descriptor(32, (uint64_t)isr_32, false, false);
     SetIDT_Descriptor(33, (uint64_t)isr_33, false, false);
     SetIDT_Descriptor(34, (uint64_t)isr_34, false, false);
+    SetIDT_Descriptor(46, (uint64_t)isr_46, false, false);
 }
 
 
@@ -170,7 +171,10 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
             // INT3
             log_to_serial("INT3\n");
             if (GetCurrentThread()->run_mode == PROCESS_STATE_SLEEPING || true)
+            {
+                log_to_serial("Sleeping, invoking scheduler!\n");
                 InvokeScheduler(tf);
+            }
             break;
         }
         case 13:
@@ -198,6 +202,7 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         }
         case IDT_KEYBOARD_INT:
         {
+            log_to_serial("keyboard");
             keyboard_irq_handler();
             apic_end_of_interrupt();
             break;
@@ -214,6 +219,7 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         case 46:
         {
             log_to_serial("INT46 --> IDE INT");
+            ideintr();
             break;
         }
         case IDT_APIC_SPURIOUS_INT:

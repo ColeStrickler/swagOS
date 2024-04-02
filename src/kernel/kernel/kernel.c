@@ -196,23 +196,24 @@ void kthread_setup()
 	get_current_cpu()->current_thread = kthread;
 }
 
+void smp_start()
+{
+	for (int i = 0; i < global_Settings.cpu_count; i++)
+	{
+		uint16_t id = global_Settings.cpu[i].id;
+		if (id != get_current_cpu()->id)
+		{
+			log_hexval("Attempting to init", id);
+			InitCPUByID(id);
+		}
+	}
+}
 
 
 void IdleThread()
 {
+	log_hexval("idle thread here", lapic_id());
 	while(1) {__asm__ __volatile__("pause");}
-}
-
-void TestThread()
-{
-	for (uint32_t i = 0; i < UINT32_MAX; i++)
-	{
-
-	}
-	while(1)
-	{
-		Wakeup(1);
-	}
 }
 
 
@@ -262,8 +263,7 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	log_to_serial("apic setup finished\n");
 	kheap_init(); // we use spinlocks here and mess with interrupt flags so do this after we initialize interrupt stuff
 	
-	log_to_serial("kheap_init() finished\n");
-	keyboard_driver_init();
+	
 	log_to_serial("keyboard driver init finished\n");
 	
 	video_init();
@@ -273,53 +273,33 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	init_terminal();
 	log_to_serial("terminal init finished!\n");
 	
-	uint8_t r = 0xae;
-	uint8_t g = 0x18;
-	uint8_t b = 0xed;
+	log_to_serial("kheap_init() finished\n");
+	keyboard_driver_init();
+	//sti();
 
 
+
+	
 	char* msg = "yolo yolo yolo yolo yolo yolo yolo yolo yolo";
 	printf(msg);printf(msg);
 	printf(msg);
 	printf(msg);
 	printf(msg);
 	printf(msg);
-
 	CreateIdleThread(IdleThread); // do this before smp initialization and after kheap_init()
-	CreateThread(TestThread, 69, true);
-	//printf(swag);
 	enable_supervisor_mem_protections();
-	//clear_screen(0, 0, 0);
-	//char* label = "swag yolo";
-
-	for (int i = 0; i < global_Settings.cpu_count; i++)
-	{
-		uint16_t id = global_Settings.cpu[i].id;
-		if (id != get_current_cpu()->id)
-		{
-			log_hexval("Attempting to init", id);
-			InitCPUByID(id);
-		}
-	}
-	GetCurrentThread()->sleep_channel = 0x1;
-	GetCurrentThread()->status = PROCESS_STATE_SLEEPING;
-	__asm__ __volatile__("int3");
-	
-
-
-
-	/*
-	PCI_EnumBuses();
-	log_hexval("Dev Count:", global_Settings.PCI_Driver.device_count);
-	binit();
+	smp_start();
 	ideinit();
-	
-	iobuf* bb = bread(0, 0);
-	
-	log_hexval("bb", bb);
-	for (int i = 0; i < 512; i++)
-		log_hex_to_serial(bb->data[i]);
-	*/
+	binit();
+	iobuf* buf = bread(0, 1);
+	if (buf != NULL)
+		log_hexval("GOT BUF!", buf);
+	else
+		log_hexval("BUF NULL", buf);
+
+	//log_hexval("CLI COUNT", global_Settings.cpu[0].cli_count);
+	//log_hexval("RFLAGS", read_rflags() & CPU_FLAG_IF);
+
 
 	log_to_serial("\nKERNEL END\n");
 	while(1){};

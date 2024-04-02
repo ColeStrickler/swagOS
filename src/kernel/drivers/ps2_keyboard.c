@@ -280,6 +280,7 @@ void keyboard_irq_handler()
 {
     uint8_t scancode = inb(0x60);
     char c;
+
     if(scancode_to_char(scancode, &c) && is_ascii(c))
         terminal_write_char(c, RGB_COLOR(0x00, 0xdd, 0x44));
 }

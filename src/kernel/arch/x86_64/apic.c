@@ -277,12 +277,6 @@ bool io_apic_write(io_apic* ioapic, uint8_t offset, uint32_t write_value)
     return true;
 }
 
-void io_apic_enable(int irq)
-{
-    
-}
-
-
 
 bool io_apic_read(io_apic* ioapic, uint8_t offset, uint32_t* read_out)
 {
@@ -318,6 +312,8 @@ bool set_io_apic_redirect(io_apic* ioapic, uint32_t irq_num, uint32_t entry1_wri
         return false;
     return true;
 }
+
+
 
 
 /*
@@ -370,6 +366,7 @@ void set_irq(uint8_t irq_type, uint8_t redirect_table_pos, uint8_t idt_entry, ui
 
     set_io_apic_redirect(global_Settings.pIoApic, redirect_table_pos, (uint32_t)entry.raw, (uint32_t)((uint64_t)entry.raw >> 32));
 }
+
 
 
 

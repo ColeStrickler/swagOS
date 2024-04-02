@@ -19,6 +19,8 @@
 #define IDE_CMD_RDMUL 0xc4
 #define IDE_CMD_WRMUL 0xc5
 
+extern KernelSettings global_Settings;
+
 struct ide_queue ide_request_queue;
 
 // Wait for IDE disk to become ready.
@@ -41,13 +43,45 @@ ideinit(void)
   int i;
 
   init_Spinlock(&ide_request_queue.ide_lock);
-  set_irq_mask(0x14, false);
+  //io_apic_enable(0xe, lapic_id());
+  //set_irq_mask(0xe, false);
+  set_irq(0xe, 0xe, 0x2e, 0x0, 0x0, false);
   idewait(0);
 
   // Switch back to disk 0.
   outb(0x1f6, 0xe0 | (0<<4));
 }
 
+
+// Start the request for b.  Caller must hold idelock.
+static void
+idestart(struct iobuf *b)
+{
+  if(b == 0)
+    panic("idestart");
+  if(b->blockno >= FSSIZE)
+    panic("incorrect blockno");
+  int sector_per_block =  BSIZE/SECTOR_SIZE;
+  int sector = b->blockno * sector_per_block;
+  int read_cmd = (sector_per_block == 1) ? IDE_CMD_READ :  IDE_CMD_RDMUL;
+  int write_cmd = (sector_per_block == 1) ? IDE_CMD_WRITE : IDE_CMD_WRMUL;
+
+  if (sector_per_block > 7) panic("idestart");
+
+  idewait(0);
+  outb(0x3f6, 0);  // generate interrupt
+  outb(0x1f2, sector_per_block);  // number of sectors
+  outb(0x1f3, sector & 0xff);
+  outb(0x1f4, (sector >> 8) & 0xff);
+  outb(0x1f5, (sector >> 16) & 0xff);
+  outb(0x1f6, 0xe0 | ((b->dev&1)<<4) | ((sector>>24)&0x0f));
+  if(b->flags & B_DIRTY){
+    outb(0x1f7, write_cmd);
+    outsl(0x1f0, b->data, BSIZE/4);
+  } else {
+    outb(0x1f7, read_cmd);
+  }
+}
 
 
 // Interrupt handler.
@@ -87,18 +121,13 @@ ideintr(void)
   b->flags |= B_VALID;
   b->flags &= ~B_DIRTY;
 
-  /*
-    RESUME HERE
-    RESUME HERE
-  */
-
-  //wakeup(b);
+  Wakeup(b);
 
   // Start disk on next buf in queue.
- // if(idequeue != 0)
-  //  idestart(idequeue);
-
- // release(&idelock);
+  if(ide_request_queue.queue.entry_count != 0)
+    idestart((IDE_QUEUE_ITEM(ide_request_queue.queue.first))->buf);
+  
+  release_Spinlock(&ide_request_queue.ide_lock);
 }
 
 
@@ -106,35 +135,7 @@ ideintr(void)
 
 
 
-// Start the request for b.  Caller must hold idelock.
-static void
-idestart(struct iobuf *b)
-{
-  if(b == 0)
-    panic("idestart");
-  if(b->blockno >= FSSIZE)
-    panic("incorrect blockno");
-  int sector_per_block =  BSIZE/SECTOR_SIZE;
-  int sector = b->blockno * sector_per_block;
-  int read_cmd = (sector_per_block == 1) ? IDE_CMD_READ :  IDE_CMD_RDMUL;
-  int write_cmd = (sector_per_block == 1) ? IDE_CMD_WRITE : IDE_CMD_WRMUL;
 
-  if (sector_per_block > 7) panic("idestart");
-
-  idewait(0);
-  outb(0x3f6, 0);  // generate interrupt
-  outb(0x1f2, sector_per_block);  // number of sectors
-  outb(0x1f3, sector & 0xff);
-  outb(0x1f4, (sector >> 8) & 0xff);
-  outb(0x1f5, (sector >> 16) & 0xff);
-  outb(0x1f6, 0xe0 | ((b->dev&1)<<4) | ((sector>>24)&0x0f));
-  if(b->flags & B_DIRTY){
-    outb(0x1f7, write_cmd);
-    outsl(0x1f0, b->data, BSIZE/4);
-  } else {
-    outb(0x1f7, read_cmd);
-  }
-}
 
 
 // Sync buf with disk.
@@ -144,8 +145,8 @@ void
 iderw(struct iobuf *b)
 {
   struct iobuf **pp;
-
-  if(!spinlock_check_held(&b->lock))
+  log_to_serial("iderw()\n");
+  if(!holdingsleep(&b->lock))
     panic("iderw: buf not locked");
   if((b->flags & (B_VALID|B_DIRTY)) == B_VALID)
     panic("iderw: nothing to do");
@@ -156,17 +157,9 @@ iderw(struct iobuf *b)
   if (req == NULL)
     panic("iderw() --> kalloc returned NULL!\n");
   acquire_Spinlock(&ide_request_queue.ide_lock);  //DOC:acquire-lock
-
+  log_to_serial("iderw() --> spinlock acquired\n");
   req->buf = b;
   insert_dll_entry_tail(&ide_request_queue.queue, &req->entry);
-
-  /*
-    // Append b to idequeue.
-    b->qnext = NULL;
-    for(pp=&idequeue; *pp; pp=&(*pp)->qnext)  //DOC:insert-queue
-      ;
-    *pp = b;
-  */
 
   // Start disk if new request is front of the queue
   if((IDE_QUEUE_ITEM(ide_request_queue.queue.first))->buf == b)
@@ -174,9 +167,9 @@ iderw(struct iobuf *b)
 
   // Wait for request to finish.
   while((b->flags & (B_VALID|B_DIRTY)) != B_VALID){
+    log_to_serial("iderw() going to sleep!\n");
     ThreadSleep(b, &ide_request_queue.ide_lock);
   }
-
 
   release_Spinlock(&ide_request_queue.ide_lock);
 }

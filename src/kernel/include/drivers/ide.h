@@ -20,7 +20,9 @@ typedef struct ide_queue
     struct dll_Head queue;
 } ide_queue;
 
+void ideinit(void);
 
-
+void ideintr(void);
 
 #endif
+

@@ -1,6 +1,7 @@
 #ifndef BUFFERED_IO_H
 #define BUFFERED_IO_H
 #include <kernel.h>
+#include <sleeplock.h>
 
 #define BSIZE 512 // block size
 
@@ -8,7 +9,7 @@ typedef struct iobuf {
   int flags;
   uint32_t dev;
   uint32_t blockno;
-  struct Spinlock lock;
+  struct Sleeplock lock;
   uint32_t refcnt;
   struct iobuf *prev; // LRU cache list
   struct iobuf *next;
