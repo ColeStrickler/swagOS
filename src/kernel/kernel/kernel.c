@@ -22,6 +22,7 @@
 #include <ide.h>
 #include <buffered_io.h>
 #include <scheduler.h>
+#include <ext2.h>
 /*
 	These global variables are created in boot.asm
 */
@@ -291,14 +292,22 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	smp_start();
 	ideinit();
 	binit();
-	iobuf* buf = bread(0, 1);
-	if (buf != NULL)
-		log_hexval("GOT BUF!", buf);
-	else
-		log_hexval("BUF NULL", buf);
+	
+	
+	iobuf* buf = bread(0, 2050);
+	struct ext2_superblock* superblock = (struct ext2_superblock*)buf->data;
+	if (superblock->ext2_magic == EXT2_SIGNATURE)
+	{
+		log_hexval("SUPERBLOCK FOUND AT SECTOR", 2);
+		panic("FOUND\n");
+	}
+	brelse(buf);
 
-	//log_hexval("CLI COUNT", global_Settings.cpu[0].cli_count);
-	//log_hexval("RFLAGS", read_rflags() & CPU_FLAG_IF);
+
+	
+
+	log_hexval("CLI COUNT", global_Settings.cpu[0].cli_count);
+	log_hexval("RFLAGS", read_rflags() & CPU_FLAG_IF);
 
 
 	log_to_serial("\nKERNEL END\n");

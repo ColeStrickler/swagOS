@@ -77,6 +77,7 @@ void InvokeScheduler(struct cpu_context_t* ctx)
 
     if (old_thread == NULL || old_thread->status == PROCESS_STATE_SLEEPING) // If we already hold the Idle thread we can avoid this overhead
     {
+        //log_hexval("Doing Idle Thread on CPU", lapic_id());
         ScheduleIdleThread(old_thread, ctx);
     }
     release_Spinlock(&global_Settings.threads.lock);

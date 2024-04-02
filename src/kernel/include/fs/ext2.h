@@ -1,6 +1,9 @@
 #ifndef EXT2_H
 #define EXT2_H
 
+#define SUPERBLOCK_SECTOR 2050
+#define EXT2_SIGNATURE 0xEF53
+
 typedef struct ext2_superblock {
     uint32_t total_inodes;
     uint32_t total_blocks;

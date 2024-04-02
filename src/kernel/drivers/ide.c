@@ -7,20 +7,10 @@
 #include <panic.h>
 
 #include <serial.h>
-#define SECTOR_SIZE   512
-#define FSSIZE       1000  // size of file system in blocks
-#define IDE_BSY       0x80
-#define IDE_DRDY      0x40
-#define IDE_DF        0x20
-#define IDE_ERR       0x01
 
-#define IDE_CMD_READ  0x20
-#define IDE_CMD_WRITE 0x30
-#define IDE_CMD_RDMUL 0xc4
-#define IDE_CMD_WRMUL 0xc5
 
 extern KernelSettings global_Settings;
-
+bool disk1 = false;
 struct ide_queue ide_request_queue;
 
 // Wait for IDE disk to become ready.
@@ -47,7 +37,14 @@ ideinit(void)
   //set_irq_mask(0xe, false);
   set_irq(0xe, 0xe, 0x2e, 0x0, 0x0, false);
   idewait(0);
-
+   // Check if disk 1 is present
+  outb(0x1f6, 0xe0 | (1<<4));
+  for(i=0; i<1000; i++){
+    if(inb(0x1f7) != 0){
+      disk1 = true;
+      break;
+    }
+  }
   // Switch back to disk 0.
   outb(0x1f6, 0xe0 | (0<<4));
 }
@@ -145,19 +142,18 @@ void
 iderw(struct iobuf *b)
 {
   struct iobuf **pp;
-  log_to_serial("iderw()\n");
   if(!holdingsleep(&b->lock))
     panic("iderw: buf not locked");
   if((b->flags & (B_VALID|B_DIRTY)) == B_VALID)
     panic("iderw: nothing to do");
-  if(b->dev != 0)
+  if(b->dev != 0 && !disk1)
     panic("iderw: only disk 0 is supported");
-
+  //log_hexval("DISK1", disk1);
   struct ide_request* req = (struct ide_request*)kalloc(sizeof(struct ide_request));
   if (req == NULL)
     panic("iderw() --> kalloc returned NULL!\n");
   acquire_Spinlock(&ide_request_queue.ide_lock);  //DOC:acquire-lock
-  log_to_serial("iderw() --> spinlock acquired\n");
+  //log_to_serial("iderw() --> spinlock acquired\n");
   req->buf = b;
   insert_dll_entry_tail(&ide_request_queue.queue, &req->entry);
 
@@ -167,9 +163,8 @@ iderw(struct iobuf *b)
 
   // Wait for request to finish.
   while((b->flags & (B_VALID|B_DIRTY)) != B_VALID){
-    log_to_serial("iderw() going to sleep!\n");
+    //log_to_serial("iderw() going to sleep!\n");
     ThreadSleep(b, &ide_request_queue.ide_lock);
   }
-
   release_Spinlock(&ide_request_queue.ide_lock);
 }

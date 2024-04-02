@@ -169,10 +169,10 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         case 3:
         {
             // INT3
-            log_to_serial("INT3\n");
+            //log_to_serial("INT3\n");
             if (GetCurrentThread()->run_mode == PROCESS_STATE_SLEEPING || true)
             {
-                log_to_serial("Sleeping, invoking scheduler!\n");
+                //log_to_serial("Sleeping, invoking scheduler!\n");
                 InvokeScheduler(tf);
             }
             break;
@@ -218,7 +218,6 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         }
         case 46:
         {
-            log_to_serial("INT46 --> IDE INT");
             ideintr();
             break;
         }

@@ -88,10 +88,11 @@ bread(uint32_t dev, uint32_t blockno)
   struct iobuf *b;
 
   b = bget(dev, blockno);
-  log_hexval("Found block, starting rw", b);
+
   if((b->flags & B_VALID) == 0) {
     iderw(b);
   }
+
   return b;
 }
 
