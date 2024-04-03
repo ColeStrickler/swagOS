@@ -1,8 +1,20 @@
 #ifndef EXT2_H
 #define EXT2_H
 
+#include <stdint.h>
+#include <stdbool.h>
+#include <ide.h>
+#include <panic.h>
+
 #define SUPERBLOCK_SECTOR 2050
 #define EXT2_SIGNATURE 0xEF53
+
+
+
+
+
+
+
 
 typedef struct ext2_superblock {
     uint32_t total_inodes;
@@ -58,4 +70,36 @@ typedef struct ext2_superblock {
 }__attribute__ ((packed)) ext2_superblock;
 
 
+typedef struct ext2_block_group_desc {
+    uint32_t block_bitmap;
+    uint32_t inode_bitmap;
+    uint32_t inode_table;
+    uint32_t free_blocks;
+    uint32_t free_inodes;
+    uint32_t num_dirs;
+    uint32_t unused1;
+    uint32_t unused2;
+}__attribute__((packed)) ext2_block_group_desc;
+
+
+
+typedef struct EXT2_DRIVER {
+    uint32_t total_inodes;
+    uint32_t total_blocks;
+    uint32_t block_size;
+    uint32_t blocks_per_group;
+    uint32_t inodes_per_group;
+    bool extended_fields_available;
+    uint32_t total_groups;
+    ext2_superblock* superblock;
+    ext2_block_group_desc* bgdt;
+    uint32_t bgdt_blockno;
+} EXT2_DRIVER;
+
+void ext2_driver_init();
+
+void ext2_get_bgd(uint32_t descriptor_index, ext2_block_group_desc *out);
+
+bool ext2_extended_fields_available(ext2_superblock *superblock);
 #endif
+

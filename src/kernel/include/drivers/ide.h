@@ -5,7 +5,7 @@
 #include <linked_list.h>
 
 #define IDE_QUEUE_ITEM(entry) (struct ide_request*)(entry) // pass in &entry
-#define SECTOR_SIZE   512
+#define DISK_SECTOR_SIZE   512
 #define FSSIZE        129024  // size of file system in disk blocks 
 #define IDE_BSY       0x80
 #define IDE_DRDY      0x40

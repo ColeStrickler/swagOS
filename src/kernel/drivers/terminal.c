@@ -105,13 +105,25 @@ void terminal_print_buffer(uint32_t color)
     }
 }
 
+void handle_endline()
+{
+    TerminalState* driver = &global_Settings.TerminalDriver;
+    uint32_t row_size_in_chars = (driver->max_x) / (16);
+    driver->buffer_write_location += row_size_in_chars - (driver->buffer_write_location % row_size_in_chars);
+}
+
 void terminal_write_char(char c, uint32_t color)
 {
     //log_to_serial("terminal_write_char()\n");
     TerminalState* driver = &global_Settings.TerminalDriver;
-
-   // log_hexval("driver->buffer_write_location",driver->buffer_write_location);
-   // log_hexval("driver->terminal_buf_size", driver->terminal_buf_size);
+    if (c == '\n')
+    {
+        handle_endline();
+        if (driver->buffer_write_location >= driver->terminal_buf_size)
+            terminal_scroll_down();
+        return;
+    }
+        
     if (driver->buffer_write_location >= driver->terminal_buf_size)
     {
         terminal_scroll_down();

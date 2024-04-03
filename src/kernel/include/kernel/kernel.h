@@ -15,6 +15,7 @@
 #include <cpu.h>
 #include <proc.h>
 #include <pci.h>
+#include <ext2.h>
 //#include <ahci.h>
 
 

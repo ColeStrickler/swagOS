@@ -281,12 +281,6 @@ void kernel_main(uint64_t ptr_multiboot_info)
 
 
 	
-	char* msg = "yolo yolo yolo yolo yolo yolo yolo yolo yolo";
-	printf(msg);printf(msg);
-	printf(msg);
-	printf(msg);
-	printf(msg);
-	printf(msg);
 	CreateIdleThread(IdleThread); // do this before smp initialization and after kheap_init()
 	enable_supervisor_mem_protections();
 	smp_start();
@@ -294,21 +288,10 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	binit();
 	
 	
-	iobuf* buf = bread(0, 2050);
-	struct ext2_superblock* superblock = (struct ext2_superblock*)buf->data;
-	if (superblock->ext2_magic == EXT2_SIGNATURE)
-	{
-		log_hexval("SUPERBLOCK FOUND AT SECTOR", 2);
-		panic("FOUND\n");
-	}
-	brelse(buf);
-
-
+	ext2_driver_init();
 	
-
-	log_hexval("CLI COUNT", global_Settings.cpu[0].cli_count);
-	log_hexval("RFLAGS", read_rflags() & CPU_FLAG_IF);
-
+	
+	printf("Ext2 initialized\n");
 
 	log_to_serial("\nKERNEL END\n");
 	while(1){};
