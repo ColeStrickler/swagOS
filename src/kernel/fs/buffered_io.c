@@ -55,8 +55,11 @@ bget(uint32_t dev, uint32_t blockno)
   acquire_Spinlock(&bcache.lock);
 
   // Is the block already cached?
-  for(b = bcache.head.next; b != &bcache.head; b = b->next){
-    if(b->dev == dev && b->blockno == blockno){
+  for (uint8_t i = 0; i < NBUF; i++)
+  {
+    b = &bcache.buf[i];
+    if(b->dev == dev && b->blockno == blockno)
+    {
       b->refcnt++;
       release_Spinlock(&bcache.lock);
       acquire_Sleeplock(&b->lock);
@@ -64,10 +67,13 @@ bget(uint32_t dev, uint32_t blockno)
     }
   }
 
+
   // Not cached; recycle an unused buffer.
   // Even if refcnt==0, B_DIRTY indicates a buffer is in use
   // because log.c has modified it but not yet committed it.
-  for(b = bcache.head.prev; b != &bcache.head; b = b->prev){
+  for (uint8_t i = 0; i < NBUF; i++)
+  {
+    b = &bcache.buf[i];
     if(b->refcnt == 0 && (b->flags & B_DIRTY) == 0) {
       b->dev = dev;
       b->blockno = blockno;
@@ -78,6 +84,9 @@ bget(uint32_t dev, uint32_t blockno)
       return b;
     }
   }
+
+  
+
   panic("bget: no buffers");
 }
 
@@ -86,9 +95,9 @@ struct iobuf*
 bread(uint32_t dev, uint32_t blockno)
 {
   struct iobuf *b;
-
+  //log_to_serial("bread() bget start!");
   b = bget(dev, blockno);
-
+ // log_to_serial("bread() bget end!");
   if((b->flags & B_VALID) == 0) {
     iderw(b);
   }
@@ -117,16 +126,6 @@ brelse(struct iobuf *b)
 
   acquire_Spinlock(&bcache.lock);
   b->refcnt--;
-  if (b->refcnt == 0) {
-    // no one is waiting for it.
-    b->next->prev = b->prev;
-    b->prev->next = b->next;
-    b->next = bcache.head.next;
-    b->prev = &bcache.head;
-    bcache.head.next->prev = b;
-    bcache.head.next = b;
-  }
-  
   release_Spinlock(&bcache.lock);
 }
 //PAGEBREAK!

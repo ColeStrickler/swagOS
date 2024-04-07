@@ -92,10 +92,10 @@ build-disk : clean myos.iso
 
 
 qemu: build-disk
-	sudo qemu-system-x86_64 -enable-kvm -cpu host -serial file:out.log -m 4G -smp 2 -drive format=raw,file=./build/disk.img
+	sudo qemu-system-x86_64 -enable-kvm -cpu host -serial file:out.log -m 4G -smp 4 -drive format=raw,file=./build/disk.img
 
 debug: build-disk
-	qemu-system-x86_64 -enable-kvm -cpu host -s -S -serial file:out.log -m 4G -smp 2 -drive format=raw,file=./build/disk.img
+	qemu-system-x86_64 -enable-kvm -cpu host -s -S -serial file:out.log -m 4G -smp 8 -drive format=raw,file=./build/disk.img
 
 clean:
 	# beginning line with a hyphen tells make to ignore errors

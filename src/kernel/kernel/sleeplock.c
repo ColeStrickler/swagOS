@@ -5,7 +5,7 @@
 
 void init_Sleeplock(struct Sleeplock* lock)
 {
-    init_Spinlock(&lock->lock);
+    init_Spinlock(&lock->lock, "sleeplock");
     lock->is_locked = false;
     lock->owner_tid = 0;
 }
@@ -30,8 +30,8 @@ void release_Sleeplock(struct Sleeplock* lock)
     acquire_Spinlock(&lock->lock);
     lock->is_locked = false;
     lock->owner_tid = -1;
-    Wakeup(lock);
     release_Spinlock(&lock->lock);
+    Wakeup(lock);
 }
 
 

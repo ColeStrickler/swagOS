@@ -103,7 +103,7 @@ void video_init()
 
     if (framebuffer->framebuffer_type != 1)
     {
-        log_hexval("Found framebuffer type", framebuffer->type);
+        //log_hexval("Found framebuffer type", framebuffer->type);
         panic("video_init() --> we currently only support direct RGB mode frame buffering.");
     }
 

@@ -201,7 +201,7 @@ void keyboard_driver_init()
 	unsigned char key = 0;
     // let's clear any junk currently in the keyboard port
     while(((key = inb(0x64)) & 1) == 1){
-		log_hexval("key", key);
+		//log_hexval("key", key);
         inb(0x60);
     }
     // Unmask the keyboard IRQ in the IOAPIC
@@ -276,12 +276,33 @@ bool scancode_to_char(uint8_t scancode, char* outchar)
 }
 
 
+void view_idle_cpu()
+{
+    printf("View idle cpu: ");
+    for (int i = 0; i < global_Settings.cpu_count; i++)
+    {
+        if (global_Settings.cpu[i].current_thread != NULL)
+        {
+            CPU* cpu = &global_Settings.cpu[i];
+            printf("CPU: %d, NCLI: %d, TID: %d\n", cpu->id, cpu->cli_count, cpu->current_thread->id);
+        }
+    }
+}
+
+
 void keyboard_irq_handler()
 {
     uint8_t scancode = inb(0x60);
     char c;
 
     if(scancode_to_char(scancode, &c) && is_ascii(c))
+    {
+        if (c == 'i')
+        {
+            view_idle_cpu();
+            return;
+        }
+    }
         terminal_write_char(c, RGB_COLOR(0x00, 0xdd, 0x44));
 }
 

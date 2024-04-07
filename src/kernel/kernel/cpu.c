@@ -22,7 +22,7 @@ void write_to_smp_info_struct(struct SMP_INFO_STRUCT smp_info)
     write_struct->gdt_ptr_pa = smp_info.gdt_ptr_pa;
     write_struct->kstack_va = smp_info.kstack_va;
     write_struct->pml4t_pa = smp_info.pml4t_pa;
-    log_hexval("check 2", &write_struct->pml4t_pa);
+   // log_hexval("check 2", &write_struct->pml4t_pa);
     write_struct->magic = 0x1111;
     write_struct->smp_32bit_init_addr = smp_info.smp_32bit_init_addr;
     write_struct->smp_64bit_init_addr = smp_info.smp_64bit_init_addr;

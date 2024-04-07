@@ -72,7 +72,7 @@ void parse_multiboot_info(uint64_t ptr_multiboot_info)
 	if (!doRSDPChecksum(rsdp, sizeof(RSDP_t)))
 	{
 		log_to_serial(((RSDP_t*)rsdp)->Signature);
-		log_to_serial("Bad RSDP checksum.\n");
+		//log_to_serial("Bad RSDP checksum.\n");
 	}
 	global_Settings.SystemDescriptorPointer = rsdp;
 
@@ -91,5 +91,5 @@ void parse_multiboot_info(uint64_t ptr_multiboot_info)
 		panic("MADT not found!\n");
 	}
 	global_Settings.madt= madt_header;
-	log_to_serial("parse_multiboot_info() end!\n");
+	//log_to_serial("parse_multiboot_info() end!\n");
 }

@@ -80,7 +80,7 @@ void kheap_init()
     {
         if (is_frame_mapped_hugepages(HUGEPGROUNDDOWN(global_Settings.kernel_heap.va_start + (i*HUGEPGSIZE)), global_Settings.pml4t_kernel))
         {
-            log_hexval("Frame", global_Settings.kernel_heap.va_start + (i*HUGEPGSIZE));
+           // log_hexval("Frame", global_Settings.kernel_heap.va_start + (i*HUGEPGSIZE));
             panic("kheap_init() --> heap frame already mapped.\n");
         }
         uint64_t free_frame = physical_frame_request();
@@ -90,7 +90,7 @@ void kheap_init()
         i++;
     }
 
-    log_to_serial("kernel_heap_tree_init() beginning!\n");
+    //log_to_serial("kernel_heap_tree_init() beginning!\n");
     kernel_heap_tree_init(&global_Settings.kernel_heap, 0, 1024*1024*1024, 0);
 
 }

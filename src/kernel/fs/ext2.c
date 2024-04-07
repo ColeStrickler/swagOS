@@ -4,8 +4,8 @@
 
 extern KernelSettings global_Settings;
 
-#define DIV_FLOOR(num, denom)((num/denom) - (num%denom))
-#define DIV_CEIL(num, denom)((num + (num%denom))/denom)
+#define DIV_FLOOR(x, y) ((x) / (y))
+#define DIV_CEIL(x, y) (((x) + (y) - 1) / (y))
 
 EXT2_DRIVER ext2_driver;
 
@@ -39,14 +39,19 @@ uint32_t ext2_disk_sector_to_block(uint32_t disk_sector)
 void read_disk_sector(void* out, uint32_t sector, uint32_t byte_count)
 {
     iobuf* b = bread(0, sector);
+    //log_to_serial("bread done\n");
     memcpy(out, b->data, byte_count);
     brelse(b);
+    //log_to_serial("brelse done\n");
 }
+
 
 
 void ext2_driver_init()
 {
     iobuf* buf = bread(0, SUPERBLOCK_SECTOR);
+    if (buf == NULL)
+        panic("ext2_driver_init() --> got NULL buf\n");
 	struct ext2_superblock* superblock = (struct ext2_superblock*)buf->data;
 	if (superblock->ext2_magic != EXT2_SIGNATURE)
         panic("ext2_driver_init() --> could not find superblock!\n");
@@ -62,19 +67,22 @@ void ext2_driver_init()
 	ext2_driver.blocks_per_group = ext2_driver.superblock->blocks_per_group;
 	ext2_driver.inodes_per_group = ext2_driver.superblock->inodes_per_group;
 	ext2_driver.extended_fields_available = ext2_extended_fields_available(ext2_driver.superblock);
-    ext2_driver.total_groups = DIV_CEIL(ext2_driver.superblock->total_blocks, ext2_driver.superblock->blocks_per_group);\
+    ext2_driver.total_groups = DIV_CEIL(ext2_driver.superblock->total_blocks, ext2_driver.superblock->blocks_per_group);
+  //  printf("\n groups: %d\n", DIV_CEIL(ext2_driver.superblock->total_blocks, ext2_driver.superblock->blocks_per_group));
     ext2_driver.bgdt_blockno = DIV_CEIL(ext2_driver.total_groups*sizeof(ext2_block_group_desc), ext2_driver.block_size);
-
     ext2_driver.bgdt = kalloc(ext2_driver.bgdt_blockno * ext2_driver.block_size);
+    //printf("kalloc size() %d\n", ext2_driver.bgdt_blockno * ext2_driver.block_size);
     if (ext2_driver.bgdt == NULL)
         panic("ext2_driver_init() --> kalloc() failure for bgdt!\n");
 	uint32_t offset = 0;
-    uint32_t sector = SUPERBLOCK_SECTOR + ext2_driver.block_size;
+    uint32_t sector = SUPERBLOCK_SECTOR + 8;// + (ext2_driver.block_size/DISK_SECTOR_SIZE);
     for (uint32_t i = 0; i < ext2_driver.bgdt_blockno; i++)
     {
         for (uint32_t j = 0; j < ext2_driver.block_size / DISK_SECTOR_SIZE; j++)
         {
-            read_disk_sector((void*)(((uint64_t)(ext2_driver.bgdt))+ offset), sector, DISK_SECTOR_SIZE);
+            DEBUG_PRINT("reading to offset", offset);
+            read_disk_sector((void*)(((uint64_t)(ext2_driver.bgdt)) + offset), sector, DISK_SECTOR_SIZE);
+            DEBUG_PRINT("Done", offset);
             sector++;
             offset += DISK_SECTOR_SIZE;
         }

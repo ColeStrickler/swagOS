@@ -4,7 +4,7 @@
 #include <serial.h>
 #include <string.h>
 #include <paging.h>
-#include <idt.h> 
+#include <idt.h>
 #include <asm_routines.h>
 #include <apic.h>
 #include <kernel.h>
@@ -17,8 +17,8 @@
 #include <spinlock.h>
 #include <cpuid.h>
 #include <pci.h>
-//#include <ahci.h>
-//#include <ata.h>
+// #include <ahci.h>
+// #include <ata.h>
 #include <ide.h>
 #include <buffered_io.h>
 #include <scheduler.h>
@@ -27,31 +27,36 @@
 	These global variables are created in boot.asm
 */
 // these initial page tables are the direct mapped page tables
-extern uint64_t pml4t[512] __attribute__((aligned(0x1000))); 
+extern uint64_t pml4t[512] __attribute__((aligned(0x1000)));
 extern uint64_t pdpt[512] __attribute__((aligned(0x1000)));
 extern uint64_t pdt[512] __attribute__((aligned(0x1000)));
-
-
 
 extern uint64_t global_gdt_ptr_high;
 extern uint64_t global_gdt_ptr_low;
 extern uint64_t global_stack_top;
-
 
 extern uint64_t KERNEL_START;
 extern uint64_t KERNEL_END;
 
 KernelSettings global_Settings;
 
-
-
-
 extern InterruptDescriptor64 IDT[];
+extern EXT2_DRIVER ext2_driver;
+
+void DEBUG_PRINT(const char *str, uint64_t hex);
 
 /* Forward declarations */
 void higher_half_entry(uint64_t);
 void kernel_main(uint64_t);
 
+Spinlock print_lock;
+
+void DEBUG_PRINT(const char* str, uint64_t hex)
+{
+	acquire_Spinlock(&print_lock);
+	log_hexval(str, hex);
+	release_Spinlock(&print_lock);
+}
 
 
 /*
@@ -60,12 +65,12 @@ void kernel_main(uint64_t);
 
 	We will want to pass in the multiboot information here eventually]
 */
-void __higherhalf_stubentry(uint64_t ptr_multiboot_info) 
+void __higherhalf_stubentry(uint64_t ptr_multiboot_info)
 {
 
 	uint64_t pml4t_index = (KERNEL_HH_START >> 39) & 0x1FF; // 511
-	uint64_t pdpt_index = (KERNEL_HH_START >> 30) & 0x1FF; // 510
-	uint64_t pdt_index = (KERNEL_HH_START >> 21) & 0x1FF; // 0
+	uint64_t pdpt_index = (KERNEL_HH_START >> 30) & 0x1FF;	// 510
+	uint64_t pdt_index = (KERNEL_HH_START >> 21) & 0x1FF;	// 0
 	/*
 		Because we are doing a higher half kernel, we linked all of this code starting at KERNEL_HH_START=0xffffffff80000000
 
@@ -74,23 +79,19 @@ void __higherhalf_stubentry(uint64_t ptr_multiboot_info)
 		So currently all these addresses are wrong and need adjusted. We will build the higher half page table mappings here and then load
 		the new page tables into CR3
 	*/
-	uint64_t* pml4t_addr = ((uint64_t*)((uint64_t)&pml4t & ~KERNEL_HH_START));
-	uint64_t* pdpt_addr = ((uint64_t*)((uint64_t)&pdpt & ~KERNEL_HH_START));
-	uint64_t* pdt_addr = (uint64_t*)((uint64_t)global_Settings.pdt_kernel[0] & ~KERNEL_HH_START);
+	uint64_t *pml4t_addr = ((uint64_t *)((uint64_t)&pml4t & ~KERNEL_HH_START));
+	uint64_t *pdpt_addr = ((uint64_t *)((uint64_t)&pdpt & ~KERNEL_HH_START));
+	uint64_t *pdt_addr = (uint64_t *)((uint64_t)global_Settings.pdt_kernel[0] & ~KERNEL_HH_START);
 
 	pml4t_addr[pml4t_index] = ((uint64_t)pdpt_addr) | (PAGE_PRESENT | PAGE_WRITE);
-	//pml4t_addr[510] = ((uint64_t)pml4t_addr) | (PAGE_PRESENT | PAGE_WRITE);
-	pdpt_addr[pdpt_index] = ((uint64_t)pdt_addr) | (PAGE_PRESENT | PAGE_WRITE); 
-
+	// pml4t_addr[510] = ((uint64_t)pml4t_addr) | (PAGE_PRESENT | PAGE_WRITE);
+	pdpt_addr[pdpt_index] = ((uint64_t)pdt_addr) | (PAGE_PRESENT | PAGE_WRITE);
 
 	uint64_t pg_size = HUGEPGSIZE;
 	for (unsigned int i = 0; i < 512; i++)
 	{
-		pdt_addr[i] = ((i*pg_size)) | (PAGE_PRESENT | PAGE_WRITE | PAGE_HUGE);
+		pdt_addr[i] = ((i * pg_size)) | (PAGE_PRESENT | PAGE_WRITE | PAGE_HUGE);
 	}
-
-	
-
 
 	/*
 		Now that we have mapped our kernel into the higher half we need to update our stack mapping and gdt so that they use the new
@@ -103,12 +104,11 @@ void __higherhalf_stubentry(uint64_t ptr_multiboot_info)
 		"mov %1, %%rsp\n\t"
 		"lgdt (%0)\n\t"
 		"mov %%cr3, %%rax\n\t"
-        "mov %%rax, %%cr3\n\t"
+		"mov %%rax, %%cr3\n\t"
 		"cpuid"
-        :
-        : "r" (global_gdt_ptr_high), "r" (global_stack_top)
-		: "%eax", "memory"
-    );
+		:
+		: "r"(global_gdt_ptr_high), "r"(global_stack_top)
+		: "%eax", "memory");
 
 	/*
 		Before we invalidate our direct mappings in the pml4t, we have to actually jump to a higher half virtual address.
@@ -123,7 +123,6 @@ void __higherhalf_stubentry(uint64_t ptr_multiboot_info)
 	higher_half_entry(ptr_multiboot_info);
 }
 
-
 /*
 	higher_half_entry() is the first function called using its higher half virtual address.
 	Now that we are operating from the higher half, we can invalidate the old direct mapped
@@ -134,37 +133,34 @@ void __higherhalf_stubentry(uint64_t ptr_multiboot_info)
 */
 void higher_half_entry(uint64_t ptr_multiboot_info)
 {
-	uint64_t* pml4t_addr = ((uint64_t*)((uint64_t)&pml4t & ~KERNEL_HH_START));
+	uint64_t *pml4t_addr = ((uint64_t *)((uint64_t)&pml4t & ~KERNEL_HH_START));
 
 	/*
 		This assembly does the following:
 		1. Invalidates the former direct mappings in the page table
 		2. Reloads cr3
-		3. Issues a sequential instruction(cpuid) to ensure that the changes take place and 
-		   are not mid-execution in the CPU pipeline before proceeding 
+		3. Issues a sequential instruction(cpuid) to ensure that the changes take place and
+		   are not mid-execution in the CPU pipeline before proceeding
 
 	*/
 	__asm__ __volatile__(
 		"xor %%rax, %%rax\n\t"
 		"mov %%eax, (%0)\n\t"
 		"mov %%cr3, %%rax\n\t"
-        "mov %%rax, %%cr3\n\t"
-		"cpuid"			
-        :
-        : "r" (pml4t_addr)
-		: "%eax", "memory"
-    );
-	log_to_serial("[higher_half_entry()]: Successfully entered higher half.\n");
-	log_hexval("PML4T PROPER", pml4t_addr);
+		"mov %%rax, %%cr3\n\t"
+		"cpuid"
+		:
+		: "r"(pml4t_addr)
+		: "%eax", "memory");
+	// log_to_serial("[higher_half_entry()]: Successfully entered higher half.\n");
+	// log_hexval("PML4T PROPER", pml4t_addr);
 
 	/*
 		We will never return from here
 	*/
-	
+
 	kernel_main(ptr_multiboot_info);
 }
-
-
 
 void setup_global_data()
 {
@@ -174,13 +170,11 @@ void setup_global_data()
 	global_Settings.pdpt_kernel = &pdpt;
 	global_Settings.gdt = global_gdt_ptr_low;
 
-	
-
-	init_Spinlock(&global_Settings.PMM.lock);
-	init_Spinlock(&global_Settings.serial_lock);
-	init_Spinlock(&global_Settings.threads.lock);
+	init_Spinlock(&global_Settings.PMM.lock, "PMM");
+	init_Spinlock(&global_Settings.serial_lock, "SERIAL");
+	init_Spinlock(&global_Settings.threads.lock, "gThreads");
+	init_Spinlock(&print_lock, "PRINT");
 }
-
 
 /*
 	This function must be called after the CPU information of the MADT is parsed because
@@ -190,10 +184,11 @@ void kthread_setup()
 {
 	// Initialize kernel main thread
 	global_Settings.threads.thread_count = 1;
-	struct Thread* kthread = &global_Settings.threads.thread_table[0];
+	struct Thread *kthread = &global_Settings.threads.thread_table[0];
 	kthread->id = 0;
 	kthread->pml4t = KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel);
 	kthread->status = PROCESS_STATE_RUNNING;
+	kthread->can_wakeup = true;
 	get_current_cpu()->current_thread = kthread;
 }
 
@@ -210,13 +205,14 @@ void smp_start()
 	}
 }
 
-
 void IdleThread()
 {
-	log_hexval("idle thread here", lapic_id());
-	while(1) {__asm__ __volatile__("pause");}
+	// log_hexval("idle thread here", lapic_id());
+	while (1)
+	{
+		__asm__ __volatile__("pause");
+	}
 }
-
 
 /*
 	In kernel_main() is where we set up our various kernel functionality.
@@ -233,67 +229,68 @@ void enable_supervisor_mem_protections()
 {
 	uint32_t eax, ebx, ecx, edx;
 	__cpuid_count(7, 0, eax, ebx, ecx, edx);
-	if (ebx & (1 << 7)) 	// CHECK SMEP AVAILABLE
-		set_cr4_bit(CPU_CR4_SMEP_ENABLE);		
-	if (ebx & (1 << 20))	// CHECK SMAP AVAILABLE
+	if (ebx & (1 << 7)) // CHECK SMEP AVAILABLE
+		set_cr4_bit(CPU_CR4_SMEP_ENABLE);
+	if (ebx & (1 << 20)) // CHECK SMAP AVAILABLE
 		set_cr4_bit(CPU_CR4_SMAP_ENABLE);
 }
 
-
-
-
 void kernel_main(uint64_t ptr_multiboot_info)
 {
-	log_to_serial("[kernel_main()]: Entered.\n");
+	// log_to_serial("[kernel_main()]: Entered.\n");
 
-	
 	// Linker symbols have addresses only
 	setup_global_data();
 	parse_multiboot_info(ptr_multiboot_info);
 	parse_madt(global_Settings.madt);
-	//log_to_serial("1\n");
-	
-	//log_to_serial("2\n");
+	// log_to_serial("1\n");
+
+	// log_to_serial("2\n");
 	idt_setup();
-	//log_to_serial("3\n");
+	// log_to_serial("3\n");
 	set_irq(0x02, 0x02, 0x22, 0, 0x0, true);
 	apic_setup();
 	kthread_setup();
-	
-	
-	log_to_serial("apic setup finished\n");
-	kheap_init(); // we use spinlocks here and mess with interrupt flags so do this after we initialize interrupt stuff
-	
-	
-	log_to_serial("keyboard driver init finished\n");
-	
-	video_init();
-	log_to_serial("video init finished\n");
 
+	// log_to_serial("apic setup finished\n");
+	kheap_init(); // we use spinlocks here and mess with interrupt flags so do this after we initialize interrupt stuff
+
+	// log_to_serial("keyboard driver init finished\n");
+
+	video_init();
+	// log_to_serial("video init finished\n");
 
 	init_terminal();
-	log_to_serial("terminal init finished!\n");
-	
-	log_to_serial("kheap_init() finished\n");
+	// log_to_serial("terminal init finished!\n");
+
+	// log_to_serial("kheap_init() finished\n");
 	keyboard_driver_init();
-	//sti();
+	// sti();
 
-
-
-	
 	CreateIdleThread(IdleThread); // do this before smp initialization and after kheap_init()
 	enable_supervisor_mem_protections();
 	smp_start();
 	ideinit();
 	binit();
-	
-	
+
+	//log_to_serial("beginning ext2 init!\n");
+
 	ext2_driver_init();
+	/*
 	
-	
+	printf("total_groups %d\n", ext2_driver.total_groups);
+	for (int i = 0; i < ext2_driver.total_groups; i++)
+	{
+		if (ext2_driver.bgdt[i].free_blocks)
+			printf("ext2_driver.bgdt[%d].free_blocks %d\n", i, ext2_driver.bgdt[i].free_blocks);
+	}
+
 	printf("Ext2 initialized\n");
-
+	*
+	*/
+	printf("\nKERNEL END\n");
 	log_to_serial("\nKERNEL END\n");
-	while(1){};
+	while (1)
+	{
+	};
 }
-

@@ -61,6 +61,7 @@ typedef struct cpu_context_t
 */
 typedef struct Thread
 {
+    bool can_wakeup;
     PROCESS_STATE status;
     THREAD_RUN_MODE run_mode;
     uint32_t id;

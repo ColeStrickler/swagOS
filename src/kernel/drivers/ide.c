@@ -32,7 +32,7 @@ ideinit(void)
 {
   int i;
 
-  init_Spinlock(&ide_request_queue.ide_lock);
+  init_Spinlock(&ide_request_queue.ide_lock, "IDE_LOCK");
   //io_apic_enable(0xe, lapic_id());
   //set_irq_mask(0xe, false);
   set_irq(0xe, 0xe, 0x2e, 0x0, 0x0, false);
@@ -55,7 +55,7 @@ static void
 idestart(struct iobuf *b)
 {
   if(b == 0)
-    panic("idestart");
+    panic("idestart() --> null buf");
   if(b->blockno >= FSSIZE)
     panic("incorrect blockno");
   int sector_per_block =  BSIZE/DISK_SECTOR_SIZE;
@@ -85,6 +85,7 @@ idestart(struct iobuf *b)
 void
 ideintr(void)
 {
+  
   struct iobuf *b;
 
   // First queued buffer is the active request.
@@ -97,12 +98,13 @@ ideintr(void)
     }
   */
 
-  if (ide_request_queue.queue.entry_count == 0)
+  if(ide_request_queue.queue.entry_count == 0)
   {
     release_Spinlock(&ide_request_queue.ide_lock);
     return;
   }
   struct dll_Entry* entry = remove_dll_entry_head(&ide_request_queue.queue);
+  ide_request_queue.queue.entry_count--;
   if (entry == NULL)
     panic("ideintr() --> got NULL dll_Entry! Condition should not exist.\n");
 
@@ -118,13 +120,16 @@ ideintr(void)
   b->flags |= B_VALID;
   b->flags &= ~B_DIRTY;
 
+  //panic("WAKEUP");
   Wakeup(b);
-
+  
   // Start disk on next buf in queue.
+  
   if(ide_request_queue.queue.entry_count != 0)
     idestart((IDE_QUEUE_ITEM(ide_request_queue.queue.first))->buf);
-  
+  kfree(req);
   release_Spinlock(&ide_request_queue.ide_lock);
+  //log_hexval("cpu ncli", get_current_cpu()->cli_count);
 }
 
 
@@ -142,6 +147,10 @@ void
 iderw(struct iobuf *b)
 {
   struct iobuf **pp;
+  DEBUG_PRINT("iderw() begin", 0);
+  if (b == NULL)
+    panic("iderw() --> b is NULL\n");
+
   if(!holdingsleep(&b->lock))
     panic("iderw: buf not locked");
   if((b->flags & (B_VALID|B_DIRTY)) == B_VALID)
@@ -156,15 +165,21 @@ iderw(struct iobuf *b)
   //log_to_serial("iderw() --> spinlock acquired\n");
   req->buf = b;
   insert_dll_entry_tail(&ide_request_queue.queue, &req->entry);
-
+  ide_request_queue.queue.entry_count++;
   // Start disk if new request is front of the queue
   if((IDE_QUEUE_ITEM(ide_request_queue.queue.first))->buf == b)
     idestart(b);
 
+
+
+  release_Spinlock(&ide_request_queue.ide_lock);
   // Wait for request to finish.
   while((b->flags & (B_VALID|B_DIRTY)) != B_VALID){
-    //log_to_serial("iderw() going to sleep!\n");
-    ThreadSleep(b, &ide_request_queue.ide_lock);
+    log_to_serial("iderw() going to sleep!\n");
+    //ThreadSleep(b, &ide_request_queue.ide_lock);
   }
+  
+
   release_Spinlock(&ide_request_queue.ide_lock);
+  DEBUG_PRINT("iderw() finished", 0);
 }

@@ -9,13 +9,17 @@
 #include <vmm.h>
 #include <string.h>
 #include <panic.h>
+#include <spinlock.h>
 extern KernelSettings global_Settings;
+Spinlock terminal_lock;
+
 
 
 
 
 void init_terminal()
 {
+    init_Spinlock(&terminal_lock, "TERMINAL");
     TerminalState* driver = &global_Settings.TerminalDriver;
     driver->current_x = 0;
     driver->current_y = 0;
@@ -29,11 +33,12 @@ void init_terminal()
     */
     driver->terminal_buf_size = (driver->max_x * driver->max_y) /  (16*16);
     char* terminal_buf = (char*)kalloc(driver->terminal_buf_size);
-    log_hexval("terminal buf", terminal_buf);
+    //log_hexval("terminal buf", terminal_buf);
     driver->buffer_write_location = 0;
     if (terminal_buf == NULL)
         panic("init_terminal() --> could not allocate memory for terminal driver buffer.");
     driver->terminal_buf = terminal_buf;
+    
 }
 
 uint8_t char_code_to_fontcode(char c)
@@ -120,9 +125,13 @@ void terminal_write_char(char c, uint32_t color)
     {
         handle_endline();
         if (driver->buffer_write_location >= driver->terminal_buf_size)
+        {
             terminal_scroll_down();
+            terminal_print_buffer(color);
+        }
         return;
     }
+    
         
     if (driver->buffer_write_location >= driver->terminal_buf_size)
     {
@@ -213,6 +222,7 @@ void handle_format_long(long arg, uint32_t color)
 
 void printf(const char* fmt, ...)
 {
+    //acquire_Spinlock(&terminal_lock);
     uint32_t i = 0;
     va_list args;
     va_start(args, fmt);
@@ -268,6 +278,7 @@ void printf(const char* fmt, ...)
             }
         }
     }
+    //release_Spinlock(&terminal_lock);
 }
 
 

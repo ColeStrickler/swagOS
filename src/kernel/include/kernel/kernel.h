@@ -26,6 +26,8 @@
 
 typedef struct KernelSettings
 {
+    bool panic;
+
     struct CPU cpu[256];
     uint16_t cpu_count;
 

@@ -20,6 +20,7 @@ void CreateIdleThread(void(*entry)(void*))
     idle->id = 0x1;
     idle->pml4t = KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel);
     idle->status = PROCESS_STATE_READY; // We will keep this so
+    idle->can_wakeup = true;
 
     uint64_t stack_alloc = (uint64_t)kalloc(0x100);
     if (stack_alloc == NULL)
@@ -80,6 +81,7 @@ void CreateThread(void(*entry)(void*), uint32_t pid, bool kthread)
             if (ctx == NULL)
                 panic("CreateThread() --> failed to allocatged cpu_context_t for new task!\n");
             init_thread->execution_context = ctx;
+            init_thread->can_wakeup = true;
             ctx->i_rip = entry;
             ctx->i_rsp = stack_alloc;
             ctx->i_rflags = 0x202; // IF | Reserved
@@ -104,20 +106,35 @@ void CreateThread(void(*entry)(void*), uint32_t pid, bool kthread)
 void ThreadSleep(void* sleep_channel, struct Spinlock* spin_lock)
 {
     struct Thread* thread = GetCurrentThread();
+    thread->sleep_channel = sleep_channel;
+    thread->status = PROCESS_STATE_SLEEPING;
+    thread->can_wakeup = false; // must save context first
+    
     if (spin_lock == NULL || sleep_channel== NULL || thread == NULL)
         panic("ThreadSleep() --> got NULL.");
 
     uint32_t sleeping_cpu = get_current_cpu()->id;
-
-    thread->sleep_channel = sleep_channel;
-    thread->status = PROCESS_STATE_SLEEPING;
+    
+    
+    
     if (spin_lock != &global_Settings.threads.lock)
         release_Spinlock(spin_lock);
     //log_hexval("CLI", get_current_cpu()->cli_count);
     // We currently have this set up to sleep if thread->status is PROCESS_STATE_SLEEPING
     // If we want to add software debugging in the future we will need to edit this
-    __asm__ __volatile__("int3"); 
-
+    DEBUG_PRINT("Sleeping", sleeping_cpu);
+    if (thread->status == PROCESS_STATE_SLEEPING) // woke up early
+        __asm__ __volatile__("int3");
+    else
+    {
+        DEBUG_PRINT("SKIPPING SLEEP", thread->id);
+        if (spin_lock != &global_Settings.threads.lock)
+        acquire_Spinlock(spin_lock);
+        thread->sleep_channel = NULL;
+        return;
+    }
+    
+    DEBUG_PRINT("Woken up!", lapic_id());
     thread->sleep_channel = NULL;
 
 
@@ -130,6 +147,7 @@ void ThreadSleep(void* sleep_channel, struct Spinlock* spin_lock)
     //cpu_context_t* ctx = ;
     //InvokeScheduler();
     //thread->
+    //log_to_serial("ThreadSleep() done!\n");
     
 }
 
@@ -141,7 +159,22 @@ void Wakeup(void* channel)
     {
         Thread* t =  &thread_table[i];
         if (t->status == PROCESS_STATE_SLEEPING && t->sleep_channel == channel)
+        {
+            DEBUG_PRINT("waking up", t->id);
+            /*
+                We are getting here before the scheduler can set the execution context during sleep
+            
+            */
+
+            while(!t->can_wakeup){};
+
             t->status = PROCESS_STATE_READY;
+
+
+            if(t->execution_context == NULL)
+                panic("wakeup() --> t->execution context null");
+             DEBUG_PRINT("waking up", t->id);
+        }
     }
     release_Spinlock(&global_Settings.threads.lock);
 }

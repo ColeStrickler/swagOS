@@ -4,6 +4,7 @@
 #include <kernel.h>
 #include <cpu.h>
 #include <panic.h>
+#include <asm_routines.h>
 
 extern KernelSettings global_Settings;
 
@@ -37,18 +38,22 @@ void SaveThreadContext(struct Thread* old_thread, struct cpu_context_t* ctx)
         panic("InvokeScheduler() --> old_thread was in unexpected state.\n");
     old_thread->execution_context = ctx;
     old_thread->status =(old_thread->status == PROCESS_STATE_SLEEPING ? PROCESS_STATE_SLEEPING : PROCESS_STATE_READY);
+   // DEBUG_PRINT("CONTEXT SAVED\n");
+    old_thread->can_wakeup = true;
 }
 
 
 void InvokeScheduler(struct cpu_context_t* ctx)
 {
+    if (global_Settings.panic)
+        panic2();
     struct Thread* thread_table = &global_Settings.threads.thread_table[0];
     struct CPU* current_cpu = get_current_cpu();
     struct Thread* old_thread = current_cpu->current_thread;
     
     acquire_Spinlock(&global_Settings.threads.lock);
     //log_to_serial("Invoke Scheduler!\n");
-    //log_hexval("InvokeScheduler() CPU", lapic_id());
+    //DEBUG_PRINT("InvokeScheduler() CPU", lapic_id());
     //log_hexval("Old thread", old_thread);
     uint32_t old_thread_id  = (old_thread == NULL ? 0 : old_thread->id);
 
@@ -61,7 +66,7 @@ void InvokeScheduler(struct cpu_context_t* ctx)
             continue;
         
         SaveThreadContext(old_thread, ctx);       
-        //log_hexval("Doing process", i);
+        //DEBUG_PRINT("Doing process", thread_table[i].id);
         schedule(current_cpu, &thread_table[i], PROCESS_STATE_RUNNING);
     }
 
@@ -71,27 +76,32 @@ void InvokeScheduler(struct cpu_context_t* ctx)
             continue;
         
         SaveThreadContext(old_thread, ctx);
-        //log_hexval("Doing process", i);
+      //  DEBUG_PRINT("Doing process", thread_table[i].id);
         schedule(current_cpu, &thread_table[i], PROCESS_STATE_RUNNING);
     }
 
     if (old_thread == NULL || old_thread->status == PROCESS_STATE_SLEEPING) // If we already hold the Idle thread we can avoid this overhead
     {
-        //log_hexval("Doing Idle Thread on CPU", lapic_id());
+       // DEBUG_PRINT("Doing Idle Thread on CPU", lapic_id());
         ScheduleIdleThread(old_thread, ctx);
     }
     release_Spinlock(&global_Settings.threads.lock);
+   // DEBUG_PRINT("DONE SCHEDULING", lapic_id());
     apic_end_of_interrupt(); // move this back to idt?
 }
 
 
 void schedule(struct CPU* cpu, struct Thread* thread, PROCESS_STATE state)
 {
-    
+    if (thread->execution_context == NULL)
+        panic("schedule() --> thread's execution context was null\n");
     cpu->current_thread = thread;
     thread->status = state;
+    DEBUG_PRINT("CPU", cpu->id);
+    DEBUG_PRINT("Targeting RIP", thread->execution_context->i_rip);
     release_Spinlock(&global_Settings.threads.lock);
     apic_end_of_interrupt(); // move this back to idt?
+    
     /*
         thread->execution_context is a pointer to the top of the saved stack
     */

@@ -45,4 +45,5 @@ typedef struct KernelHeap
 void kheap_init();
 
 void *kalloc(uint64_t size);
+bool kfree(void *address);
 #endif

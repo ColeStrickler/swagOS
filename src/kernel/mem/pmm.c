@@ -141,7 +141,7 @@ void parse_multiboot_mmap_entries(struct multiboot_tag_mmap* mm_tag)
     page_bitmap_whiteout(); // before we free any pages set all bit entries to 1
     while(curr_size < mm_tag->size)
     {
-        log_mmap_entry(entry);
+       // log_mmap_entry(entry);
         if (entry->type == MULTIBOOT_MEMORY_AVAILABLE)
         {
             free_hugeframe_range(entry->addr, entry->addr+entry->len);

@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <kernel.h>
 #include <serial.h>
+#include <spinlock.h>
+
 
 
 inline unsigned char inb(int portnum)
@@ -14,7 +16,9 @@ inline unsigned char inb(int portnum)
 
 inline void outb(int portnum, unsigned char data)
 {
+  //acquire_Spinlock(&serial_lock);
   __asm__ __volatile__ ("outb %%al, %%dx" :: "a" (data),"d" (portnum));
+  //release_Spinlock(&serial_lock);
 }
 
 inline void outportw(uint16_t portid, uint16_t value)

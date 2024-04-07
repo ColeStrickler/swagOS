@@ -149,6 +149,17 @@ void build_IDT(void)
     SetIDT_Descriptor(32, (uint64_t)isr_32, false, false);
     SetIDT_Descriptor(33, (uint64_t)isr_33, false, false);
     SetIDT_Descriptor(34, (uint64_t)isr_34, false, false);
+    SetIDT_Descriptor(35, (uint64_t)isr_35, false, false);
+    SetIDT_Descriptor(36, (uint64_t)isr_36, false, false);
+    SetIDT_Descriptor(37, (uint64_t)isr_37, false, false);
+    SetIDT_Descriptor(38, (uint64_t)isr_38, false, false);
+    SetIDT_Descriptor(39, (uint64_t)isr_39, false, false);
+    SetIDT_Descriptor(40, (uint64_t)isr_40, false, false);
+    SetIDT_Descriptor(41, (uint64_t)isr_41, false, false);
+    SetIDT_Descriptor(42, (uint64_t)isr_42, false, false);
+    SetIDT_Descriptor(43, (uint64_t)isr_43, false, false);
+    SetIDT_Descriptor(44, (uint64_t)isr_44, false, false);
+    SetIDT_Descriptor(45, (uint64_t)isr_45, false, false);
     SetIDT_Descriptor(46, (uint64_t)isr_46, false, false);
 }
 
@@ -162,6 +173,9 @@ void idt_setup()
 
 
 
+
+
+
 trapframe64_t* isr_handler(trapframe64_t* tf)
 {
     switch(tf->isr_id)
@@ -170,24 +184,33 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         {
             // INT3
             //log_to_serial("INT3\n");
-            if (GetCurrentThread()->run_mode == PROCESS_STATE_SLEEPING || true)
+            if (GetCurrentThread()->status == PROCESS_STATE_SLEEPING)
             {
-                //log_to_serial("Sleeping, invoking scheduler!\n");
-                InvokeScheduler(tf);
+                DEBUG_PRINT("Sleeping, invoking scheduler!", lapic_id());
+                InvokeScheduler((cpu_context_t*)tf);
             }
+            else
+            {
+                log_hexval("Bad INT3 on thread id", GetCurrentThread()->id);
+                log_hexval("Bad INT3 stat", GetCurrentThread()->status);
+                break; 
+            }
+            
             break;
         }
         case 13:
         {
-            log_to_serial("General Protection fault interrupt.\n");
-            log_hexval("General Protection fault on CPU", lapic_id());
-            panic("\n");
+            //printf("\nGeneral Protection fault interrupt.\nGeneral Protection fault on CPU: %d\nRIP: %u\n", lapic_id(), tf->i_rip);
+            DEBUG_PRINT("GP FAULT on CPU", lapic_id());
+            DEBUG_PRINT("RIP", tf->i_rip);
+            panic("");
             break;
         }
         case 14:
         {
-            log_hexval("Page Fault Interrupt on CPU", lapic_id());
-            panic("Page Fault Interrupt");
+            DEBUG_PRINT("PF CPU", lapic_id());
+            DEBUG_PRINT("Page Fault Interrupt", tf->i_rip);
+            panic("");
             break;
         }
         case IDT_APIC_TIMER_INT:
@@ -202,7 +225,7 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         }
         case IDT_KEYBOARD_INT:
         {
-            log_to_serial("keyboard");
+            //log_to_serial("keyboard");
             keyboard_irq_handler();
             apic_end_of_interrupt();
             break;
@@ -218,7 +241,9 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         }
         case 46:
         {
+            DEBUG_PRINT("idt intr!", 0);
             ideintr();
+            apic_end_of_interrupt();
             break;
         }
         case IDT_APIC_SPURIOUS_INT:
@@ -228,10 +253,10 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         }
         default:
         {
-            if (tf->isr_id < 32)
-                log_to_serial((char*)exception_names[tf->isr_id]);
-            log_hexval("\nExperienced unexpected interrupt.", tf->isr_id);
-            log_hexval("CPU ID", lapic_id());
+          //  if (tf->isr_id < 32)
+            //    log_to_serial((char*)exception_names[tf->isr_id]);
+            DEBUG_PRINT("\nExperienced unexpected interrupt.", tf->isr_id);
+            DEBUG_PRINT("CPU ID", lapic_id());
 
             __asm__ __volatile__ ("hlt");
         }

@@ -74,14 +74,14 @@ int apic_init()
     else if (apic_available)    // add support for regular APIC later
     {
        // panic("apic_init() --> X2APIC not available and alternative modes are not yet implemented.\n");
-        log_to_serial("Proceeding Regular APIC DMA mode.\n");
+       // log_to_serial("Proceeding Regular APIC DMA mode.\n");
         global_Settings.settings_x8664.use_x2_apic = false;
         apic_write_reg(APIC_REG_SPURIOUS_INT,  IDT_APIC_SPURIOUS_INT | APIC_SOFTWARE_ENABLE, 0);
     }
     else // we can proceed later with PIC 8259 PIC here
     {
         init_pic_legacy(0x20, 0x28);
-        log_to_serial("Proceeding with 8259 PIC legacy mode.\n");
+        //log_to_serial("Proceeding with 8259 PIC legacy mode.\n");
     }
 
     
@@ -111,7 +111,7 @@ void smp_apic_init()
         apic_msr_lo |= IA32_APIC_BASE_MSR_X2ENABLE;
         cpuSetMSR(IA32_APIC_BASE_MSR, apic_msr_lo, apic_msr_hi);
         apic_write_reg(APIC_REG_SPURIOUS_INT,  IDT_APIC_SPURIOUS_INT | APIC_SOFTWARE_ENABLE, 0);
-        log_to_serial("Proceeding with X2APIC.\n");
+        //log_to_serial("Proceeding with X2APIC.\n");
     }
     else 
     {
@@ -394,7 +394,7 @@ void apic_calibrate_timer() {
     // Set APIC init counter to -1
     apic_write_reg(APIC_REG_TIMER_INITCNT, 0xFFFFFFFF, 0);
 
-    log_to_serial("sleeping for 10ms\n");
+   // log_to_serial("sleeping for 10ms\n");
     set_irq_mask(0x2, false);
     // Perform PIT-supported sleep for 10ms
     pit_perform_sleep(10);
@@ -404,7 +404,7 @@ void apic_calibrate_timer() {
     // Now we know how often the APIC timer has ticked in 10ms
     global_Settings.ticksIn10ms = (uint32_t)0xFFFFFFFF - (uint32_t)apic_read_reg(APIC_REG_TIMER_CURRCNT);
     set_irq_mask(0x2, true);
-    log_to_serial("calibration done!\n");
+   // log_to_serial("calibration done!\n");
     
     // Start timer as periodic on IRQ 0, divider 16, with the number of ticks we counted
     apic_write_reg(APIC_REG_TIMER_DIV, 0x3, 0x00);

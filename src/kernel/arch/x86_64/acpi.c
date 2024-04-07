@@ -44,8 +44,8 @@ MADT* retrieveMADT(bool use_xsdt, void* sdp)
         /*
             We will just direct map these frames into the kernel since they are reserved memory anyways
         */
-        log_hexval("xsdt", xsdt);
-        log_hexval("rsdt", rsdt);
+        //log_hexval("xsdt", xsdt);
+        //log_hexval("rsdt", rsdt);
         if (use_xsdt)
             map_kernel_page(HUGEPGROUNDDOWN((uint64_t)xsdt), HUGEPGROUNDDOWN((uint64_t)xsdt), ALLOC_TYPE_DM_IO);
         else
