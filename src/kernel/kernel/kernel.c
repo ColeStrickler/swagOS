@@ -276,18 +276,20 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	//log_to_serial("beginning ext2 init!\n");
 
 	ext2_driver_init();
-	/*
+	
 	
 	printf("total_groups %d\n", ext2_driver.total_groups);
 	for (int i = 0; i < ext2_driver.total_groups; i++)
 	{
 		if (ext2_driver.bgdt[i].free_blocks)
+		{
 			printf("ext2_driver.bgdt[%d].free_blocks %d\n", i, ext2_driver.bgdt[i].free_blocks);
+			printf("ext2_driver.bgdt[%d].free_inodes %d\n", i,ext2_driver.bgdt[i].free_inodes);
+		}
 	}
 
 	printf("Ext2 initialized\n");
-	*
-	*/
+	
 	printf("\nKERNEL END\n");
 	log_to_serial("\nKERNEL END\n");
 	while (1)

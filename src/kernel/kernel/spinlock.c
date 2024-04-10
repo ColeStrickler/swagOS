@@ -37,7 +37,7 @@ void acquire_Spinlock(Spinlock* lock)
     inc_cli();
     if (spinlock_check_held(lock))
     {
-        DEBUG_PRINT("Spinlock name", lock->name);
+        DEBUG_PRINT(lock->name, 0x0);
         panic("acquire_Spinlock() --> encountered deadlock situation.");
     }
  
@@ -56,7 +56,7 @@ void release_Spinlock(Spinlock* lock)
 {
     if (!spinlock_check_held(lock))
     {
-        DEBUG_PRINT("Spinlock name", lock->name);
+        DEBUG_PRINT(lock->name, 0x0);
         panic("release_Spinlock() --> tried to release a spinlock that was not held by the current CPU.");
     }
 

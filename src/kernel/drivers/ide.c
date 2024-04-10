@@ -147,7 +147,7 @@ void
 iderw(struct iobuf *b)
 {
   struct iobuf **pp;
-  DEBUG_PRINT("iderw() begin", 0);
+  //DEBUG_PRINT("iderw() begin", 0);
   if (b == NULL)
     panic("iderw() --> b is NULL\n");
 
@@ -175,11 +175,11 @@ iderw(struct iobuf *b)
   release_Spinlock(&ide_request_queue.ide_lock);
   // Wait for request to finish.
   while((b->flags & (B_VALID|B_DIRTY)) != B_VALID){
-    log_to_serial("iderw() going to sleep!\n");
+   // log_to_serial("iderw() going to sleep!\n");
     //ThreadSleep(b, &ide_request_queue.ide_lock);
   }
   
 
-  release_Spinlock(&ide_request_queue.ide_lock);
-  DEBUG_PRINT("iderw() finished", 0);
+ // release_Spinlock(&ide_request_queue.ide_lock);
+  //DEBUG_PRINT("iderw() finished", 0);
 }

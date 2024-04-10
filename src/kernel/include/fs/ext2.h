@@ -5,10 +5,10 @@
 #include <stdbool.h>
 #include <ide.h>
 #include <panic.h>
-
-#define SUPERBLOCK_SECTOR 2050
+#define DEVICE_START 2048
+#define SUPERBLOCK_SECTOR DEVICE_START+2
 #define EXT2_SIGNATURE 0xEF53
-
+#define OFFSET_TO_SECTOR(offset)(DEVICE_START + ((offset)/DISK_SECTOR_SIZE))
 
 
 

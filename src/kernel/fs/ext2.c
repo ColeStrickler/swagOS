@@ -24,15 +24,12 @@ inline uint32_t ext2_getblocksize(ext2_superblock* superblock)
 
 uint32_t ext2_block_to_disk_sector(uint32_t blockno)
 {
-    return SUPERBLOCK_SECTOR + (blockno * (ext2_driver.block_size / DISK_SECTOR_SIZE));
+    return OFFSET_TO_SECTOR(((blockno << ext2_driver.superblock->log2block_size) << 10));
 }
 
 uint32_t ext2_disk_sector_to_block(uint32_t disk_sector)
 {
-    uint32_t block = (disk_sector - SUPERBLOCK_SECTOR);
-    uint32_t tmp = DIV_FLOOR(block, 8);
-    block += tmp;
-    return block;
+    return (disk_sector >> ext2_driver.superblock->log2block_size) >> 10;
 }
 
 
@@ -50,6 +47,7 @@ void read_disk_sector(void* out, uint32_t sector, uint32_t byte_count)
 void ext2_driver_init()
 {
     iobuf* buf = bread(0, SUPERBLOCK_SECTOR);
+    iobuf* buf2 = bread(0, SUPERBLOCK_SECTOR+1);
     if (buf == NULL)
         panic("ext2_driver_init() --> got NULL buf\n");
 	struct ext2_superblock* superblock = (struct ext2_superblock*)buf->data;
@@ -59,8 +57,10 @@ void ext2_driver_init()
     ext2_driver.superblock = kalloc(sizeof(ext2_superblock));
     if (ext2_driver.superblock == NULL)
         panic("ext2_driver_init() --> kalloc() failure for superblock!\n");
-    memcpy(ext2_driver.superblock, buf->data, sizeof(ext2_superblock));
+    memcpy(ext2_driver.superblock, buf->data, 512); // first half
+    memcpy(((uint64_t)ext2_driver.superblock) + 512, buf2->data, 512); // second half
     brelse(buf);
+    brelse(buf2);
 	ext2_driver.total_inodes = ext2_driver.superblock->total_inodes;
 	ext2_driver.block_size = 1024 << ext2_driver.superblock->log2block_size;
 	ext2_driver.total_blocks =  ext2_driver.superblock->total_blocks;
@@ -68,6 +68,8 @@ void ext2_driver_init()
 	ext2_driver.inodes_per_group = ext2_driver.superblock->inodes_per_group;
 	ext2_driver.extended_fields_available = ext2_extended_fields_available(ext2_driver.superblock);
     ext2_driver.total_groups = DIV_CEIL(ext2_driver.superblock->total_blocks, ext2_driver.superblock->blocks_per_group);
+    if (ext2_driver.total_groups != DIV_CEIL(ext2_driver.total_inodes, ext2_driver.inodes_per_group))
+        panic("ext2_driver_init() --> got different group numbers!");
   //  printf("\n groups: %d\n", DIV_CEIL(ext2_driver.superblock->total_blocks, ext2_driver.superblock->blocks_per_group));
     ext2_driver.bgdt_blockno = DIV_CEIL(ext2_driver.total_groups*sizeof(ext2_block_group_desc), ext2_driver.block_size);
     ext2_driver.bgdt = kalloc(ext2_driver.bgdt_blockno * ext2_driver.block_size);
@@ -75,14 +77,16 @@ void ext2_driver_init()
     if (ext2_driver.bgdt == NULL)
         panic("ext2_driver_init() --> kalloc() failure for bgdt!\n");
 	uint32_t offset = 0;
-    uint32_t sector = SUPERBLOCK_SECTOR + 8;// + (ext2_driver.block_size/DISK_SECTOR_SIZE);
-    for (uint32_t i = 0; i < ext2_driver.bgdt_blockno; i++)
+
+    // Superblock is 2 blocks into its block, so we subtract that from the total block size to reach the next block
+    uint32_t sector = ext2_block_to_disk_sector(ext2_disk_sector_to_block(2048) + 1);
+    log_hexval("Got Sector", ext2_block_to_disk_sector(1));
     {
         for (uint32_t j = 0; j < ext2_driver.block_size / DISK_SECTOR_SIZE; j++)
         {
-            DEBUG_PRINT("reading to offset", offset);
+            //DEBUG_PRINT("reading to offset", offset);
             read_disk_sector((void*)(((uint64_t)(ext2_driver.bgdt)) + offset), sector, DISK_SECTOR_SIZE);
-            DEBUG_PRINT("Done", offset);
+            //DEBUG_PRINT("Done", offset);
             sector++;
             offset += DISK_SECTOR_SIZE;
         }
