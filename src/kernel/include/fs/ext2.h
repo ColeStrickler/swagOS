@@ -11,7 +11,7 @@
 #define OFFSET_TO_SECTOR(offset)(DEVICE_START + ((offset)/DISK_SECTOR_SIZE))
 
 
-
+#define INODE_TYPE_DIRECTORY 0x4000
 
 
 
@@ -81,6 +81,32 @@ typedef struct ext2_block_group_desc {
     uint32_t unused2;
 }__attribute__((packed)) ext2_block_group_desc;
 
+
+ typedef struct {
+        uint16_t mode;       // Indicates the format of the file
+        uint16_t uid;        // User ID
+        uint32_t size;       // Lower 32 bits of the file size
+        uint32_t accessTime; // Last access in UNIX time
+        uint32_t createTime; // Creation time in UNIX time
+        uint32_t modTime;    // Modification time in UNIX time
+        uint32_t deleteTime; // Deletion time in UNIX time
+        uint16_t gid;        // Group ID
+        uint16_t linkCount;  // Amount of hard links (most inodes will have a count of 1)
+        uint32_t blockCount; // Number of 512 byte blocks reserved to the data of this inode
+        uint32_t flags;      // How to access data
+        uint32_t osd1;       // Operating System dependant value
+        uint32_t
+            blocks[15]; // Amount of blocks used to hold data, the first 12 entries are direct blocks, the 13th first
+                        // indirect block, the 14th is the first doubly-indirect block and the 15th triply indirect
+        uint32_t generation; // Indicates the file version
+        uint32_t fileACL;    // Extended attributes (only applies to rev 1)
+        union {
+            uint32_t dirACL; // For regular files (in rev 1) this is the upper 32 bits of the filesize
+            uint32_t sizeHigh;
+        };
+        uint32_t fragAddr; // Location of the file fragment (obsolete)
+        uint8_t osd2[12];
+    } __attribute__((packed)) ext2_inode_t;
 
 
 typedef struct EXT2_DRIVER {
