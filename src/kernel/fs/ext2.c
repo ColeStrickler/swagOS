@@ -68,7 +68,6 @@ void ext2_read_block(void* out, uint32_t block)
         sector++;
         offset += DISK_SECTOR_SIZE;
     }
-
 }
 
 
@@ -79,14 +78,14 @@ void ext2_read_inode(ext2_inode_t* inode, uint32_t inode_num)
     uint32_t bg = ext2_GetInodeBlockGroup(inode_num);
     uint32_t index = ext2_GetInodeBlockGroupIndex(inode_num);
     ext2_block_group_desc* bgd = &ext2_driver.bgdt[bg];
-    uint32_t block = (index * sizeof(ext2_inode_t))/ext2_driver.block_size;
+    uint32_t block = (index * INODE_SIZE)/ext2_driver.block_size;
 
     uint8_t buf[4096];
     ext2_read_block(buf, bgd->inode_table + block);
     ext2_inode_t* _inode = (ext2_inode_t*)buf;
 
     _inode = (ext2_inode_t*)buf;
-	index = index % (ext2_driver.block_size/sizeof(ext2_inode_t));
+	index = index % (ext2_driver.block_size/INODE_SIZE);
 
     /*
     
@@ -94,7 +93,7 @@ void ext2_read_inode(ext2_inode_t* inode, uint32_t inode_num)
     */
     for (int i = 0; i <= index; i++)
         _inode++;
-
+    log_hexval("offset", (uint64_t)_inode - (uint64_t)buf);
     memcpy(inode, _inode, sizeof(ext2_inode_t));
 }
 
@@ -105,7 +104,7 @@ void ext2_driver_init()
 {
     iobuf* buf = bread(0, SUPERBLOCK_SECTOR);
     iobuf* buf2 = bread(0, SUPERBLOCK_SECTOR+1);
-    if (buf == NULL)
+    if (buf == NULL || buf2 == NULL)
         panic("ext2_driver_init() --> got NULL buf\n");
 	struct ext2_superblock* superblock = (struct ext2_superblock*)buf->data;
 	if (superblock->ext2_magic != EXT2_SIGNATURE)
@@ -118,6 +117,13 @@ void ext2_driver_init()
     memcpy(((uint64_t)ext2_driver.superblock) + 512, buf2->data, 512); // second half
     brelse(buf);
     brelse(buf2);
+    ext2_driver.inode_size = sizeof(ext2_inode_t);
+    if (ext2_driver.superblock->major >= 1)
+    {
+        ext2_driver.extended_fields_available = true;
+        ext2_driver.inode_size = ext2_driver.superblock->inode_size;
+    }
+
 	ext2_driver.total_inodes = ext2_driver.superblock->total_inodes;
 	ext2_driver.block_size = 1024 << ext2_driver.superblock->log2block_size;
 	ext2_driver.total_blocks =  ext2_driver.superblock->total_blocks;

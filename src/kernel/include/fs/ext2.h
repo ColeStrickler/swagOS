@@ -9,7 +9,8 @@
 #define SUPERBLOCK_SECTOR DEVICE_START+2
 #define EXT2_SIGNATURE 0xEF53
 #define OFFSET_TO_SECTOR(offset)(DEVICE_START + ((offset)/DISK_SECTOR_SIZE))
-
+#define INODE_SIZE ext2_driver.inode_size
+#define SUPERBLOCK_EXT_FEAT_OFFSET 236
 
 #define INODE_TYPE_DIRECTORY 0x4000
 
@@ -70,6 +71,8 @@ typedef struct ext2_superblock {
 }__attribute__ ((packed)) ext2_superblock;
 
 
+
+
 typedef struct ext2_block_group_desc {
     uint32_t block_bitmap;
     uint32_t inode_bitmap;
@@ -106,7 +109,12 @@ typedef struct ext2_block_group_desc {
         };
         uint32_t fragAddr; // Location of the file fragment (obsolete)
         uint8_t osd2[12];
-    } __attribute__((packed)) ext2_inode_t;
+} __attribute__((packed)) ext2_inode_t;
+
+
+
+
+
 
 
 typedef struct EXT2_DRIVER {
@@ -120,6 +128,7 @@ typedef struct EXT2_DRIVER {
     ext2_superblock* superblock;
     ext2_block_group_desc* bgdt;
     uint32_t bgdt_blockno;
+    uint32_t inode_size;
 } EXT2_DRIVER;
 
 void ext2_driver_init();
