@@ -9,7 +9,7 @@ extern KernelSettings global_Settings;
 
 EXT2_DRIVER ext2_driver;
 
-
+extern DEBUG_PRINT0(const char *str);
 bool ext2_extended_fields_available(ext2_superblock* superblock)
 {
     return superblock->major > 1;
@@ -98,7 +98,38 @@ void ext2_read_inode(ext2_inode_t* inode, uint32_t inode_num)
 }
 
 
-
+uint32_t ext2_read_directory(char* filename, ext2_dir_entry* dir)
+{
+    //log_hexval("ext2_read_directory() begin\n", 0x0);
+	while(dir->inode != 0) {
+		char *name = (char *)kalloc(dir->namelength + 1);
+		memcpy(name, &dir->reserved+1, dir->namelength);
+        DEBUG_PRINT0(name);
+        DEBUG_PRINT0("\n");
+		name[dir->namelength] = 0;
+		//kprintf("DIR: %s (%d)\n", name, dir->size);
+        //log_to_serial("Checking conditions!\n");
+		if(filename && strcmp(filename, name) == 0)
+		{
+            ext2_inode_t inode;
+			/* If we are looking for a file, we had found it */
+			ext2_read_inode(&inode, dir->inode);
+			//printf("Found inode %s! %d\n", filename, dir->inode);
+			kfree(name);
+			return dir->inode;
+		}
+		if(!filename && (uint32_t)filename != 1) {
+			//mprint("Found dir entry: %s to inode %d \n", name, dir->inode);
+			//printf(name);
+		}
+        //log_to_serial("here\n");
+        //log_hexval("dir", dir);
+		dir = (ext2_dir_entry*)((uint64_t)dir + dir->size);
+        //log_hexval("new_dir", dir);
+		kfree(name);
+	}
+	return 0;
+}
 
 void ext2_driver_init()
 {
@@ -118,6 +149,8 @@ void ext2_driver_init()
     brelse(buf);
     brelse(buf2);
     ext2_driver.inode_size = sizeof(ext2_inode_t);
+
+    // If extended features are available
     if (ext2_driver.superblock->major >= 1)
     {
         ext2_driver.extended_fields_available = true;
@@ -150,13 +183,21 @@ void ext2_driver_init()
     }
     
 
-    log_to_serial("HERE!\n");
     ext2_inode_t root_inode;
     ext2_read_inode(&root_inode, 2);
-    log_hexval("Time Created", root_inode.createTime);
-    log_hexval("Type", root_inode.mode);
     if ((root_inode.mode & 0xF000) != INODE_TYPE_DIRECTORY)
         panic("ext2_driver_init() --> Root inode is not a directory");
+
+    unsigned char* root_buf = kalloc(ext2_driver.block_size);
+    for (int i = 0; i < 12; i++)
+    {
+        uint32_t block = root_inode.blocks[i];
+        if (block == 0)
+            break;
+        ext2_read_block(root_buf, block);
+        ext2_read_directory("/yolo", (ext2_dir_entry*)root_buf);
+    }
+    
 
 }
 

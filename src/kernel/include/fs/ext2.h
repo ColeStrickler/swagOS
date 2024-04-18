@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <ide.h>
 #include <panic.h>
+#include <string.h>
 #define DEVICE_START 2048
 #define SUPERBLOCK_SECTOR DEVICE_START+2
 #define EXT2_SIGNATURE 0xEF53
@@ -98,8 +99,7 @@ typedef struct ext2_block_group_desc {
         uint32_t blockCount; // Number of 512 byte blocks reserved to the data of this inode
         uint32_t flags;      // How to access data
         uint32_t osd1;       // Operating System dependant value
-        uint32_t
-            blocks[15]; // Amount of blocks used to hold data, the first 12 entries are direct blocks, the 13th first
+        uint32_t blocks[15]; // Amount of blocks used to hold data, the first 12 entries are direct blocks, the 13th first
                         // indirect block, the 14th is the first doubly-indirect block and the 15th triply indirect
         uint32_t generation; // Indicates the file version
         uint32_t fileACL;    // Extended attributes (only applies to rev 1)
@@ -111,7 +111,13 @@ typedef struct ext2_block_group_desc {
         uint8_t osd2[12];
 } __attribute__((packed)) ext2_inode_t;
 
-
+typedef struct {
+        uint32_t inode;        // Inode number
+        uint16_t size; // Displacement to next directory entry/record (must be 4 byte aligned)
+        uint8_t namelength;    // Length of the filename (must not be  larger than (recordLength - 8))
+        uint8_t reserved;      // Revision 1 only, indicates file type
+        char name[];
+} __attribute__((packed)) ext2_dir_entry;
 
 
 

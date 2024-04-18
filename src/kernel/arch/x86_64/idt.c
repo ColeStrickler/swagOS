@@ -241,7 +241,7 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         }
         case 46:
         {
-            DEBUG_PRINT("idt intr!", 0);
+            //DEBUG_PRINT("idt intr!", 0);
             ideintr();
             apic_end_of_interrupt();
             break;

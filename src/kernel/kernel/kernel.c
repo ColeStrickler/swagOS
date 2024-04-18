@@ -58,6 +58,13 @@ void DEBUG_PRINT(const char* str, uint64_t hex)
 	release_Spinlock(&print_lock);
 }
 
+void DEBUG_PRINT0(const char* str)
+{
+	acquire_Spinlock(&print_lock);
+	log_to_serial(str);
+	release_Spinlock(&print_lock);
+}
+
 
 /*
 	__higherhalf_stubentry() builds out the higher half page table mappings
