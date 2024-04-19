@@ -195,7 +195,7 @@ void ext2_driver_init()
         if (block == 0)
             break;
         ext2_read_block(root_buf, block);
-        ext2_read_directory("/yolo", (ext2_dir_entry*)root_buf);
+        ext2_read_directory("/test", (ext2_dir_entry*)root_buf);
     }
     
 
