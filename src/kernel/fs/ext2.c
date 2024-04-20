@@ -8,7 +8,7 @@ extern KernelSettings global_Settings;
 #define DIV_CEIL(x, y) (((x) + (y) - 1) / (y))
 
 EXT2_DRIVER ext2_driver;
-
+extern DEBUG_PRINT(const char *str, uint64_t hex);
 extern DEBUG_PRINT0(const char *str);
 bool ext2_extended_fields_available(ext2_superblock* superblock)
 {
@@ -93,19 +93,17 @@ void ext2_read_inode(ext2_inode_t* inode, uint32_t inode_num)
     */
     for (int i = 0; i <= index; i++)
         _inode++;
-    log_hexval("offset", (uint64_t)_inode - (uint64_t)buf);
+    //log_hexval("offset", (uint64_t)_inode - (uint64_t)buf);
     memcpy(inode, _inode, sizeof(ext2_inode_t));
 }
 
 
-uint32_t ext2_read_directory(char* filename, ext2_dir_entry* dir)
+uint32_t ext2_read_from_directory(char* filename, ext2_dir_entry* dir)
 {
     //log_hexval("ext2_read_directory() begin\n", 0x0);
 	while(dir->inode != 0) {
 		char *name = (char *)kalloc(dir->namelength + 1);
 		memcpy(name, &dir->reserved+1, dir->namelength);
-        DEBUG_PRINT0(name);
-        DEBUG_PRINT0("\n");
 		name[dir->namelength] = 0;
 		//kprintf("DIR: %s (%d)\n", name, dir->size);
         //log_to_serial("Checking conditions!\n");
@@ -130,6 +128,181 @@ uint32_t ext2_read_directory(char* filename, ext2_dir_entry* dir)
 	}
 	return 0;
 }
+
+
+uint32_t ext2_read_from_root_directory(char* filename)
+{
+    ext2_inode_t* root_inode = &ext2_driver.root_inode;
+    if ((root_inode->mode & 0xF000) != INODE_TYPE_DIRECTORY)
+        panic("ext2_read_from_root_directory() --> EXT2_DRIVER.root_inode was corrupted.\n");
+
+    unsigned char* buf = kalloc(sizeof(ext2_driver.block_size));
+    if (!buf)
+        panic("ext2_read_from_root_directory() --> kalloc() failure!.\n");
+
+    for (uint16_t i = 0; i < 12; i++)
+    {
+        uint32_t block = root_inode->blocks[i];
+        if (!block)
+            break;
+        uint32_t inode_num = 0;
+        ext2_read_block(buf, block);
+        if ((inode_num = ext2_read_from_directory(filename, (ext2_dir_entry*)buf)))
+        {
+            return inode_num;
+        }
+    }
+    return 0;
+
+}
+
+
+/*
+    Attempts to find the inode of a file.
+
+    On failure, return UINT32_MAX;
+*/
+uint32_t ext2_find_file_inode(char* path, ext2_inode_t* inode_out)
+{
+    uint32_t len = strlen(path);
+    char* filename = kalloc(len + 1);
+    char* og = filename;
+    memcpy(filename, path, len);
+    filename[len] = 0x0;
+    uint32_t dir_depth = strsplit(path, '/');
+    filename++; // skip first '/' that got zeroed out
+    dir_depth--;
+    uint32_t inode_num = ext2_read_from_root_directory(filename);
+    filename += strlen(filename) + 1; // skip to next section
+    if (dir_depth <= 1) // root dir
+    {
+        if (!inode_num)
+            return UINT32_MAX;
+        kfree(og);
+        ext2_read_inode(inode_out, inode_num);
+        return 0;
+    }
+
+
+    unsigned char* buf = kalloc(ext2_driver.block_size);
+    ext2_inode_t inode;
+    if (!buf)
+        panic("ext2_find_file_inode() --> kalloc() failure.\n");
+
+    while(dir_depth--)
+    {
+        ext2_read_inode(&inode, inode_num);
+        for (int i = 0; i < 12; i++) // do not use the indirect blocks for directories, only files
+        {
+            uint32_t block = inode.blocks[i];
+            if (!block)
+                break;
+            ext2_read_block(buf, block);
+            uint32_t tmp_inode_num;
+            if ((tmp_inode_num = ext2_read_from_directory(filename, (ext2_dir_entry*)buf)))
+            {
+                inode_num = tmp_inode_num;
+                break; // out of for loop
+            }
+            else
+            {
+                // not found
+                kfree(og);
+                return UINT32_MAX;
+            }
+        }
+        filename += strlen(filename) + 1;
+    }
+
+    ext2_read_inode(inode_out, inode_num);
+    kfree(og);
+    kfree(buf);
+    return 0;
+}
+
+
+/*
+    Returns a buffer that must be kfree()'d.
+
+    The buffer contains the content of the read blocks.
+
+    Returns NULL on failure
+*/
+unsigned char* ext2_read_single_indirect(uint32_t blockno)
+{
+    uint32_t max_blocks = ext2_driver.block_size / sizeof(uint32_t);
+    
+    uint32_t* blocks = kalloc(ext2_driver.block_size);
+    if (!blocks)
+        panic("ext2_read_single_indirect() --> kalloc() failure!\n");
+    
+    ext2_read_block(blocks, blockno);
+    uint32_t total_blocks = 0;
+    uint32_t x = 0;
+    while(blocks[x])
+    {
+        total_blocks++;
+        x++;
+    }
+    if (total_blocks > max_blocks)
+        panic("ext2_read_single_indirect() --> total_blocks > max_blocks!\n");
+
+    unsigned char* ret_buf = kalloc(total_blocks*ext2_driver.block_size);
+    if (!ret_buf)
+        panic("ext2_read_single_indirect() --> kalloc() 2. failure!\n");
+
+    for (uint32_t i = 0; i < total_blocks; i++)
+    {
+        if (!blocks[i])
+            panic("ext2_read_single_indirect() --> blocks[i] was null. Misalignment. \n");
+        ext2_read_block(ret_buf + i * ext2_driver.block_size, blocks[i]);
+    }
+    kfree(blocks);
+    return ret_buf;
+}
+
+/*
+     Returns a buffer that must be kfree()'d.
+
+    The buffer contains pointers to the content of the read blocks.
+
+    Returns NULL on failure
+*/
+unsigned char** ext2_read_double_indirect(uint32_t blockno)
+{
+     uint32_t max_blocks = ext2_driver.block_size / sizeof(uint32_t);
+    
+    uint32_t* blocks = kalloc(ext2_driver.block_size);
+    if (!blocks)
+        panic("ext2_read_double_indirect() --> kalloc() failure!\n");
+    
+    uint32_t total_blocks = 0;
+    uint32_t x = 0;
+    ext2_read_block(blocks, blockno);
+    while(blocks[x])
+    {
+        total_blocks++;
+        x++;
+    }
+    if (total_blocks > max_blocks)
+        panic("ext2_read_double_indirect() --> total_blocks > max_blocks!\n");
+
+    unsigned char** ret_buf = kalloc(total_blocks*sizeof(unsigned char*));
+    if (!ret_buf)
+        panic("ext2_read_double_indirect() --> kalloc() 2. failure!\n");
+
+    for (uint32_t i = 0; i < total_blocks; i++)
+    {
+        if (!blocks[i])
+            panic("ext2_read_double_indirect() --> blocks[i] was null. Misalignment. \n");
+
+        ret_buf[i] = ext2_read_single_indirect(blocks[i]);
+    }
+    kfree(blocks);
+    return ret_buf;
+}
+
+
 
 void ext2_driver_init()
 {
@@ -183,21 +356,27 @@ void ext2_driver_init()
     }
     
 
-    ext2_inode_t root_inode;
-    ext2_read_inode(&root_inode, 2);
-    if ((root_inode.mode & 0xF000) != INODE_TYPE_DIRECTORY)
+    ext2_inode_t* root_inode = &ext2_driver.root_inode;
+    ext2_read_inode(root_inode, 2);
+    if ((root_inode->mode & 0xF000) != INODE_TYPE_DIRECTORY)
         panic("ext2_driver_init() --> Root inode is not a directory");
 
     unsigned char* root_buf = kalloc(ext2_driver.block_size);
+    ext2_inode_t hello;
     for (int i = 0; i < 12; i++)
     {
-        uint32_t block = root_inode.blocks[i];
+        uint32_t block = root_inode->blocks[i];
         if (block == 0)
             break;
         ext2_read_block(root_buf, block);
-        ext2_read_directory("/test", (ext2_dir_entry*)root_buf);
+        //uint32_t node = ext2_read_from_directory("hello.txt", (ext2_dir_entry*)root_buf); 
+    //kfree(root_buf); // we will want to mount the root buf eventually
     }
-    
+
+    //if (ext2_find_file_inode("/hello.txt", &hello) == UINT32_MAX)
+    //{
+    //    DEBUG_PRINT0("method failure!\n");
+    //}
 
 }
 

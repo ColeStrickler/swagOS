@@ -14,7 +14,7 @@
 #define SUPERBLOCK_EXT_FEAT_OFFSET 236
 
 #define INODE_TYPE_DIRECTORY 0x4000
-
+#define INODE_TYPE_FILE 0x8000
 
 
 
@@ -135,6 +135,7 @@ typedef struct EXT2_DRIVER {
     ext2_block_group_desc* bgdt;
     uint32_t bgdt_blockno;
     uint32_t inode_size;
+    ext2_inode_t root_inode;
 } EXT2_DRIVER;
 
 void ext2_driver_init();
