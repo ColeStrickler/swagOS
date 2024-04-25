@@ -96,7 +96,7 @@ typedef struct ext2_block_group_desc {
         uint32_t deleteTime; // Deletion time in UNIX time
         uint16_t gid;        // Group ID
         uint16_t linkCount;  // Amount of hard links (most inodes will have a count of 1)
-        uint32_t blockCount; // Number of 512 byte blocks reserved to the data of this inode
+        uint32_t diskSectors; // Number of 512 byte blocks reserved to the data of this inode
         uint32_t flags;      // How to access data
         uint32_t osd1;       // Operating System dependant value
         uint32_t blocks[15]; // Amount of blocks used to hold data, the first 12 entries are direct blocks, the 13th first

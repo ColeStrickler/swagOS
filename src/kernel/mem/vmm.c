@@ -4,7 +4,7 @@
 #include <serial.h>
 #include <panic.h>
 #include <spinlock.h>
-
+Spinlock KernelHeapLock;
 extern KernelSettings global_Settings;
 
 void kernel_heap_tree_init(struct KernelHeap* kheap, uint32_t curr_index, uint32_t block_size, uint32_t offset)
@@ -12,7 +12,7 @@ void kernel_heap_tree_init(struct KernelHeap* kheap, uint32_t curr_index, uint32
     
     if (curr_index >= KERNEL_HEAP_LEN)
         return;
-
+    init_Spinlock(&KernelHeapLock, "KernelHeapLock");
     global_Settings.kernel_heap.heap_tree[curr_index].in_use = false;
     global_Settings.kernel_heap.heap_tree[curr_index].index = curr_index;
     global_Settings.kernel_heap.heap_tree[curr_index].flags = 0x0;
@@ -167,10 +167,13 @@ void* kalloc(uint64_t size)
 {
     //log_hexval("kalloc with size", size);
     // retrieve the address of an open frame
+
+    //These are not optimized and we can definitely place these locks in a better spot
+    acquire_Spinlock(&KernelHeapLock);
     uint64_t kheap_memory = kheap_request(size);
     if (kheap_memory == UINT64_MAX)
         return NULL;
-
+    release_Spinlock(&KernelHeapLock);
     /*
         We may want to do some book keeping here
     
@@ -181,6 +184,8 @@ void* kalloc(uint64_t size)
 
 bool kfree(void* address)
 {
+    //These are not optimized and we can definitely place these locks in a better spot
+    acquire_Spinlock(&KernelHeapLock);
     uint64_t addr = (uint64_t)address;
     if (addr < global_Settings.kernel_heap.va_start)
         return false;
@@ -209,6 +214,6 @@ bool kfree(void* address)
         parent.flags = 0x0;
         buddy = get_buddy(kheap, section_index);
     }
-
+    release_Spinlock(&KernelHeapLock);
     return true;
 }

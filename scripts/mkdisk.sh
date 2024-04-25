@@ -45,7 +45,7 @@ sudo losetup /dev/loop30 disk.img
 sudo losetup /dev/loop31 disk.img -o 1048576
 
 # Format partition with ext2
-sudo mke2fs /dev/loop31
+sudo mke2fs -t ext2 /dev/loop31
 
 
 # Mount partition
@@ -53,7 +53,7 @@ sudo mount /dev/loop31 /mnt
 
 
 # Add a file to the disk
-echo "Hello, world!" | sudo tee /mnt/hello.txt > /dev/null
+sudo sh -c 'echo "Hello, World!" > /mnt/hello.txt'
 
 # Mount ISO and copy its contents
 sudo mkdir -p /mnt/iso 
