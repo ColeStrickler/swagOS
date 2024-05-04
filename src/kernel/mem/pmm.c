@@ -112,6 +112,17 @@ static void log_mmap_entry(struct multiboot_mmap_entry* entry)
 
 }
 
+
+
+void init_PMM()
+{
+
+    init_Spinlock(&global_Settings.PMM.manager_4kb.spm_lock, "manager_4kb");
+    init_Spinlock(&global_Settings.PMM.lock, "PMM_lock");
+    page_bitmap_whiteout();// before we free any pages set all bit entries to 1
+}
+
+
 /*
     This function simply sets all the bits in the page bitmap to bit-1 ==> in use. Doing this
     will simplify things and allow use to explicitly free and make available only
@@ -122,7 +133,7 @@ void page_bitmap_whiteout()
     for (uint16_t i = 0; i < 512; i++)
         global_Settings.PMM.PhysicalPageBitmap[i] = UINT64_MAX;
 
-
+    
     
     if ((global_Settings.PMM.PhysicalPageBitmap[0] & ((uint64_t)1 << 22)) == 0)
         panic("whiteout failure");
@@ -138,7 +149,7 @@ void parse_multiboot_mmap_entries(struct multiboot_tag_mmap* mm_tag)
     uint64_t entry_addr = &mm_tag->entries;
     struct multiboot_mmap_entry* entry = (struct multiboot_mmap_entry*)entry_addr;
     uint32_t curr_size = sizeof(struct multiboot_tag_mmap);
-    page_bitmap_whiteout(); // before we free any pages set all bit entries to 1
+    init_PMM(); // initialize physical memory manager state
     while(curr_size < mm_tag->size)
     {
        // log_mmap_entry(entry);
@@ -224,17 +235,159 @@ uint64_t physical_frame_request()
 }
 
 
+
+
 /*
-    Since we reserve of our page tables at compile time, 
+    This function will check the physical memory manager's small frame manager to see if
+    a 2mb page has already been chunked
+
+    returns UINT64_MAX on failure, on success returns physical address of a 4kb frame
+
+    We can probably optimize this to use a tree searching structure
+
 */
-uint32_t find_proper_pdt_table(uint64_t va)
+uint64_t check_available_chunked_frame()
 {
-    va &= (0xFFFFFFFFF);
-    // each pdt has (512 entries/pdt) * (2mb/entry) = 1GB/pdt
-    // Math formula is to just round down
-    uint32_t table_selector = (va - (va%(1*1024*1024*1024)))/(1*1024*1024*1024);
-    return table_selector;
+    SmallPageManager* spm = &global_Settings.PMM.manager_4kb;
+
+    acquire_Spinlock(&spm->spm_lock);
+    struct dll_Entry* entry = spm->head.first;
+    if (spm->head.entry_count && entry != NULL) // check frames already in use
+    {
+        while(entry != NULL && (uint64_t)entry != (uint64_t)&spm->head)
+        {
+            HugeChunk_2mb* chunk = (HugeChunk_2mb*)entry;
+            if (chunk->use_count < 500) // there is a free index 
+            {
+                for (uint16_t i = 0; i < 500; i++)
+                {
+                    uint32_t bit = i % 4;
+                    uint32_t index = i / 4;
+                    if (!((chunk->frame_bitmap[index] >> bit) & 1)) // if bit is not set, frame is free
+                    {
+                        uint64_t frame = chunk->start_address + (bit*(PGSIZE)) + (index*4*PGSIZE);
+                        chunk->frame_bitmap[index] |= (1 << bit); // mark bit in bitmap;
+                        chunk->use_count++;
+                        release_Spinlock(&spm->spm_lock);
+                        return frame;
+                    }
+                }
+            }
+            entry = entry->next;
+        }
+    }
+    release_Spinlock(&spm->spm_lock);
+    return UINT64_MAX;
 }
+
+/*
+    This function will free a 4kb frame from a currently chunked frame if it exists.
+
+    If the frame is not in the chunked list, we return false and let kfree recycle the 2mb frame
+
+    If the frame is in the chunked list we free the frame in the chunked frame bitmap and decrease the use count and then:
+        1. if the use count is zero, remove the frame from the linked list, free the structure and return false
+           kfree will then proceed to recycle the 2mb frame
+        2. if the use count is not zero, return true and kfree will not recycle the 2mb frame
+
+
+*/
+bool try_free_chunked_frame(void* address)
+{
+    uint64_t addr = (uint64_t)address;
+    SmallPageManager* spm = &global_Settings.PMM.manager_4kb;
+
+    acquire_Spinlock(&spm->spm_lock);
+    struct dll_Entry* entry = spm->head.first;
+    if (spm->head.entry_count && entry != NULL) // check frames already in use
+    {
+        while(entry != NULL && (uint64_t)entry != (uint64_t)&spm->head)
+        {
+            HugeChunk_2mb* chunk = (HugeChunk_2mb*)entry;
+            if (addr >= chunk->start_address && addr < chunk->start_address + HUGEPGSIZE)
+            {
+                // address is chunked
+
+                // free the 4kb frame
+                uint64_t abs_index = (PGROUNDDOWN(addr) - chunk->start_address) / PGSIZE;
+                uint64_t bit = abs_index % 4;
+                uint64_t index = abs_index / 4;
+                chunk->frame_bitmap[index] &= ~(1 << bit); // unset the bit representing the page
+                chunk->use_count--;
+                if (chunk->use_count == 0) // remove and recycle 2mb chunk if use count is zero
+                {
+                    remove_dll_entry(&chunk->entry);
+
+                    /*
+                        We should be able to call kfree() here as kfree() will only free items allocated on the kernel
+                        heap and this function is going to be allocating frames for user mode
+                    */
+                    kfree(chunk);
+                }
+
+                release_Spinlock(&spm->spm_lock);
+                return true;
+            }
+            entry = entry->next;
+        }
+    }
+    release_Spinlock(&spm->spm_lock);
+    return false;
+}
+
+
+
+
+/*
+    This function takes in an allocated 2mb huge frame, and will create a chunked entry that we
+    can use to break it up into smaller 4kb frames
+    
+*/
+uint64_t create_new_chunked_frame(uint64_t start_address)
+{
+    SmallPageManager* spm = &global_Settings.PMM.manager_4kb;
+    HugeChunk_2mb* chunk = kalloc(sizeof(HugeChunk_2mb));
+    if (chunk == NULL)
+        panic("create_new_chunked_frame() --> kalloc() returned NULL.\n");
+
+    memset(chunk->frame_bitmap, 0x00, sizeof(uint32_t)*125);
+    chunk->start_address = start_address;
+    acquire_Spinlock(&spm->spm_lock);
+    insert_dll_entry_head(&spm->head, &chunk->entry);
+    // We will also use the first entry in this chunk
+    chunk->frame_bitmap[0] |= 1;
+    chunk->use_count++;
+    release_Spinlock(&spm->spm_lock);
+    return start_address;
+}
+
+
+
+/*
+    Returns the physical address of a 4kb frame
+
+    Upon failure return UINT64_MAX
+*/
+uint64_t physical_frame_request_4kb()
+{
+    uint64_t frame_4kb = UINT64_MAX;
+
+    /*
+        Do not allocate new chunked frame unless we need to
+    */
+    frame_4kb = check_available_chunked_frame();
+    if (frame_4kb != UINT64_MAX)
+        return frame_4kb;
+
+    uint64_t frame_2mb = physical_frame_request();
+    if (frame_2mb == UINT64_MAX)
+        return UINT64_MAX;
+    physical_frame_checkout(frame_2mb);
+    
+    frame_4kb = create_new_chunked_frame(frame_2mb);
+    return frame_4kb;
+}
+
 
 
 /*
@@ -250,21 +403,12 @@ uint32_t find_proper_pdt_table(uint64_t va)
 */
 bool map_kernel_page(uint64_t va, uint64_t pa, PAGE_ALLOC_TYPE type)
 {
-
     uint64_t pml4t_index =  (va >> 39) & 0x1FF; 
 	uint64_t pdpt_index =   (va >> 30) & 0x1FF; 
 	uint64_t pdt_index =    (va >> 21) & 0x1FF; 
 
-    /*
-        WE WILL NEED TO FIX FIND_PROPER_PDT_TABLE IF WE WANT TO USE IT FOR CERTAIN ALLOCATIONS,
-
-        WE ARE CURRENTLY EXTRACTING FIRST 36 BITS(allows 64Gb) FROM THE VIRTUAL ADDRESS TO INDEX
-        INTO THE PDT TABLES. WE WILL NEED TO BE CAREFUL WITH THIS LATER ON AND THINK ABOUT
-        IMPLEMENTING SOMETHING MORE ELEGANT
-    */
-    //uint32_t proper_pdt_table = find_proper_pdt_table(va);
     uint64_t page_flags = (PAGE_PRESENT | PAGE_WRITE | PAGE_HUGE);
-    if (type == ALLOC_TYPE_DM_IO)
+    if (type == ALLOC_TYPE_DM_IO) // disable caching for direct mapped IO
         page_flags |= PAGE_CACHEDISABLE;
 
     // table physical addresses
@@ -279,6 +423,19 @@ bool map_kernel_page(uint64_t va, uint64_t pa, PAGE_ALLOC_TYPE type)
     
     return true;
 }
+
+
+
+bool uva_copy_kernel(uint64_t* pml4t_virtual)
+{
+    memcpy(pml4t_virtual, global_Settings.pml4t_kernel, PGSIZE);
+    //pml4t_virtual[0] = 0x0; // avoid DMIO
+}
+
+
+
+
+
 
 
 void map_4kb_page_kernel(uint64_t virtual_address, uint64_t physical_address)
@@ -305,6 +462,31 @@ void map_4kb_page_kernel(uint64_t virtual_address, uint64_t physical_address)
 }
 
 
+void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address)
+{
+    uint64_t pml4t_index = (virtual_address >> 39) & 0x1FF; 
+    uint64_t pdpt_index = (virtual_address >> 30) & 0x1FF; 
+    uint64_t pdt_index = (virtual_address >> 21) & 0x1FF; 
+    uint64_t pt_index = (virtual_address >> 12) & 0x1FF;
+
+
+    // table physical addresses
+    uint64_t* pml4t_addr = ((uint64_t*)((uint64_t)global_Settings.pml4t_kernel & ~KERNEL_HH_START));
+	uint64_t* pdpt_addr = ((uint64_t*)((uint64_t)global_Settings.pdpt_kernel & ~KERNEL_HH_START));
+	uint64_t* pdt_addr = (uint64_t*)((uint64_t)global_Settings.smp_pdt & ~KERNEL_HH_START);
+    uint64_t* pt_addr = ((uint64_t*)((uint64_t)global_Settings.smp_pt & ~KERNEL_HH_START));
+
+
+    global_Settings.pml4t_kernel[pml4t_index] = ((uint64_t)pdpt_addr) | (PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
+	global_Settings.pdpt_kernel[pdpt_index] = ((uint64_t)pdt_addr) | (PAGE_PRESENT | PAGE_WRITE | PAGE_USER); 
+    global_Settings.smp_pdt[pdt_index] = ((uint64_t)pt_addr) | (PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
+    global_Settings.smp_pt[pt_index] = physical_address | (PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
+
+    return;
+}
+
+
+
 
 
 
@@ -323,6 +505,7 @@ bool is_frame_mapped_hugepages(uint64_t virtual_address, uint64_t* pml4t_addr)
     uint64_t pml4t_index = (virtual_address >> 39) & 0x1FF; 
 	uint64_t pdpt_index = (virtual_address >> 30) & 0x1FF; 
 	uint64_t pdt_index = (virtual_address >> 21) & 0x1FF;
+    
 
     //log_hexval("pml4t index",   pml4t_index);
     //log_hexval("ppdpt index",   pdpt_index);
@@ -351,6 +534,64 @@ bool is_frame_mapped_hugepages(uint64_t virtual_address, uint64_t* pml4t_addr)
     return true;
 }
 
+
+
+/*
+    Will return the physical frame address and the frame offset of a virtual address
+
+
+    If the virtual address is not mapped, both are set to UINT64_MAX
+*/
+void virtual_to_physical(uint64_t virtual_address, uint64_t* pml4t_addr, uint64_t* frame_addr, uint64_t* frame_offset)
+{
+    uint64_t pml4t_index = (virtual_address >> 39) & 0x1FF; 
+	uint64_t pdpt_index = (virtual_address >> 30) & 0x1FF; 
+	uint64_t pdt_index = (virtual_address >> 21) & 0x1FF;
+    uint64_t pt_index = (virtual_address >> 12) & 0x1FF;
+
+
+    uint64_t* pdpt = (uint64_t*)((uint64_t)(pml4t_addr[pml4t_index] & PTADDRMASK) + KERNEL_HH_START); 
+    if (pdpt == NULL)
+    {
+        *frame_addr = UINT64_MAX;
+        *frame_offset = UINT64_MAX;
+        return;
+    }
+
+    uint64_t* pdt = (uint64_t*)((uint64_t)(pdpt[pdpt_index] & PTADDRMASK) + KERNEL_HH_START);
+    if (pdt == NULL)
+    {
+        *frame_addr = UINT64_MAX;
+        *frame_offset = UINT64_MAX;
+        return;
+    }
+
+    if (pdt[pdt_index] == NULL)
+    {
+        *frame_addr = UINT64_MAX;
+        *frame_offset = UINT64_MAX;
+        return;
+    }
+
+    if (pdt[pdt_index] & PAGE_HUGE)
+    {
+        *frame_addr = pdt[pdt_index] & PTADDRMASK;
+        *frame_offset = virtual_address & 0xFFFFF; // first 20bits for 2mb pages
+        return;
+    }
+
+    uint64_t* pt = (uint64_t*)(pt[pt_index] & PTADDRMASK);
+    if (pt == NULL)
+    {
+        *frame_addr = UINT64_MAX;
+        *frame_offset = UINT64_MAX;
+        return;
+    }
+
+    *frame_addr = pt[pt_index] & PTADDRMASK;
+    *frame_offset = virtual_address & 0xFFF; // first 12 bits for 4kb pages
+    return;
+}
 
 
 /*

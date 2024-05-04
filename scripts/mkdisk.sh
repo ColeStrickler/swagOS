@@ -54,6 +54,7 @@ sudo mount /dev/loop31 /mnt
 
 # Add a file to the disk
 sudo sh -c 'echo "Hello, World!" > /mnt/hello.txt'
+sudo cp /home/cole/test /mnt/
 
 # Mount ISO and copy its contents
 sudo mkdir -p /mnt/iso 

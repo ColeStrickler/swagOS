@@ -31,6 +31,8 @@ extern uint64_t pml4t[512] __attribute__((aligned(0x1000)));
 extern uint64_t pdpt[512] __attribute__((aligned(0x1000)));
 extern uint64_t pdt[512] __attribute__((aligned(0x1000)));
 
+extern uint64_t GDT_;
+extern uint64_t end_gdt_;
 extern uint64_t global_gdt_ptr_high;
 extern uint64_t global_gdt_ptr_low;
 extern uint64_t global_stack_top;
@@ -171,12 +173,18 @@ void higher_half_entry(uint64_t ptr_multiboot_info)
 
 void setup_global_data()
 {
+
+	global_Settings.original_GDT = GDT_;
+	global_Settings.original_GDT_size = end_gdt_ - GDT_;
 	global_Settings.PMM.kernel_loadaddr = &KERNEL_START;
 	global_Settings.PMM.kernel_phystop = &KERNEL_END;
 	global_Settings.pml4t_kernel = &pml4t;
 	global_Settings.pdpt_kernel = &pdpt;
-	global_Settings.gdt = global_gdt_ptr_low;
+	global_Settings.gdtr_val = global_gdt_ptr_low;
 
+	
+	uint64_t *pml4t_addr = ((uint64_t *)((uint64_t)&pml4t & ~KERNEL_HH_START));
+	log_hexval("PML4TADDR", pml4t_addr);
 	init_Spinlock(&global_Settings.PMM.lock, "PMM");
 	init_Spinlock(&global_Settings.serial_lock, "SERIAL");
 	init_Spinlock(&global_Settings.threads.lock, "gThreads");
@@ -193,7 +201,8 @@ void kthread_setup()
 	global_Settings.threads.thread_count = 1;
 	struct Thread *kthread = &global_Settings.threads.thread_table[0];
 	kthread->id = 0;
-	kthread->pml4t = KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel);
+	kthread->pml4t_phys = KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel);
+	kthread->pml4t_va = global_Settings.pml4t_kernel;
 	kthread->status = PROCESS_STATE_RUNNING;
 	kthread->can_wakeup = true;
 	get_current_cpu()->current_thread = kthread;
@@ -251,12 +260,17 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	parse_multiboot_info(ptr_multiboot_info);
 	parse_madt(global_Settings.madt);
 	// log_to_serial("1\n");
-
+	
 	// log_to_serial("2\n");
 	idt_setup();
 	// log_to_serial("3\n");
 	set_irq(0x02, 0x02, 0x22, 0, 0x0, true);
 	apic_setup();
+	cli();
+	alloc_per_cpu_gdt(); // otherwise this does not get done on cpu1
+	sti();
+
+
 	kthread_setup();
 
 	// log_to_serial("apic setup finished\n");
@@ -280,11 +294,12 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	ideinit();
 	binit();
 
-	//log_to_serial("beginning ext2 init!\n");
+	log_to_serial("beginning ext2 init!\n");
 
 	ext2_driver_init();
 	
-	
+	log_hexval("GDT SIZE", global_Settings.original_GDT_size);
+	log_hexval("addr", global_Settings.original_GDT);
 	printf("total_groups %d\n", ext2_driver.total_groups);
 	for (int i = 0; i < ext2_driver.total_groups; i++)
 	{
@@ -297,6 +312,10 @@ void kernel_main(uint64_t ptr_multiboot_info)
 
 	printf("Ext2 initialized\n");
 	
+	
+	
+
+
 	printf("\nKERNEL END\n");
 	log_to_serial("\nKERNEL END\n");
 	while (1)

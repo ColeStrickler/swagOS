@@ -65,7 +65,8 @@ typedef struct Thread
     PROCESS_STATE status;
     THREAD_RUN_MODE run_mode;
     uint32_t id;
-    uint64_t* pml4t;
+    uint64_t* pml4t_va;
+    uint64_t* pml4t_phys;
     cpu_context_t* execution_context;
     void* sleep_channel;  // will be NULL if process is not sleeping
 } Thread;
@@ -81,7 +82,9 @@ Thread *GetCurrentThread();
 
 void CreateIdleThread(void (*entry)(void *));
 
-void CreateThread(void (*entry)(void *), uint32_t pid, bool kthread);
+void CreatePageTables(Thread *thread, uint32_t file_size);
+
+void CreateKernelThread(void (*entry)(void *), uint32_t pid);
 
 
 void ThreadSleep(void* sleep_channel, Spinlock *spin_lock);

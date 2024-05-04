@@ -70,28 +70,30 @@ void kheap_init()
         We mapped 1gb for the kernel, so we will start the heap immediately after the kernel and it will grow upwards
         to the top of virtual memory
     */
-    global_Settings.kernel_heap.va_start = HUGEPGROUNDDOWN(KERNEL_HH_START + (HUGEPGSIZE * 512));
-
+    global_Settings.kernel_heap.va_start = (uint64_t)KERNEL_HH_START - (uint32_t)(2*HUGEPGSIZE * 512);
     /*
         We will go ahead and map the entire heap(1gb)
     */
+
+
     uint32_t i = 0;
-    while(i < 512)
+    while(i < 1024)
     {
-        if (is_frame_mapped_hugepages(HUGEPGROUNDDOWN(global_Settings.kernel_heap.va_start + (i*HUGEPGSIZE)), global_Settings.pml4t_kernel))
+        
+        if (is_frame_mapped_hugepages(HUGEPGROUNDDOWN(global_Settings.kernel_heap.va_start + (i*HUGEPGSIZE)+1), global_Settings.pml4t_kernel))
         {
-           // log_hexval("Frame", global_Settings.kernel_heap.va_start + (i*HUGEPGSIZE));
+            log_hexval("Frame", global_Settings.kernel_heap.va_start + (i*HUGEPGSIZE));
             panic("kheap_init() --> heap frame already mapped.\n");
         }
         uint64_t free_frame = physical_frame_request();
         if (free_frame == UINT64_MAX)
             panic("kheap_init() --> could not find free frame for kernel heap initialization.\n");
-        map_kernel_page(HUGEPGROUNDDOWN(global_Settings.kernel_heap.va_start + (i*HUGEPGSIZE)), free_frame, ALLOC_TYPE_KERNEL_HEAP);
+        map_kernel_page(HUGEPGROUNDDOWN(global_Settings.kernel_heap.va_start + (i*HUGEPGSIZE)), free_frame, (i >= 512 ? ALLOC_TYPE_KERNEL_HEAP2 : ALLOC_TYPE_KERNEL_HEAP));
         i++;
     }
 
     //log_to_serial("kernel_heap_tree_init() beginning!\n");
-    kernel_heap_tree_init(&global_Settings.kernel_heap, 0, 1024*1024*1024, 0);
+    kernel_heap_tree_init(&global_Settings.kernel_heap, 0, 2*1024*1024*1024, 0);
 
 }
 
@@ -184,8 +186,14 @@ void* kalloc(uint64_t size)
 
 bool kfree(void* address)
 {
+    
+  
+
     //These are not optimized and we can definitely place these locks in a better spot
     acquire_Spinlock(&KernelHeapLock);
+
+    
+
     uint64_t addr = (uint64_t)address;
     if (addr < global_Settings.kernel_heap.va_start)
         return false;

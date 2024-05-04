@@ -9,6 +9,9 @@ global global_stack_top
 global ptr_multiboot_info
 global global_jump_here_smp
 global start
+global GDT_
+global end_gdt_
+
 
 ; Higher half virtual address
 HH_VA equ 0xFFFFFFFF80000000 
@@ -53,6 +56,10 @@ global_stack_top:
     dq stack_top
 ptr_multiboot_info:
     dq HH_VA    ; we will add a value to this
+GDT_:
+    dq GDT
+end_gdt_:
+    dq end_gdt
 
 section .rodata
 GDT:
@@ -69,23 +76,34 @@ GDT:
         db 0                                        ; Base (mid, bits 16-23)
         db PRESENT | NOT_SYS | RW                   ; Access
         db GRAN_4K | SZ_32 | 0xF                    ; Flags & Limit (high, bits 16-19)
-        db 0                                        ; Base (high, bits 24-31)
-    .TSS: equ $ - GDT
-        dd 0x00000068
-        dd 0x00CF8900
+        db 0                                        ; Base (high, bits 24-31
+    .UserCode: equ $ - GDT
+        dd 0xFFFF                                   ; Limit & Base (low, bits 0-15)
+        db 0                                        ; Base (mid, bits 16-23)
+        db 0xFA                                     ; Access
+        db 0xA                                      ; Flags & Limit (high, bits 16-19)
+        db 0                                        ; Base (high, bits 24-31
+    .UserData: equ $ - GDT
+        dd 0xFFFF                                   ; Limit & Base (low, bits 0-15)
+        db 0                                        ; Base (mid, bits 16-23)
+        db 0xF2                                     ; Access
+        db 0xC                                      ; Flags & Limit (high, bits 16-19)
+        db 0                                        ; Base (high, bits 24-31                                        
+    .TSS_LOW: equ $ - GDT
+        dq 0
+    .TSS_HIGH: equ $-GDT
+        dq 0
 gdt_ptr:
         dw $ - GDT - 1
         dq GDT-HH_VA
 gdt_ptr_high:
         dw gdt_ptr - GDT - 1
         dq GDT
-
+end_gdt:
 
 
 section .text
 [bits 32]
-
-
 check_multiboot:
     cmp eax, 0x36d76289
     jne no_multiboot
@@ -255,4 +273,3 @@ error:
 
 
 
-r

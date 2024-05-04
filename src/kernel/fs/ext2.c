@@ -1,6 +1,7 @@
 #include <ext2.h>
 #include <kernel.h>
 #include <string.h>
+#include <elf_load.h>
 
 extern KernelSettings global_Settings;
 
@@ -502,7 +503,7 @@ void ext2_driver_init()
     //kfree(root_buf); // we will want to mount the root buf eventually
     }
 
-    char* fp = "/hello.txt";
+    char* fp = "/test";
     if (ext2_find_file_inode(fp, &hello) == UINT32_MAX)
     {
         DEBUG_PRINT0("method failure!\n");
@@ -512,32 +513,31 @@ void ext2_driver_init()
 //
     
 
-    // Why is one of the root blocks the same block as we get here??
-    for (int x = 0; x<15; x++)
-    {
-        
-        DEBUG_PRINT("BLOCK", x); 
-        DEBUG_PRINT("BLOCK[x]", hello.blocks[x]);  
-    }
-    char b[4096];
-    ext2_read_block(b,hello.blocks[0]);
 
+    //char b[4096];
+    //ext2_read_block(b,hello.blocks[0]);
+    char* b = ext2_read_file("/test");
 
     if (hello.flags == root_inode->flags)
         DEBUG_PRINT0("FLAGS!\n");
     if (hello.blocks[0] == root_inode->blocks[0])
         DEBUG_PRINT0("BLOCKS\n");
+    if (ELF_check_magic((struct elf64_header_t*)b) && ELF_check_file_class((struct elf64_header_t*)b))
+        DEBUG_PRINT0("FOUND VALID ELF FILE!\n");
 
     //DEBUG_PRINT("", hello.)
   
-   // DEBUG_PRINT("\n/test", ext2_get_file_size(&hello));
+    DEBUG_PRINT("\n/file size", ext2_get_file_size(&hello));
 ////
    // unsigned char* b = ext2_read_file(fp);
    // DEBUG_PRINT("b", b);
     for (uint64_t i = 0; i < ext2_get_file_size(&hello); i++)
     {
-        log_char_to_serial(b[i]);
+        //log_hex_to_serial(b[i]);
     }
+
+
+    //switch_to_user_mode()
 
 }
 

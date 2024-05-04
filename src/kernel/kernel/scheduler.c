@@ -66,7 +66,7 @@ void InvokeScheduler(struct cpu_context_t* ctx)
             continue;
         
         SaveThreadContext(old_thread, ctx);       
-        //DEBUG_PRINT("Doing process", thread_table[i].id);
+        DEBUG_PRINT("Doing process", thread_table[i].id);
         schedule(current_cpu, &thread_table[i], PROCESS_STATE_RUNNING);
     }
 
@@ -76,13 +76,13 @@ void InvokeScheduler(struct cpu_context_t* ctx)
             continue;
         
         SaveThreadContext(old_thread, ctx);
-      //  DEBUG_PRINT("Doing process", thread_table[i].id);
+        DEBUG_PRINT("Doing process", thread_table[i].id);
         schedule(current_cpu, &thread_table[i], PROCESS_STATE_RUNNING);
     }
 
     if (old_thread == NULL || old_thread->status == PROCESS_STATE_SLEEPING) // If we already hold the Idle thread we can avoid this overhead
     {
-       // DEBUG_PRINT("Doing Idle Thread on CPU", lapic_id());
+        DEBUG_PRINT("Doing Idle Thread on CPU", lapic_id());
         ScheduleIdleThread(old_thread, ctx);
     }
     release_Spinlock(&global_Settings.threads.lock);
@@ -126,6 +126,6 @@ void schedule(struct CPU* cpu, struct Thread* thread, PROCESS_STATE state)
         "pop %%rax\n\t"
         "add $16, %%rsp\n\t"
         "iretq\n\t" ::"r" (thread->execution_context),     
-        "r"(thread->pml4t));
+        "r"(thread->pml4t_phys));
 }
 

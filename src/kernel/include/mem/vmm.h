@@ -3,16 +3,17 @@
 
 
 /*
-    The Kernel heap is allowed 1gb (2^30)
+    The Kernel heap is allowed 2gb (2^31)
 
-    The minimum size buddy allocation is 64kb (2^16)
+    The minimum size buddy allocation is 4kb (2^12)
 
-    (2^30)/(2^16) = 2^14
+    (2^31)/(2^12) = 2^19
 
-    Sigma(2^k, k=0, 15) -> 2^0 + 2^1 + ... 2^14 + 2^15 = 32767 enrties --> the size we need for the heap 
-    
+    Sigma(2^k, k=0, 15) -> 2^0 + 2^1 + ... 2^18 + 2^19 = 1048575 enrties --> the size we need for the heap 
+
+    This equates to about 32mb
 */
-#define KERNEL_HEAP_LEN         32767
+#define KERNEL_HEAP_LEN         1048575//32767
 #define KERNEL_HEAP_MINBLOCK    (64*1024)
 
 #define HEAP_GET_PARENT(x) (x-(x%2))/2;
@@ -38,6 +39,7 @@ typedef struct KernelHeap
     struct HeapSection heap_tree[KERNEL_HEAP_LEN];
     uint64_t va_start; // virtual adress where the heap begins tracking
 }KernelHeap;
+
 
 
 

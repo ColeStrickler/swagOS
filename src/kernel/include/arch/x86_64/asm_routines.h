@@ -1,7 +1,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-
+#include <string.h>
+#include <cpu.h>
 
 static inline void
 cli(void)
@@ -86,4 +87,19 @@ clear_cr4_bit(unsigned int bit) {
     asm volatile ("mov %%cr4, %0" : "=r" (cr4));
     cr4 &= ~bit;
     asm volatile ("mov %0, %%cr4" : : "r" (cr4));
+}
+
+static inline void
+lgdt(gdtdesc_t* gdtdesc)
+{
+  volatile unsigned short pd[5];
+
+  memcpy(pd, gdtdesc, sizeof(gdtdesc_t));
+  asm volatile("lgdt (%0)" : : "r" (pd));
+}
+
+static inline void
+ltr(unsigned short sel)
+{
+  asm volatile("ltr %0" : : "r" (sel));
 }
