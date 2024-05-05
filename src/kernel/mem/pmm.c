@@ -320,7 +320,7 @@ bool try_free_chunked_frame(void* address)
 
                     /*
                         We should be able to call kfree() here as kfree() will only free items allocated on the kernel
-                        heap and this function is going to be allocating frames for user mode
+                        heap and this function is not going to be working under that API. 
                     */
                     kfree(chunk);
                 }
@@ -462,26 +462,51 @@ void map_4kb_page_kernel(uint64_t virtual_address, uint64_t physical_address)
 }
 
 
-void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address)
+void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thread* thread)
 {
     uint64_t pml4t_index = (virtual_address >> 39) & 0x1FF; 
     uint64_t pdpt_index = (virtual_address >> 30) & 0x1FF; 
     uint64_t pdt_index = (virtual_address >> 21) & 0x1FF; 
     uint64_t pt_index = (virtual_address >> 12) & 0x1FF;
+    uint64_t pt2_index = pdt_index;
 
 
-    // table physical addresses
-    uint64_t* pml4t_addr = ((uint64_t*)((uint64_t)global_Settings.pml4t_kernel & ~KERNEL_HH_START));
-	uint64_t* pdpt_addr = ((uint64_t*)((uint64_t)global_Settings.pdpt_kernel & ~KERNEL_HH_START));
-	uint64_t* pdt_addr = (uint64_t*)((uint64_t)global_Settings.smp_pdt & ~KERNEL_HH_START);
-    uint64_t* pt_addr = ((uint64_t*)((uint64_t)global_Settings.smp_pt & ~KERNEL_HH_START));
+
+    uint64_t* pml4t_va = &thread->pgdir->pml4t[0];
+    uint64_t* pdpt_va = &thread->pgdir->pdpt[0];
+    uint64_t* pdt_va = &thread->pgdir->pdt[0];
+    uint64_t* pt_va = &thread->pgdir->pd[pt2_index];
 
 
-    global_Settings.pml4t_kernel[pml4t_index] = ((uint64_t)pdpt_addr) | (PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
-	global_Settings.pdpt_kernel[pdpt_index] = ((uint64_t)pdt_addr) | (PAGE_PRESENT | PAGE_WRITE | PAGE_USER); 
-    global_Settings.smp_pdt[pdt_index] = ((uint64_t)pt_addr) | (PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
-    global_Settings.smp_pt[pt_index] = physical_address | (PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
+    uint64_t pdpt_phys = (uint64_t)(pml4t_va[pml4t_index] & PTADDRMASK);
+    if (pdpt_phys == NULL)
+    {
+        uint64_t frame;
+        uint64_t offset;
+        virtual_to_physical(pdpt_va, global_Settings.pml4t_kernel, &frame, &offset);
+        pml4t_va[pml4t_index] = (frame+offset) | (PAGE_PRESENT | PAGE_WRITE | PAGE_USER) ;
+    }
 
+    uint64_t pdt_phys = (uint64_t)(pdpt_va[pdpt_index] & PTADDRMASK);
+    if (pdt_phys == NULL)
+    {
+        uint64_t frame;
+        uint64_t offset;
+        virtual_to_physical(pdt_va, global_Settings.pml4t_kernel, &frame, &offset);
+        pdpt_va[pdpt_index] = (frame+offset) | (PAGE_PRESENT | PAGE_WRITE | PAGE_USER) ;
+    }
+
+    uint64_t pt_phys = (uint64_t)(pdt_va[pdt_index] & PTADDRMASK);
+    if (pt_phys == NULL)
+    {
+        uint64_t frame;
+        uint64_t offset;
+        virtual_to_physical(pt_va, global_Settings.pml4t_kernel, &frame, &offset);
+        pdt_va[pdt_index] = (frame+offset) | (PAGE_PRESENT | PAGE_WRITE | PAGE_USER) ;
+    }
+
+
+    pt_va[pt_index] = physical_address | (PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
     return;
 }
 

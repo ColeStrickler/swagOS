@@ -22,6 +22,15 @@ typedef enum {
     USER_THREAD
 } THREAD_RUN_MODE;
 
+typedef struct thread_pagetables_t
+{
+    uint64_t pml4t[512];
+    uint64_t pdpt[512];
+    uint64_t pdt[512];
+    uint64_t pd[512][512];
+}__attribute__((packed))thread_pagetables_t;
+
+
 
 typedef struct cpu_context_t
 {
@@ -64,6 +73,8 @@ typedef struct Thread
     bool can_wakeup;
     PROCESS_STATE status;
     THREAD_RUN_MODE run_mode;
+    thread_pagetables_t* pgdir;
+    uint64_t kstack;
     uint32_t id;
     uint64_t* pml4t_va;
     uint64_t* pml4t_phys;

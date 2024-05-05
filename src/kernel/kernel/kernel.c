@@ -161,8 +161,6 @@ void higher_half_entry(uint64_t ptr_multiboot_info)
 		:
 		: "r"(pml4t_addr)
 		: "%eax", "memory");
-	// log_to_serial("[higher_half_entry()]: Successfully entered higher half.\n");
-	// log_hexval("PML4T PROPER", pml4t_addr);
 
 	/*
 		We will never return from here
@@ -314,7 +312,7 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	
 	
 	
-
+	
 
 	printf("\nKERNEL END\n");
 	log_to_serial("\nKERNEL END\n");

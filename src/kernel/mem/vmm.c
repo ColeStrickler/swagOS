@@ -186,13 +186,9 @@ void* kalloc(uint64_t size)
 
 bool kfree(void* address)
 {
-    
-  
 
     //These are not optimized and we can definitely place these locks in a better spot
     acquire_Spinlock(&KernelHeapLock);
-
-    
 
     uint64_t addr = (uint64_t)address;
     if (addr < global_Settings.kernel_heap.va_start)

@@ -100,6 +100,8 @@ uint64_t physical_frame_request();
 
 bool try_free_chunked_frame(void *address);
 
+uint64_t physical_frame_request_4kb();
+
 bool map_kernel_page(uint64_t va, uint64_t pa, PAGE_ALLOC_TYPE type);
 
 bool uva_copy_kernel(uint64_t *pml4t_virtual);
@@ -107,6 +109,8 @@ bool uva_copy_kernel(uint64_t *pml4t_virtual);
 
 
 void map_4kb_page_kernel(uint64_t virtual_address, uint64_t physical_address);
+
+void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thread *thread);
 
 bool is_frame_mapped_hugepages(uint64_t virtual_address, uint64_t *pml4t_addr);
 

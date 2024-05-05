@@ -16,8 +16,9 @@ void CreateIdleThread(void (*entry)(void *))
 {
     struct Thread *idle = &global_Settings.threads.thread_table[IDLE_THREAD];
     idle->id = 0x1;
-    idle->pml4t_phys = KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel);
-    idle->pml4t_va = global_Settings.pml4t_kernel;
+    //idle->pml4t_phys = KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel);
+    //idle->pml4t_va = global_Settings.pml4t_kernel;
+    CreatePageTables(idle, 0);
     idle->status = PROCESS_STATE_READY; // We will keep this so
     idle->can_wakeup = true;
 
@@ -51,19 +52,15 @@ void CreatePageTables(struct Thread *thread, uint32_t file_size)
     /*
         Create PML4T
     */
-    thread->pml4t_va = kalloc(PGSIZE); // this should be page aligned based on how we set up our heap
+    thread->pgdir = (thread_pagetables_t*)kalloc(sizeof(thread_pagetables_t));
+    thread->pml4t_va = &thread->pgdir->pml4t[0];
     if (thread->pml4t_va == NULL)
         panic("CreatePageTables() --> kalloc() returned NULL for pml4t!\n");
     memset(thread->pml4t_va, 0x00, PGSIZE);
-
     uint64_t frame;
     uint64_t offset;
     virtual_to_physical(thread->pml4t_va, global_Settings.pml4t_kernel, &frame, &offset);
     thread->pml4t_phys = frame + offset;
-
-
-
-
 
     // Map top 4gb from kernel into the user address space, will avoid DMIO
     uva_copy_kernel(thread->pml4t_va);
@@ -90,6 +87,10 @@ void CreateUserThread(void *(*entry)(), uint32_t pid, uint32_t size)
             if (stack_alloc == NULL)
                 panic("CreateThread() --> kalloc() failed!\n");
             stack_alloc += 0x10000; // point stack to top of allocation
+            init_thread->kstack = stack_alloc;
+
+            
+            CreatePageTables(init_thread, 0);
             log_hexval("STACK:", stack_alloc);
             /*
                 Need to set up the stack in such a way that we can pop off of it and run the process
