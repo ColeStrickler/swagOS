@@ -92,6 +92,10 @@ void __higherhalf_stubentry(uint64_t ptr_multiboot_info)
 	uint64_t *pdpt_addr = ((uint64_t *)((uint64_t)&pdpt & ~KERNEL_HH_START));
 	uint64_t *pdt_addr = (uint64_t *)((uint64_t)global_Settings.pdt_kernel[0] & ~KERNEL_HH_START);
 
+
+	
+
+
 	pml4t_addr[pml4t_index] = ((uint64_t)pdpt_addr) | (PAGE_PRESENT | PAGE_WRITE);
 	// pml4t_addr[510] = ((uint64_t)pml4t_addr) | (PAGE_PRESENT | PAGE_WRITE);
 	pdpt_addr[pdpt_index] = ((uint64_t)pdt_addr) | (PAGE_PRESENT | PAGE_WRITE);
@@ -204,6 +208,7 @@ void kthread_setup()
 	kthread->status = PROCESS_STATE_RUNNING;
 	kthread->can_wakeup = true;
 	get_current_cpu()->current_thread = kthread;
+	get_current_cpu()->kstack = global_stack_top;
 }
 
 void smp_start()
@@ -215,6 +220,11 @@ void smp_start()
 		{
 			log_hexval("Attempting to init", id);
 			InitCPUByID(id);
+		}
+		else
+		{
+			alloc_per_cpu_gdt();
+			global_Settings.cpu[i].kstack = kalloc(0x10000);
 		}
 	}
 }
@@ -247,6 +257,12 @@ void enable_supervisor_mem_protections()
 		set_cr4_bit(CPU_CR4_SMEP_ENABLE);
 	if (ebx & (1 << 20)) // CHECK SMAP AVAILABLE
 		set_cr4_bit(CPU_CR4_SMAP_ENABLE);
+}
+
+
+void test1()
+{
+	while(1){log_to_serial("test\n");}
 }
 
 void kernel_main(uint64_t ptr_multiboot_info)
@@ -282,7 +298,7 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	init_terminal();
 	// log_to_serial("terminal init finished!\n");
 
-	// log_to_serial("kheap_init() finished\n");
+	 log_to_serial("kheap_init() finished\n");
 	keyboard_driver_init();
 	// sti();
 
@@ -293,30 +309,40 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	binit();
 
 	log_to_serial("beginning ext2 init!\n");
-
+	for (uint64_t i = 0; i < UINT32_MAX; i++)
+	{}
 	ext2_driver_init();
 	
 	log_hexval("GDT SIZE", global_Settings.original_GDT_size);
 	log_hexval("addr", global_Settings.original_GDT);
-	printf("total_groups %d\n", ext2_driver.total_groups);
-	for (int i = 0; i < ext2_driver.total_groups; i++)
-	{
-		if (ext2_driver.bgdt[i].free_blocks)
-		{
-			printf("ext2_driver.bgdt[%d].free_blocks %d\n", i, ext2_driver.bgdt[i].free_blocks);
-			printf("ext2_driver.bgdt[%d].free_inodes %d\n", i,ext2_driver.bgdt[i].free_inodes);
-		}
-	}
 
 	printf("Ext2 initialized\n");
 	
 	
-	
-	
+
+	log_to_serial("here!\n");
+	char* b = ext2_read_file("/test1");
+    CreateUserThread(420, b);
+    log_to_serial("here2!\n");
+
+
+	//char* user = 0x69000;
+    //unsigned char arr[] = {0xeb, 0xfe, 0x90, 0x90};
+    //uint64_t frame = physical_frame_request_4kb();
+    //map_4kb_page_kernel(user, frame, 10);
+    //memcpy(user, arr, 4);
+    //uint64_t ustack = physical_frame_request_4kb();
+	//cli();
+	//map_4kb_page_smp(user, frame, (PAGE_PRESENT | PAGE_WRITE | PAGE_USER));
+	//map_4kb_page_smp(0x40000000, ustack, (PAGE_PRESENT | PAGE_WRITE | PAGE_USER));
+	//log_to_serial("doing switch");
+    //switch_to_user_mode(0x40000000, user);
+
 
 	printf("\nKERNEL END\n");
 	log_to_serial("\nKERNEL END\n");
-	while (1)
-	{
-	};
+	ExitThread();
+	
 }
+
+

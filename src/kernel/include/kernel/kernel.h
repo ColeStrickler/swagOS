@@ -53,7 +53,8 @@ typedef struct KernelSettings
     uint64_t gdtr_val;
     uint64_t* pml4t_kernel;
     uint64_t* pdpt_kernel;
-    uint64_t pdt_kernel[4][512]__attribute__((aligned(0x1000))); // 3 pdt, one for Kernel Code&Data, two for Kernel Heap, one for DM I/O
+    uint64_t pdt_kernel[512][512]__attribute__((aligned(0x1000))); // 3 pdt, one for Kernel Code&Data, two for Kernel Heap, one for DM I/O
+    uint64_t pt_kernel[512][512]__attribute__((aligned(0x1000)));
     uint64_t smp_pdt[512]__attribute__((aligned(0x1000))); // we just need this for smp, we use huge pages elsewhere
     uint64_t smp_pt[512]__attribute__((aligned(0x1000))); // we just need this for smp, we use huge pages elsewhere
     uint64_t tick_counter;

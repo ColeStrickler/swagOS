@@ -66,29 +66,33 @@ GDT:
     .Null: equ $ - GDT
         dq 0
     .Code: equ $ - GDT
-        dd 0xFFFF                                   ; Limit & Base (low, bits 0-15)
-        db 0                                        ; Base (mid, bits 16-23)
-        db PRESENT | NOT_SYS | EXEC | RW            ; Access
-        db GRAN_4K | LONG_MODE | 0xF                ; Flags & Limit (high, bits 16-19)
-        db 0                                        ; Base (high, bits 24-31)
+        dw 0                         ; Limit (low).
+        dw 0                         ; Base (low).
+        db 0                         ; Base (middle)
+        db 10011010b                 ; Access (exec/read).
+        db 00100000b                 ; Granularity, 64 bits flag, limit19:16.
+        db 0                         ; Base (high).
     .Data: equ $ - GDT
-        dd 0xFFFF                                   ; Limit & Base (low, bits 0-15)
-        db 0                                        ; Base (mid, bits 16-23)
-        db PRESENT | NOT_SYS | RW                   ; Access
-        db GRAN_4K | SZ_32 | 0xF                    ; Flags & Limit (high, bits 16-19)
-        db 0                                        ; Base (high, bits 24-31
+        dw 0                         ; Limit (low).
+        dw 0                         ; Base (low).
+        db 0                         ; Base (middle)
+        db 10010010b                 ; Access (read/write).
+        db 00000000b                 ; Granularity.
+        db 0                         ; Base (high).
     .UserCode: equ $ - GDT
-        dd 0xFFFF                                   ; Limit & Base (low, bits 0-15)
-        db 0                                        ; Base (mid, bits 16-23)
-        db 0xFA                                     ; Access
-        db 0xA                                      ; Flags & Limit (high, bits 16-19)
-        db 0                                        ; Base (high, bits 24-31
+        dw 0                         ; Limit (low).
+        dw 0                         ; Base (low).
+        db 0                         ; Base (middle)
+        db 11111010b                 ; Access (exec/read).
+        db 00100000b                 ; Granularity, 64 bits flag, limit19:16.
+        db 0                         ; Base (high).
     .UserData: equ $ - GDT
-        dd 0xFFFF                                   ; Limit & Base (low, bits 0-15)
-        db 0                                        ; Base (mid, bits 16-23)
-        db 0xF2                                     ; Access
-        db 0xC                                      ; Flags & Limit (high, bits 16-19)
-        db 0                                        ; Base (high, bits 24-31                                        
+        dw 0                         ; Limit (low).
+        dw 0                         ; Base (low).
+        db 0                         ; Base (middle)
+        db 11110010b                 ; Access (read/write).
+        db 00000000b                 ; Granularity.
+        db 0                         ; Base (high).                                   
     .TSS_LOW: equ $ - GDT
         dq 0
     .TSS_HIGH: equ $-GDT

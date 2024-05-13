@@ -104,15 +104,21 @@ uint64_t physical_frame_request_4kb();
 
 bool map_kernel_page(uint64_t va, uint64_t pa, PAGE_ALLOC_TYPE type);
 
-bool uva_copy_kernel(uint64_t *pml4t_virtual);
+void map_4kb_page_kernel(uint64_t virtual_address, uint64_t physical_address, PAGE_ALLOC_TYPE type);
+
+bool uva_copy_kernel(Thread *thread);
 
 
 
-void map_4kb_page_kernel(uint64_t virtual_address, uint64_t physical_address);
+void map_4kb_page_smp(uint64_t virtual_address, uint64_t physical_address, uint32_t flags);
 
 void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thread *thread);
 
+void map_huge_page_user(uint64_t virtual_address, uint64_t physical_address, Thread *thread, int index);
+
 bool is_frame_mapped_hugepages(uint64_t virtual_address, uint64_t *pml4t_addr);
+
+bool is_frame_mapped_thread(Thread *t, uint64_t virtual_address);
 
 void virtual_to_physical(uint64_t virtual_address, uint64_t *pml4t_addr, uint64_t *frame_addr, uint64_t *frame_offset);
 

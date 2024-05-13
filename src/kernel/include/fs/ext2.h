@@ -138,6 +138,8 @@ typedef struct EXT2_DRIVER {
     ext2_inode_t root_inode;
 } EXT2_DRIVER;
 
+unsigned char *ext2_read_file(char *filepath);
+
 void ext2_driver_init();
 
 void ext2_get_bgd(uint32_t descriptor_index, ext2_block_group_desc *out);

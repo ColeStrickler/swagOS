@@ -5,6 +5,7 @@
 #include <serial.h>
 #include <panic.h>
 #include <scheduler.h>
+#include <paging.h>
 extern KernelSettings global_Settings;
 
 struct Thread *GetCurrentThread()
@@ -16,9 +17,9 @@ void CreateIdleThread(void (*entry)(void *))
 {
     struct Thread *idle = &global_Settings.threads.thread_table[IDLE_THREAD];
     idle->id = 0x1;
-    //idle->pml4t_phys = KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel);
-    //idle->pml4t_va = global_Settings.pml4t_kernel;
-    CreatePageTables(idle, 0);
+    idle->pml4t_phys = KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel);
+    idle->pml4t_va = global_Settings.pml4t_kernel;
+    //CreatePageTables(idle);
     idle->status = PROCESS_STATE_READY; // We will keep this so
     idle->can_wakeup = true;
 
@@ -27,11 +28,8 @@ void CreateIdleThread(void (*entry)(void *))
         panic("CreateIdleThread() --> kalloc() failed!\n");
     stack_alloc += 0x100; // point stack to top of allocation
 
-    struct cpu_context_t *ctx = kalloc(sizeof(cpu_context_t));
-    if (ctx == NULL)
-        panic("CreateThread() --> failed to allocatged cpu_context_t for new task!\n");
+    struct cpu_context_t *ctx = &idle->execution_context;
 
-    idle->execution_context = ctx;
     ctx->i_rip = entry;
     ctx->i_rsp = stack_alloc;
     ctx->i_rflags = 0x202; // IF | Reserve
@@ -43,32 +41,82 @@ void CreateIdleThread(void (*entry)(void *))
     ctx->rbp = 0x0;
 }
 
-void CreatePageTables(struct Thread *thread, uint32_t file_size)
+void CreatePageTables(struct Thread *thread)
 {
-
-    if (file_size > (1024 * 1024 * 1024))
-        panic("CreatePageTables() --> file size > 1gb not supported!\n");
-
     /*
         Create PML4T
     */
-    thread->pgdir = (thread_pagetables_t*)kalloc(sizeof(thread_pagetables_t));
-    thread->pml4t_va = &thread->pgdir->pml4t[0];
+    thread->pml4t_va = &thread->pgdir.pml4t[0];
     if (thread->pml4t_va == NULL)
         panic("CreatePageTables() --> kalloc() returned NULL for pml4t!\n");
-    memset(thread->pml4t_va, 0x00, PGSIZE);
+    memset(&thread->pgdir, 0x00, sizeof(thread_pagetables_t));
     uint64_t frame;
     uint64_t offset;
+
+    
+    /*
+        Somethjing wrong with this function!
+    */
     virtual_to_physical(thread->pml4t_va, global_Settings.pml4t_kernel, &frame, &offset);
     thread->pml4t_phys = frame + offset;
+    if (thread->pml4t_phys != KERNEL_PML4T_PHYS(&thread->pgdir.pml4t[0]))
+        panic("CreatePageTables() --> bad pml4t");
 
+    log_hexval("pml4t phys", thread->pml4t_phys);
+    log_hexval("pml4t phys", thread->pml4t_va);
     // Map top 4gb from kernel into the user address space, will avoid DMIO
-    uva_copy_kernel(thread->pml4t_va);
+    uva_copy_kernel(thread);
+    log_to_serial("done create pt\n");
+
 
 }
 
-void CreateUserThread(void *(*entry)(), uint32_t pid, uint32_t size)
+
+
+void test()
 {
+    while(1)
+    {
+        log_hexval("testing", 0);
+    }
+}
+
+
+uint64_t CreateUserProcessStack(Thread* t)
+{
+    uint64_t frame = physical_frame_request();
+    if (frame == UINT64_MAX)
+        panic("CreateUserProcessStack() --> got null frame\n");
+    int i = 0;
+
+   // while(is_frame_mapped_thread(t, USER_STACK_LOC + PGSIZE*i)){i++;}
+    map_4kb_page_user(USER_STACK_LOC+PGSIZE*i, frame, t);
+    return USER_STACK_LOC+(PGSIZE*i)+PGSIZE-8; // point to top of stack
+}
+
+
+void switch_to_user_mode(uint64_t stack_addr, uint64_t code_addr)
+{
+    asm volatile(
+    "pushq $0x23;"       // Pushes the data segment selector (0x23)
+    "pushq %0;"          // Pushes the stack address
+    "pushq $0x202;"      // Pushes the flags (0x202)
+    "pushq $0x1B;"       // Pushes the code segment selector (0x1B)
+    "pushq %1;"          // Pushes the instruction pointer
+    "iretq;"             // Interrupt return
+    :: "r"(stack_addr), "r"(code_addr)
+    );
+}
+
+void load_page_table(uint64_t new_page_table) {
+    // Load CR3 register with the physical address of the new page table
+    asm volatile("mov %0, %%cr3" : : "r"(new_page_table));
+    asm volatile("cpuid" : : : "eax", "ebx", "ecx", "edx");
+}
+
+void CreateUserThread(uint32_t pid, uint8_t* elf)
+{
+    //log_hexval("Attempting global thread_lock", (&global_Settings.threads.lock)->owner_cpu);
     acquire_Spinlock(&global_Settings.threads.lock);
     struct Thread *thread_table = &global_Settings.threads.thread_table[0];
     for (uint32_t i = 0; i < MAX_NUM_THREADS; i++)
@@ -81,7 +129,7 @@ void CreateUserThread(void *(*entry)(), uint32_t pid, uint32_t size)
 
             // CreatePageTables(init_thread);
             init_thread->status = PROCESS_STATE_READY; // --> may want to do this later
-
+            init_thread->run_mode = USER_THREAD;
             // we will want to only use this for the kernel stack
             uint64_t stack_alloc = (uint64_t)kalloc(0x10000);
             if (stack_alloc == NULL)
@@ -89,38 +137,71 @@ void CreateUserThread(void *(*entry)(), uint32_t pid, uint32_t size)
             stack_alloc += 0x10000; // point stack to top of allocation
             init_thread->kstack = stack_alloc;
 
+            //log_hexval("KSTACK:", stack_alloc);
+            CreatePageTables(init_thread);
+           // log_hexval("PT:", init_thread->pml4t_va);
+            log_hexval("mapped", is_frame_mapped_thread(init_thread, KERNEL_HH_START));
+
+
+           /*
+            Leading theory is that we are not properly doing something with the page tables. Which is quite strange
+
+
+            Some of the addresses we write in are overwriting each other. 
+           */
+            //memcpy(init_thread->pml4t_va, global_Settings.pml4t_kernel, PGSIZE);
+
+
+            //load_page_table(init_thread->pml4t_phys);
+            //log_to_serial("pt loaded!");
+        
+            struct cpu_context_t *ctx = &init_thread->execution_context;
+            if (ctx == NULL)
+                panic("CreateThread() --> failed to allocatged cpu_context_t for new task!\n");
             
-            CreatePageTables(init_thread, 0);
-            log_hexval("STACK:", stack_alloc);
+
+            ELF_load_segments(init_thread, elf);
+           // ctx->i_rip = test;
             /*
                 Need to set up the stack in such a way that we can pop off of it and run the process
 
                 We can do this like we did in isr.asm and then point init_thread->execution_context to the top of all this
                 so that InvokeScheduler() can operate on it like any other.
             */
-            struct cpu_context_t *ctx = kalloc(sizeof(cpu_context_t));
-            if (ctx == NULL)
-                panic("CreateThread() --> failed to allocatged cpu_context_t for new task!\n");
-            init_thread->execution_context = ctx;
+            
+
+           
             init_thread->can_wakeup = true;
-            ctx->i_rip = entry;
-            ctx->i_rsp = NULL;     // stack_alloc; NEED TO SET THIS TO USER STACK
+            //ctx->i_rip = entry; entry is set by the elf loader call
+            ctx->i_rsp = CreateUserProcessStack(init_thread);     // stack_alloc; NEED TO SET THIS TO USER STACK
             ctx->i_rflags = 0x202; // IF | Reserved
 
             ctx->i_cs = USER_CS;
             ctx->i_ss = USER_DS;
+            if (!is_frame_mapped_thread(init_thread, ctx->i_rip))
+                panic("rip not mapped\n");
+            if (!is_frame_mapped_thread(init_thread, ctx->i_rsp))
+                panic("rsp not mapped\n");
+            
 
             // pass args and other things
             ctx->rdi = 0x0;
             ctx->rsi = 0x0;
             ctx->rbp = 0x0;
 
+            
+
+            log_hexval("Created!", ctx->i_rip);
             break;
         }
     }
-
+    
     release_Spinlock(&global_Settings.threads.lock);
 }
+
+
+
+
 
 void CreateKernelThread(void (*entry)(void *), uint32_t pid)
 {
@@ -138,6 +219,7 @@ void CreateKernelThread(void (*entry)(void *), uint32_t pid)
             init_thread->pml4t_va = global_Settings.pml4t_kernel;
 
             init_thread->status = PROCESS_STATE_READY;
+            init_thread->run_mode = KERNEL_THREAD;
 
             // allocate kernel stack
             uint64_t stack_alloc = (uint64_t)kalloc(0x10000);
@@ -151,10 +233,10 @@ void CreateKernelThread(void (*entry)(void *), uint32_t pid)
                 We can do this like we did in isr.asm and then point init_thread->execution_context to the top of all this
                 so that InvokeScheduler() can operate on it like any other.
             */
-            struct cpu_context_t *ctx = kalloc(sizeof(cpu_context_t));
+            struct cpu_context_t *ctx = &init_thread->execution_context;
             if (ctx == NULL)
                 panic("CreateThread() --> failed to allocatged cpu_context_t for new task!\n");
-            init_thread->execution_context = ctx;
+
             init_thread->can_wakeup = true;
             ctx->i_rip = entry;
             ctx->i_rsp = stack_alloc;
@@ -239,10 +321,17 @@ void Wakeup(void *channel)
 
             t->status = PROCESS_STATE_READY;
 
-            if (t->execution_context == NULL)
-                panic("wakeup() --> t->execution context null");
+
             DEBUG_PRINT("waking up", t->id);
         }
     }
     release_Spinlock(&global_Settings.threads.lock);
+}
+
+
+void ExitThread()
+{
+    Thread* t = GetCurrentThread();
+    memset(t, 0x00, sizeof(Thread));
+    InvokeScheduler(NULL);
 }

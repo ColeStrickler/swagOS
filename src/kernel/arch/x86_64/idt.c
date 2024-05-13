@@ -117,7 +117,7 @@ void build_IDT(void)
     SetIDT_Descriptor(0, (uint64_t)isr_0, false, false);
     SetIDT_Descriptor(1, (uint64_t)isr_1, false, false);
     SetIDT_Descriptor(2, (uint64_t)isr_2, false, false);
-    SetIDT_Descriptor(3, (uint64_t)isr_3, false, false);
+    SetIDT_Descriptor(3, (uint64_t)isr_3, true, false);
     SetIDT_Descriptor(4, (uint64_t)isr_4, false, false);
     SetIDT_Descriptor(5, (uint64_t)isr_5, false, false);
     SetIDT_Descriptor(6, (uint64_t)isr_6, false, false);
@@ -127,7 +127,7 @@ void build_IDT(void)
     SetIDT_Descriptor(10, (uint64_t)isr_errorcode_10, false, false);
     SetIDT_Descriptor(11, (uint64_t)isr_errorcode_11, false, false);
     SetIDT_Descriptor(12, (uint64_t)isr_errorcode_12, false, false);
-    SetIDT_Descriptor(13, (uint64_t)isr_errorcode_13, false, false);
+    SetIDT_Descriptor(13, (uint64_t)isr_errorcode_13, true, false);
     SetIDT_Descriptor(14, (uint64_t)isr_errorcode_14, false, false);
     SetIDT_Descriptor(15, (uint64_t)isr_15, false, false);
     SetIDT_Descriptor(16, (uint64_t)isr_16, false, false);
@@ -146,7 +146,7 @@ void build_IDT(void)
     SetIDT_Descriptor(29, (uint64_t)isr_29, false, false);
     SetIDT_Descriptor(30, (uint64_t)isr_30, false, false);
     SetIDT_Descriptor(31, (uint64_t)isr_31, false, false);
-    SetIDT_Descriptor(32, (uint64_t)isr_32, false, false);
+    SetIDT_Descriptor(32, (uint64_t)isr_32, true, false);
     SetIDT_Descriptor(33, (uint64_t)isr_33, false, false);
     SetIDT_Descriptor(34, (uint64_t)isr_34, false, false);
     SetIDT_Descriptor(35, (uint64_t)isr_35, false, false);
@@ -178,6 +178,7 @@ void idt_setup()
 
 trapframe64_t* isr_handler(trapframe64_t* tf)
 {
+    load_page_table(KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
     switch(tf->isr_id)
     {
         case 3:
@@ -201,7 +202,7 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         case 13:
         {
             //printf("\nGeneral Protection fault interrupt.\nGeneral Protection fault on CPU: %d\nRIP: %u\n", lapic_id(), tf->i_rip);
-            DEBUG_PRINT("GP FAULT on CPU", lapic_id());
+            //DEBUG_PRINT("GP FAULT on CPU", lapic_id());
             DEBUG_PRINT("RIP", tf->i_rip);
             panic("");
             break;
@@ -219,7 +220,15 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
             if (!global_Settings.bTimerCalibrated)
                 panic("isr_handler() --> APIC TIMER INTERRUPT BEFORE CALIBRATION.\n");
             global_Settings.tick_counter += 1;
-            //log_to_serial("Timer!\n");
+
+            if (get_current_cpu()->current_thread->id == 420)
+            {
+                log_to_serial("Timer!\n");
+                
+            }
+            
+
+            //
             InvokeScheduler((cpu_context_t*)tf);
             break;
         }
@@ -253,8 +262,8 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         }
         default:
         {
-          //  if (tf->isr_id < 32)
-            //    log_to_serial((char*)exception_names[tf->isr_id]);
+            if (tf->isr_id < 32)
+                log_to_serial((char*)exception_names[tf->isr_id]);
             DEBUG_PRINT("\nExperienced unexpected interrupt.", tf->isr_id);
             DEBUG_PRINT("CPU ID", lapic_id());
 

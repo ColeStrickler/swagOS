@@ -376,6 +376,7 @@ uint64_t physical_frame_request_4kb()
         Do not allocate new chunked frame unless we need to
     */
     frame_4kb = check_available_chunked_frame();
+    log_hexval("returning frame", frame_4kb);
     if (frame_4kb != UINT64_MAX)
         return frame_4kb;
 
@@ -385,6 +386,7 @@ uint64_t physical_frame_request_4kb()
     physical_frame_checkout(frame_2mb);
     
     frame_4kb = create_new_chunked_frame(frame_2mb);
+    log_hexval("returning frame", frame_4kb);
     return frame_4kb;
 }
 
@@ -420,16 +422,40 @@ bool map_kernel_page(uint64_t va, uint64_t pa, PAGE_ALLOC_TYPE type)
     global_Settings.pml4t_kernel[pml4t_index] = ((uint64_t)pdpt_addr) | (PAGE_PRESENT | PAGE_WRITE);
 	global_Settings.pdpt_kernel[pdpt_index] = ((uint64_t)pdt_addr) | (PAGE_PRESENT | PAGE_WRITE); 
     global_Settings.pdt_kernel[(int)type][pdt_index] = pa | page_flags;
-    
+    //log_hexval("va1", va);
+    //log_hexval("pa1", pa);
     return true;
 }
 
 
 
-bool uva_copy_kernel(uint64_t* pml4t_virtual)
+
+void map_4kb_page_kernel(uint64_t virtual_address, uint64_t physical_address, PAGE_ALLOC_TYPE type)
 {
-    memcpy(pml4t_virtual, global_Settings.pml4t_kernel, PGSIZE);
-    //pml4t_virtual[0] = 0x0; // avoid DMIO
+    uint64_t pml4t_index = (virtual_address >> 39) & 0x1FF; 
+    uint64_t pdpt_index = (virtual_address >> 30) & 0x1FF; 
+    uint64_t pdt_index = (virtual_address >> 21) & 0x1FF; 
+    uint64_t pt_index = (virtual_address >> 12) & 0x1FF;
+
+    uint64_t page_flags = (PAGE_PRESENT | PAGE_WRITE | PAGE_HUGE);
+    if (type == ALLOC_TYPE_DM_IO) // disable caching for direct mapped IO
+        page_flags |= PAGE_CACHEDISABLE;
+
+
+
+    // table physical addresses
+    uint64_t* pml4t_addr = ((uint64_t*)((uint64_t)global_Settings.pml4t_kernel & ~KERNEL_HH_START));
+	uint64_t* pdpt_addr = ((uint64_t*)((uint64_t)global_Settings.pdpt_kernel & ~KERNEL_HH_START));
+	uint64_t* pdt_addr = (uint64_t*)((uint64_t)&global_Settings.pdt_kernel[(int)type][0] & ~KERNEL_HH_START);
+    uint64_t* pt_addr = ((uint64_t*)((uint64_t)&global_Settings.pt_kernel[pdt_index][0] & ~KERNEL_HH_START));
+
+
+    global_Settings.pml4t_kernel[pml4t_index] = ((uint64_t)pdpt_addr) | (PAGE_PRESENT | PAGE_WRITE);
+	global_Settings.pdpt_kernel[pdpt_index] = ((uint64_t)pdt_addr) | (PAGE_PRESENT | PAGE_WRITE); 
+    
+    global_Settings.pdt_kernel[(int)type][pdt_index] = ((uint64_t)pt_addr) | (PAGE_PRESENT | PAGE_WRITE);
+    global_Settings.pt_kernel[pdt_index][pt_index] = physical_address | (PAGE_PRESENT | PAGE_WRITE);
+    return;
 }
 
 
@@ -438,7 +464,32 @@ bool uva_copy_kernel(uint64_t* pml4t_virtual)
 
 
 
-void map_4kb_page_kernel(uint64_t virtual_address, uint64_t physical_address)
+bool uva_copy_kernel(Thread* thread)
+{
+    uint64_t pml4t_index = (KERNEL_HH_START >> 39) & 0x1FF; // 511
+	uint64_t pdpt_index = (KERNEL_HH_START >> 30) & 0x1FF;	// 510
+	uint64_t pdt_index = (KERNEL_HH_START >> 21) & 0x1FF;	// 0
+
+
+    thread->pgdir.pml4t[511] = KERNEL_PML4T_PHYS(&thread->pgdir.pdpt) | (PAGE_PRESENT | PAGE_WRITE);
+    thread->pgdir.pdpt[510] = KERNEL_PML4T_PHYS(thread->pgdir.pdt[0]) | (PAGE_PRESENT | PAGE_WRITE);
+    
+
+    for (uint32_t i = 0; i < 512; i++)
+    {
+        thread->pgdir.pdt[0][i] = (i * HUGEPGSIZE) | PAGE_HUGE | PAGE_PRESENT | PAGE_WRITE;
+       // map_huge_page_user(KERNEL_HH_START + i*HUGEPGSIZE, i*HUGEPGSIZE, thread);
+    }
+    
+}
+
+
+
+
+
+
+
+void map_4kb_page_smp(uint64_t virtual_address, uint64_t physical_address, uint32_t flags)
 {
     uint64_t pml4t_index = (virtual_address >> 39) & 0x1FF; 
     uint64_t pdpt_index = (virtual_address >> 30) & 0x1FF; 
@@ -453,65 +504,88 @@ void map_4kb_page_kernel(uint64_t virtual_address, uint64_t physical_address)
     uint64_t* pt_addr = ((uint64_t*)((uint64_t)global_Settings.smp_pt & ~KERNEL_HH_START));
 
 
-    global_Settings.pml4t_kernel[pml4t_index] = ((uint64_t)pdpt_addr) | (PAGE_PRESENT | PAGE_WRITE);
-	global_Settings.pdpt_kernel[pdpt_index] = ((uint64_t)pdt_addr) | (PAGE_PRESENT | PAGE_WRITE); 
-    global_Settings.smp_pdt[pdt_index] = ((uint64_t)pt_addr) | (PAGE_PRESENT | PAGE_WRITE);
-    global_Settings.smp_pt[pt_index] = physical_address | (PAGE_PRESENT | PAGE_WRITE);
+    global_Settings.pml4t_kernel[pml4t_index] = ((uint64_t)pdpt_addr) | flags;
+	global_Settings.pdpt_kernel[pdpt_index] = ((uint64_t)pdt_addr) | flags;
+    global_Settings.smp_pdt[pdt_index] = ((uint64_t)pt_addr) | flags;
+    global_Settings.smp_pt[pt_index] = physical_address | flags;
 
     return;
 }
+
+
+
 
 
 void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thread* thread)
 {
+
     uint64_t pml4t_index = (virtual_address >> 39) & 0x1FF; 
     uint64_t pdpt_index = (virtual_address >> 30) & 0x1FF; 
     uint64_t pdt_index = (virtual_address >> 21) & 0x1FF; 
     uint64_t pt_index = (virtual_address >> 12) & 0x1FF;
-    uint64_t pt2_index = pdt_index;
+
+    uint64_t flags = PAGE_USER | PAGE_WRITE | PAGE_PRESENT;
+    log_hexval("flags!", flags);
+    // table physical addresses
+    uint64_t pml4t_addr = ((uint64_t*)((uint64_t)&thread->pgdir.pml4t & ~KERNEL_HH_START));
+	uint64_t pdpt_addr = ((uint64_t*)((uint64_t)&thread->pgdir.pdpt & ~KERNEL_HH_START));
+	uint64_t pdt_addr = (uint64_t*)((uint64_t)&thread->pgdir.pdt[1] & ~KERNEL_HH_START);
+    uint64_t pt_addr = ((uint64_t*)((uint64_t)&thread->pgdir.pd[0] & ~KERNEL_HH_START));
 
 
-
-    uint64_t* pml4t_va = &thread->pgdir->pml4t[0];
-    uint64_t* pdpt_va = &thread->pgdir->pdpt[0];
-    uint64_t* pdt_va = &thread->pgdir->pdt[0];
-    uint64_t* pt_va = &thread->pgdir->pd[pt2_index];
-
-
-    uint64_t pdpt_phys = (uint64_t)(pml4t_va[pml4t_index] & PTADDRMASK);
-    if (pdpt_phys == NULL)
+    thread->pgdir.pml4t[pml4t_index] = ((uint64_t)pdpt_addr) | flags;
+	thread->pgdir.pdpt[pdpt_index] = ((uint64_t)pdt_addr) | flags;
+    if ((thread->pgdir.pdt[1][pdt_index] & PTADDRMASK) != NULL && (thread->pgdir.pdt[1][pdt_index] & PTADDRMASK) != pt_addr)
     {
-        uint64_t frame;
-        uint64_t offset;
-        virtual_to_physical(pdpt_va, global_Settings.pml4t_kernel, &frame, &offset);
-        pml4t_va[pml4t_index] = (frame+offset) | (PAGE_PRESENT | PAGE_WRITE | PAGE_USER) ;
+        log_hexval("current", thread->pgdir.pdt[1][pdt_index] & PTADDRMASK);
+        log_hexval("ptaddr", pt_addr);
+        panic("pdt");
     }
+    thread->pgdir.pdt[1][pdt_index] = ((uint64_t)pt_addr) | flags;
 
-    uint64_t pdt_phys = (uint64_t)(pdpt_va[pdpt_index] & PTADDRMASK);
-    if (pdt_phys == NULL)
-    {
-        uint64_t frame;
-        uint64_t offset;
-        virtual_to_physical(pdt_va, global_Settings.pml4t_kernel, &frame, &offset);
-        pdpt_va[pdpt_index] = (frame+offset) | (PAGE_PRESENT | PAGE_WRITE | PAGE_USER) ;
-    }
-
-    uint64_t pt_phys = (uint64_t)(pdt_va[pdt_index] & PTADDRMASK);
-    if (pt_phys == NULL)
-    {
-        uint64_t frame;
-        uint64_t offset;
-        virtual_to_physical(pt_va, global_Settings.pml4t_kernel, &frame, &offset);
-        pdt_va[pdt_index] = (frame+offset) | (PAGE_PRESENT | PAGE_WRITE | PAGE_USER) ;
-    }
-
-
-    pt_va[pt_index] = physical_address | (PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
+    if (thread->pgdir.pd[0][pt_index] & PTADDRMASK != NULL)
+        panic("pd");
+    thread->pgdir.pd[0][pt_index] = physical_address | flags;
     return;
 }
 
 
 
+void 
+map_huge_page_user(uint64_t virtual_address, uint64_t physical_address, Thread* thread, int index)
+{
+    uint64_t pml4t_index = (virtual_address >> 39) & 0x1FF; 
+    uint64_t pdpt_index = (virtual_address >> 30) & 0x1FF; 
+    uint64_t pdt_index = (virtual_address >> 21) & 0x1FF; 
+
+
+    uint64_t pdt_i = index;
+    uint64_t* pml4t_va = &thread->pgdir.pml4t;
+    uint64_t* pdpt_va = &thread->pgdir.pdpt;
+    uint64_t* pdt_va = &thread->pgdir.pdt[pdt_i];
+
+
+    uint64_t pdpt_p = KERNEL_PML4T_PHYS(pdpt_va);
+    uint64_t pdt_p = KERNEL_PML4T_PHYS(pdt_va);
+    uint64_t pt_p = KERNEL_PML4T_PHYS(pdt_va);
+
+    uint32_t flags = (PAGE_PRESENT | PAGE_WRITE);
+
+
+    thread->pgdir.pml4t[pml4t_index] = pdpt_p | flags;
+    thread->pgdir.pdpt[pdpt_index] = pdt_p | flags;
+
+    if (thread->pgdir.pdt[pdt_i][pdt_index] & PTADDRMASK != NULL)
+    {
+        log_hexval("val", thread->pgdir.pdt[pdt_i][pdt_index]);
+        panic("not null huge");
+    }
+    
+    thread->pgdir.pdt[pdt_i][pdt_index] = physical_address | flags | PAGE_HUGE;
+    //log_hexval("va", virtual_address);
+    //log_hexval("pa", physical_address);
+    return;
+}
 
 
 
@@ -560,6 +634,31 @@ bool is_frame_mapped_hugepages(uint64_t virtual_address, uint64_t* pml4t_addr)
 }
 
 
+bool is_frame_mapped_thread(struct Thread* t, uint64_t virtual_address)
+{
+    uint64_t pml4t_index = (virtual_address >> 39) & 0x1FF; 
+	uint64_t pdpt_index = (virtual_address >> 30) & 0x1FF; 
+	uint64_t pdt_index = (virtual_address >> 21) & 0x1FF;
+    uint64_t pt_index = (virtual_address >> 12) & 0x1FF;
+
+
+    if (t->pgdir.pml4t[pml4t_index] & PTADDRMASK == NULL)
+        return false;
+    if (t->pgdir.pdpt[pdpt_index] & PTADDRMASK == NULL)
+        return false;
+    if(t->pgdir.pdt[1][pdt_index] & PTADDRMASK == NULL)
+        return false;
+
+
+    if (t->pgdir.pd[0][pt_index] & PTADDRMASK != 0)
+    {
+        log_hexval("mapped to", t->pgdir.pd[pdt_index][pt_index] & PTADDRMASK);
+        return true;
+    }
+    return false;
+}
+
+
 
 /*
     Will return the physical frame address and the frame offset of a virtual address
@@ -573,7 +672,7 @@ void virtual_to_physical(uint64_t virtual_address, uint64_t* pml4t_addr, uint64_
 	uint64_t pdpt_index = (virtual_address >> 30) & 0x1FF; 
 	uint64_t pdt_index = (virtual_address >> 21) & 0x1FF;
     uint64_t pt_index = (virtual_address >> 12) & 0x1FF;
-
+    //log_hexval("vtop", virtual_address);
 
     uint64_t* pdpt = (uint64_t*)((uint64_t)(pml4t_addr[pml4t_index] & PTADDRMASK) + KERNEL_HH_START); 
     if (pdpt == NULL)
@@ -582,7 +681,7 @@ void virtual_to_physical(uint64_t virtual_address, uint64_t* pml4t_addr, uint64_
         *frame_offset = UINT64_MAX;
         return;
     }
-
+    //log_hexval("pdt", 0);
     uint64_t* pdt = (uint64_t*)((uint64_t)(pdpt[pdpt_index] & PTADDRMASK) + KERNEL_HH_START);
     if (pdt == NULL)
     {
@@ -590,31 +689,32 @@ void virtual_to_physical(uint64_t virtual_address, uint64_t* pml4t_addr, uint64_
         *frame_offset = UINT64_MAX;
         return;
     }
-
+    
     if (pdt[pdt_index] == NULL)
     {
         *frame_addr = UINT64_MAX;
         *frame_offset = UINT64_MAX;
         return;
     }
-
+   // log_hexval("checkk huge", 0);
     if (pdt[pdt_index] & PAGE_HUGE)
     {
         *frame_addr = pdt[pdt_index] & PTADDRMASK;
-        *frame_offset = virtual_address & 0xFFFFF; // first 20bits for 2mb pages
+        *frame_offset = virtual_address & 0x1FFFFF; // first 21bits for 2mb pages
         return;
     }
-
-    uint64_t* pt = (uint64_t*)(pt[pt_index] & PTADDRMASK);
+   
+    uint64_t* pt = (uint64_t*)((pdt[pdt_index] & PTADDRMASK) + KERNEL_HH_START);
     if (pt == NULL)
     {
         *frame_addr = UINT64_MAX;
         *frame_offset = UINT64_MAX;
         return;
     }
-
+    
     *frame_addr = pt[pt_index] & PTADDRMASK;
     *frame_offset = virtual_address & 0xFFF; // first 12 bits for 4kb pages
+    log_hexval("end", 0);
     return;
 }
 
@@ -781,8 +881,9 @@ void free_hugeframe_range(uint64_t start, uint64_t end)
     PhysicalMemoryManager* pmm = &global_Settings.PMM;
     
     char* pg_frame = HUGEPGROUNDUP(start); 
-    for (; pg_frame + HUGEPGSIZE <= end; pg_frame += HUGEPGSIZE)
+    for (; pg_frame + HUGEPGSIZE < end; pg_frame += HUGEPGSIZE)
     {
         physical_frame_free(pg_frame);
     }
 }
+

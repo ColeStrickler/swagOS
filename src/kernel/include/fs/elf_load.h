@@ -2,7 +2,7 @@
 #define ELF_H
 #include <stdint.h>
 #include <stdbool.h>
-
+#include <proc.h>
 
 enum ELF_TYPE {
     ET_NONE         = 0,        // no file type
@@ -72,5 +72,7 @@ typedef struct ELF64ProgramHeader {
 bool ELF_check_magic(void* elf);
 
 bool ELF_check_file_class(void* elf);
+
+bool ELF_load_segments(struct Thread *thread, unsigned char* elf);
 
 #endif

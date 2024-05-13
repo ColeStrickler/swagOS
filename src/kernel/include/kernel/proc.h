@@ -6,8 +6,10 @@
 #include <linked_list.h>
 #include <spinlock.h>
 #include <sleeplock.h>
-#define MAX_NUM_THREADS 256
+#include <elf_load.h>
+#define MAX_NUM_THREADS 64
 #define IDLE_THREAD MAX_NUM_THREADS
+#define USER_STACK_LOC 0xfffffc000
 
 typedef enum {
     PROCESS_STATE_NOT_INITIALIZED,
@@ -24,11 +26,11 @@ typedef enum {
 
 typedef struct thread_pagetables_t
 {
-    uint64_t pml4t[512];
-    uint64_t pdpt[512];
-    uint64_t pdt[512];
-    uint64_t pd[512][512];
-}__attribute__((packed))thread_pagetables_t;
+    uint64_t pml4t[512]__attribute__((aligned(0x1000)));
+    uint64_t pdpt[512]__attribute__((aligned(0x1000)));
+    uint64_t pdt[512][512]__attribute__((aligned(0x1000)));
+    uint64_t pd[512][512]__attribute__((aligned(0x1000)));
+}__attribute__((aligned(0x1000))) thread_pagetables_t;
 
 
 
@@ -73,12 +75,12 @@ typedef struct Thread
     bool can_wakeup;
     PROCESS_STATE status;
     THREAD_RUN_MODE run_mode;
-    thread_pagetables_t* pgdir;
+    thread_pagetables_t pgdir;
     uint64_t kstack;
     uint32_t id;
     uint64_t* pml4t_va;
     uint64_t* pml4t_phys;
-    cpu_context_t* execution_context;
+    cpu_context_t execution_context;
     void* sleep_channel;  // will be NULL if process is not sleeping
 } Thread;
 
@@ -93,14 +95,17 @@ Thread *GetCurrentThread();
 
 void CreateIdleThread(void (*entry)(void *));
 
-void CreatePageTables(Thread *thread, uint32_t file_size);
+void CreatePageTables(Thread *thread);
+
+void CreateUserThread(uint32_t pid, uint8_t *elf);
 
 void CreateKernelThread(void (*entry)(void *), uint32_t pid);
-
 
 void ThreadSleep(void* sleep_channel, Spinlock *spin_lock);
 
 void Wakeup(void *channel);
+
+void ExitThread();
 
 #endif
 

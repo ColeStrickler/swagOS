@@ -26,17 +26,6 @@
 
 
 
-typedef struct CPU
-{
-    uint16_t id;    // we get this from the local apic id
-    proc_lapic* local_apic;
-    uint32_t cli_count;
-    uint64_t lapic_base;
-    struct Thread* current_thread;
-    uint8_t gdt[GDT_SIZE];
-    tss_t tss;
-    uint64_t kstack;
-} CPU;
 
 
 typedef struct gdtdesc
@@ -44,6 +33,57 @@ typedef struct gdtdesc
     uint16_t size;
     uint64_t ptr;
 } __attribute__((packed))gdtdesc_t;
+
+
+
+typedef struct gdt_entry_bits {
+	unsigned int limit_low              : 16;
+	unsigned int base_low               : 24;
+	unsigned int accessed               :  1;
+	unsigned int read_write             :  1; // readable for code, writable for data
+	unsigned int conforming             :  1; // conforming for code, expand down for data
+	unsigned int code                   :  1; // 1 for code, 0 for data
+	unsigned int code_data_segment      :  1; // should be 1 for everything but TSS and LDT
+	unsigned int DPL                    :  2; // privilege level
+	unsigned int present                :  1;
+	unsigned int limit_high             :  4;
+	unsigned int available              :  1; // only used in software; has no effect on hardware
+	unsigned int long_mode              :  1;
+	unsigned int big                    :  1; // 32-bit opcodes for code, uint32_t stack for data
+	unsigned int gran                   :  1; // 1 to use 4k page addressing, 0 for byte addressing
+	unsigned int base_high              :  8;
+} __attribute__((packed))gdt_entry_bits; // or `__attribute__((packed))` depending on compiler
+
+
+
+typedef struct gdt_st
+{
+    struct gdt_entry_bits null_desc;
+    struct gdt_entry_bits kernel_code;
+    struct gdt_entry_bits kernel_data;
+    struct gdt_entry_bits user_code;
+    struct gdt_entry_bits user_data;
+    struct gdt_entry_bits tss_low;
+    struct gdt_entry_bits tss_high;
+    struct gdtdesc desc1;
+    struct gdtdesc desc2;
+}__attribute__((packed,aligned(8)))gdt_st;
+
+
+
+
+typedef struct CPU
+{
+    uint16_t id;    // we get this from the local apic id
+    proc_lapic* local_apic;
+    uint32_t cli_count;
+    uint64_t lapic_base;
+    struct Thread* current_thread;
+    gdt_st gdt;
+    tss_t tss;
+    uint64_t kstack;
+} CPU;
+
 
 void InitCPUByID(uint16_t id);
 
@@ -58,6 +98,8 @@ void inc_cli();
 void dec_cli();
 
 void switch_to_user_mode(uint64_t stack_addr, uint64_t code_addr);
+
+void load_page_table(uint64_t new_page_table);
 
 /*
     We access this structure in smp_boot.asm so if we need to edit this

@@ -28,6 +28,9 @@ void SaveThreadContext(struct Thread* old_thread, struct cpu_context_t* ctx)
 
     if (old_thread == NULL)
         return;
+    if (ctx == NULL)
+        return;
+
     /*
         We will not save any context of the idle thread so that it keeps its initializing context
         and we can schedule any thread we want to it    
@@ -36,9 +39,11 @@ void SaveThreadContext(struct Thread* old_thread, struct cpu_context_t* ctx)
         return;
     if (old_thread->status != PROCESS_STATE_RUNNING && old_thread->status != PROCESS_STATE_SLEEPING)
         panic("InvokeScheduler() --> old_thread was in unexpected state.\n");
-    old_thread->execution_context = ctx;
+    //memcpy(&old_thread->execution_context, ctx, sizeof(struct cpu_context_t));
+    old_thread->execution_context = *ctx;
+    //old_thread->execution_context = ctx;
     old_thread->status =(old_thread->status == PROCESS_STATE_SLEEPING ? PROCESS_STATE_SLEEPING : PROCESS_STATE_READY);
-   // DEBUG_PRINT("CONTEXT SAVED\n");
+    //DEBUG_PRINT("CONTEXT SAVED RIP", ctx->i_rip);
     old_thread->can_wakeup = true;
 }
 
@@ -53,8 +58,12 @@ void InvokeScheduler(struct cpu_context_t* ctx)
     
     acquire_Spinlock(&global_Settings.threads.lock);
     //log_to_serial("Invoke Scheduler!\n");
-    //DEBUG_PRINT("InvokeScheduler() CPU", lapic_id());
-    //log_hexval("Old thread", old_thread);
+    if (lapic_id() > 0)
+    {
+        DEBUG_PRINT("InvokeScheduler() CPU", lapic_id());
+        log_hexval("Old thread", old_thread);
+    }
+    
     uint32_t old_thread_id  = (old_thread == NULL ? 0 : old_thread->id);
 
     /*
@@ -93,18 +102,26 @@ void InvokeScheduler(struct cpu_context_t* ctx)
 
 void schedule(struct CPU* cpu, struct Thread* thread, PROCESS_STATE state)
 {
-    if (thread->execution_context == NULL)
-        panic("schedule() --> thread's execution context was null\n");
+    if (thread->execution_context.i_rip == 0)
+        return;
     cpu->current_thread = thread;
     thread->status = state;
     DEBUG_PRINT("CPU", cpu->id);
-    DEBUG_PRINT("Targeting RIP", thread->execution_context->i_rip);
+    DEBUG_PRINT("Targeting RIP", thread->execution_context.i_rip);
+    DEBUG_PRINT("TARGETING RSP", thread->execution_context.i_rsp);
+
+    
     release_Spinlock(&global_Settings.threads.lock);
+
     apic_end_of_interrupt(); // move this back to idt?
     
+
+
     /*
         thread->execution_context is a pointer to the top of the saved stack
     */
+
+schedule_kernel:
     __asm__ __volatile__(
         "mov %0, %%rsp\n\t"
         "mov %1, %%rax\n\t"
@@ -125,7 +142,6 @@ void schedule(struct CPU* cpu, struct Thread* thread, PROCESS_STATE state)
         "mov %%rax, %%cr3\n\t"
         "pop %%rax\n\t"
         "add $16, %%rsp\n\t"
-        "iretq\n\t" ::"r" (thread->execution_context),     
+        "iretq\n\t" ::"r" (&thread->execution_context),     
         "r"(thread->pml4t_phys));
 }
-

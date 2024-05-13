@@ -516,28 +516,26 @@ void ext2_driver_init()
 
     //char b[4096];
     //ext2_read_block(b,hello.blocks[0]);
-    char* b = ext2_read_file("/test");
+   
 
-    if (hello.flags == root_inode->flags)
-        DEBUG_PRINT0("FLAGS!\n");
-    if (hello.blocks[0] == root_inode->blocks[0])
-        DEBUG_PRINT0("BLOCKS\n");
-    if (ELF_check_magic((struct elf64_header_t*)b) && ELF_check_file_class((struct elf64_header_t*)b))
-        DEBUG_PRINT0("FOUND VALID ELF FILE!\n");
+   // if (hello.flags == root_inode->flags)
+   //     DEBUG_PRINT0("FLAGS!\n");
+   // if (hello.blocks[0] == root_inode->blocks[0])
+   //     DEBUG_PRINT0("BLOCKS\n");
+   // if (ELF_check_magic((struct elf64_header_t*)b) && ELF_check_file_class((struct elf64_header_t*)b))
+   //     DEBUG_PRINT0("FOUND VALID ELF FILE!\n");
 
     //DEBUG_PRINT("", hello.)
   
-    DEBUG_PRINT("\n/file size", ext2_get_file_size(&hello));
+    //DEBUG_PRINT("\n/file size", ext2_get_file_size(&hello));
 ////
    // unsigned char* b = ext2_read_file(fp);
    // DEBUG_PRINT("b", b);
-    for (uint64_t i = 0; i < ext2_get_file_size(&hello); i++)
-    {
-        //log_hex_to_serial(b[i]);
-    }
+   
+    //if(!ELF_load_segments(t, b))
+    //    log_hexval("bad elf", -1);
 
-
-    //switch_to_user_mode()
+   //switch_to_user_mode()
 
 }
 
