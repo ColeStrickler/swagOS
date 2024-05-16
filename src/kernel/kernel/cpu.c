@@ -16,13 +16,13 @@ extern uint64_t *pml4t;
 
 void log_gdt(struct gdt_st *gdt)
 {
-    // log_hexval("Null",      (uint64_t)gdt->null_desc);
-    // log_hexval("kcode",     (uint64_t)gdt->kernel_code);
-    // log_hexval("kdata",     (uint64_t)gdt->kernel_data);
-    // log_hexval("ucode",     (uint64_t)gdt->user_code);
-    // log_hexval("udata",     (uint64_t)gdt->user_data);
-    // log_hexval("tss_low",   (uint64_t)gdt->tss_low);
-    // log_hexval("tss_high",  (uint64_t)gdt->tss_high);
+    log_hexval("Null",      *(uint64_t*)&gdt->null_desc);
+    log_hexval("kcode",     *(uint64_t*)&gdt->kernel_code);
+    log_hexval("kdata",     *(uint64_t*)&gdt->kernel_data);
+    log_hexval("ucode",     *(uint64_t*)&gdt->user_code);
+    log_hexval("udata",     *(uint64_t*)&gdt->user_data);
+    log_hexval("tss_low",   *(uint64_t*)&gdt->tss_low);
+    log_hexval("tss_high",  *(uint64_t*)&gdt->tss_high);
 }
 
 void write_to_smp_info_struct(struct SMP_INFO_STRUCT smp_info)
@@ -142,7 +142,7 @@ void init_smp()
     smp_init_timer();
     write_magic_smp_info(SMP_INFO_MAGIC);
     alloc_per_cpu_gdt();
-    log_to_serial("here!\n");
+    DEBUG_PRINT("here cpu", lapic_id());
     for (;;)
         __asm__ __volatile__("hlt");
 }
@@ -182,7 +182,7 @@ void set_userdata(gdt_entry_bits *ring3_data)
     ring3_data->code = 0; // not code but data
 }
 
-void set_tss(CPU *cpu)
+void set_tss(CPU *cpu, Thread* thread)
 {
 
     tss_t *tss = &cpu->tss;
@@ -198,7 +198,7 @@ void set_tss(CPU *cpu)
     // Rsp contain the stack for that privilege level.
     // We use only privilege level 0 and 3, so rsp1 and rsp2 can be left as 0
     // Every thread will have it's own rsp0 pointer
-    tss->rsp0 = (uint64_t)cpu->kstack;
+    tss->rsp0 = (uint64_t)thread->kstack;
 
     /*
         IF WE GET AN ERROR CHECK THIS STACK SETUP, WE NEED TO ENSURE WE CAN REUSE THIS STACK VALUE
@@ -222,7 +222,7 @@ void set_tss(CPU *cpu)
     uint64_t *tss_high = &cpu->gdt.tss_high;
     *tss_low = 0;
     *tss_high = 0;
-
+    log_hexval("tss addr", tss);
     // TSS_ENTRY_LOW:
     uint16_t limit_low = (uint16_t)sizeof(tss_t);              // 0:15 -> Limit (first 15 bits) should be 0xFFFF
     uint16_t tss_entry_base_1 = (((uint64_t)tss & 0xFFFF));    // 16:31 -> First 16 bits of kernel_tss address
@@ -242,6 +242,23 @@ void set_tss(CPU *cpu)
     *tss_high = entry_high;
 }
 
+
+/*
+    This function will set the stack pointer in the TSS to the thread's kernel stack.
+
+    We need this because we cannot share kernel stacks between threads
+*/
+void ctx_switch_tss(CPU* cpu, Thread* thread)
+{
+
+    set_tss(cpu, thread); 
+    gdtdesc_t *desc = (gdtdesc_t *)&cpu->gdt.desc1;
+    desc->ptr = &cpu->gdt;
+    lgdt(desc);
+    ltr(0x2B);
+}
+
+
 void alloc_per_cpu_gdt()
 {
     CPU *cpu = get_current_cpu();
@@ -251,19 +268,19 @@ void alloc_per_cpu_gdt()
         panic("alloc_per_cpu_gdt() --> GDT size mismatch!\n");
 
     memcpy(&cpu->gdt, global_Settings.original_GDT, GDT_SIZE);
-    set_tss(cpu);
-
+    //set_tss(cpu);
+    
     gdt_st *gdt = (gdt_st *)&cpu->gdt;
 
-    // set_usercode(&gdt->user_code);
-    // set_userdata(&gdt->user_data);
-    // log_gdt(gdt);
+    //set_usercode(&gdt->user_code);
+    //set_userdata(&gdt->user_data);
+    log_gdt(gdt);
 
     gdtdesc_t *desc = (gdtdesc_t *)&cpu->gdt.desc1;
     desc->ptr = &cpu->gdt;
-
-    lgdt(desc);
-    ltr(0x28);
+    
+    //lgdt(desc);
+    //ltr(0x28);
 }
 
 struct CPU *get_current_cpu()

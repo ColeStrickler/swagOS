@@ -7,10 +7,10 @@
 #include <ps2_keyboard.h>
 #include <scheduler.h>
 #include <ide.h>
+#include <asm_routines.h>
 extern KernelSettings global_Settings;
 
-__attribute__((aligned(0x10)))
-InterruptDescriptor64 IDT[IDT_SIZE];
+__attribute__((aligned(0x10))) InterruptDescriptor64 IDT[IDT_SIZE];
 
 IDTR idtr;
 
@@ -171,9 +171,39 @@ void idt_setup()
 }
 
 
+void LogTrapFrame(trapframe64_t* tf)
+{
+    log_hexval("tf->r15", tf->r15);
+    log_hexval("tf->r14", tf->r14);
+    log_hexval("tf->r13", tf->r13);
+    log_hexval("tf->r12", tf->r12);
+    log_hexval("tf->r11", tf->r11);
+    log_hexval("tf->r10", tf->r10);
+    log_hexval("tf->r9", tf->r9);
+    log_hexval("tf->r8", tf->r8);
+    log_hexval("tf->rdi", tf->rdi);
+    log_hexval("tf->rsi", tf->rsi);
+    log_hexval("tf->rbp", tf->rbp);
+    log_hexval("tf->rdx", tf->rdx);
+    log_hexval("tf->rcx", tf->rcx);
+    log_hexval("tf->rbx", tf->rbx);
+    log_hexval("tf->rax", tf->rax);
+    log_hexval("tf->isr_id", tf->isr_id);
+    log_hexval("tf->error_code", tf->error_code);
+    log_hexval("tf->i_rip", tf->i_rip);
+    log_hexval("tf->i_cs", tf->i_cs);
+    log_hexval("tf->i_rflags", tf->i_rflags);
+    log_hexval("tf->i_rsp", tf->i_rsp);
+    log_hexval("tf->i_ss", tf->i_ss);
+}
 
 
 
+unsigned long get_rsp() {
+    unsigned long rsp_value;
+    asm volatile ("movq %%rsp, %0" : "=r" (rsp_value));
+    return rsp_value;
+}
 
 
 trapframe64_t* isr_handler(trapframe64_t* tf)
@@ -202,17 +232,18 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         case 13:
         {
             //printf("\nGeneral Protection fault interrupt.\nGeneral Protection fault on CPU: %d\nRIP: %u\n", lapic_id(), tf->i_rip);
-            //DEBUG_PRINT("GP FAULT on CPU", lapic_id());
+            DEBUG_PRINT("GP FAULT on CPU", lapic_id());
             DEBUG_PRINT("RIP", tf->i_rip);
-            panic("");
-            break;
+            while(1)
+                panic("");
+
         }
         case 14:
         {
             DEBUG_PRINT("PF CPU", lapic_id());
             DEBUG_PRINT("Page Fault Interrupt", tf->i_rip);
-            panic("");
-            break;
+            while(1)
+                panic("");
         }
         case IDT_APIC_TIMER_INT:
         {
@@ -221,10 +252,14 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
                 panic("isr_handler() --> APIC TIMER INTERRUPT BEFORE CALIBRATION.\n");
             global_Settings.tick_counter += 1;
 
-            if (get_current_cpu()->current_thread->id == 420)
+            if (get_current_cpu() && get_current_cpu()->current_thread && get_current_cpu()->current_thread->id == 420)
             {
                 log_to_serial("Timer!\n");
-                
+                LogTrapFrame(tf);
+                log_hexval("tss kstack", get_current_cpu()->tss.rsp0);
+                //LogTrapFrame(get_current_cpu()->tss.rsp0 + sizeof(trapframe64_t));
+                log_hexval("Current rsp", get_rsp());
+                log_hexval("tf addr", tf);   
             }
             
 
@@ -264,10 +299,18 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         {
             if (tf->isr_id < 32)
                 log_to_serial((char*)exception_names[tf->isr_id]);
+            log_hexval("RIP", tf->i_rip);
+            log_hexval("\nExperienced unexpected interrupt.", tf->isr_id);
+            log_hexval("CPU ID", lapic_id());
+
+
+            if (tf->isr_id < 32)
+                DEBUG_PRINT0((char*)exception_names[tf->isr_id]);
+            DEBUG_PRINT("RIP", tf->i_rip);
             DEBUG_PRINT("\nExperienced unexpected interrupt.", tf->isr_id);
             DEBUG_PRINT("CPU ID", lapic_id());
 
-            __asm__ __volatile__ ("hlt");
+            panic("");
         }
     }
 }

@@ -55,7 +55,7 @@ static inline uint64_t
 read_rflags(void)
 {
   uint64_t rflags;
-  asm volatile("pushfq; popq %0" : "=r" (rflags));
+  __asm__ __volatile__("pushfq; popq %0" : "=r" (rflags));
   return rflags;
 }
 

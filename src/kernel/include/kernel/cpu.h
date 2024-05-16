@@ -84,12 +84,15 @@ typedef struct CPU
     uint64_t kstack;
 } CPU;
 
+void log_gdt(gdt_st *gdt);
 
 void InitCPUByID(uint16_t id);
 
 void init_smp();
 
 CPU *get_cpu_byID(int id);
+
+void ctx_switch_tss(CPU *cpu, Thread *thread);
 
 void alloc_per_cpu_gdt();
 

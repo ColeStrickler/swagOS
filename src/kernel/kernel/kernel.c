@@ -53,20 +53,19 @@ void kernel_main(uint64_t);
 
 Spinlock print_lock;
 
-void DEBUG_PRINT(const char* str, uint64_t hex)
+void DEBUG_PRINT(const char *str, uint64_t hex)
 {
 	acquire_Spinlock(&print_lock);
 	log_hexval(str, hex);
 	release_Spinlock(&print_lock);
 }
 
-void DEBUG_PRINT0(const char* str)
+void DEBUG_PRINT0(const char *str)
 {
 	acquire_Spinlock(&print_lock);
 	log_to_serial(str);
 	release_Spinlock(&print_lock);
 }
-
 
 /*
 	__higherhalf_stubentry() builds out the higher half page table mappings
@@ -91,10 +90,6 @@ void __higherhalf_stubentry(uint64_t ptr_multiboot_info)
 	uint64_t *pml4t_addr = ((uint64_t *)((uint64_t)&pml4t & ~KERNEL_HH_START));
 	uint64_t *pdpt_addr = ((uint64_t *)((uint64_t)&pdpt & ~KERNEL_HH_START));
 	uint64_t *pdt_addr = (uint64_t *)((uint64_t)global_Settings.pdt_kernel[0] & ~KERNEL_HH_START);
-
-
-	
-
 
 	pml4t_addr[pml4t_index] = ((uint64_t)pdpt_addr) | (PAGE_PRESENT | PAGE_WRITE);
 	// pml4t_addr[510] = ((uint64_t)pml4t_addr) | (PAGE_PRESENT | PAGE_WRITE);
@@ -184,7 +179,6 @@ void setup_global_data()
 	global_Settings.pdpt_kernel = &pdpt;
 	global_Settings.gdtr_val = global_gdt_ptr_low;
 
-	
 	uint64_t *pml4t_addr = ((uint64_t *)((uint64_t)&pml4t & ~KERNEL_HH_START));
 	log_hexval("PML4TADDR", pml4t_addr);
 	init_Spinlock(&global_Settings.PMM.lock, "PMM");
@@ -207,6 +201,9 @@ void kthread_setup()
 	kthread->pml4t_va = global_Settings.pml4t_kernel;
 	kthread->status = PROCESS_STATE_RUNNING;
 	kthread->can_wakeup = true;
+	kthread->execution_context.i_cs = KERNEL_CS;
+	kthread->execution_context.i_ss = KERNEL_DS;
+	kthread->kstack = global_stack_top;
 	get_current_cpu()->current_thread = kthread;
 	get_current_cpu()->kstack = global_stack_top;
 }
@@ -224,7 +221,7 @@ void smp_start()
 		else
 		{
 			alloc_per_cpu_gdt();
-			global_Settings.cpu[i].kstack = kalloc(0x10000);
+			global_Settings.cpu[i].kstack = kalloc(0x10000) + 0x10000;
 		}
 	}
 }
@@ -259,10 +256,12 @@ void enable_supervisor_mem_protections()
 		set_cr4_bit(CPU_CR4_SMAP_ENABLE);
 }
 
-
 void test1()
 {
-	while(1){log_to_serial("test\n");}
+	while (1)
+	{
+		log_to_serial("test\n");
+	}
 }
 
 void kernel_main(uint64_t ptr_multiboot_info)
@@ -274,7 +273,7 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	parse_multiboot_info(ptr_multiboot_info);
 	parse_madt(global_Settings.madt);
 	// log_to_serial("1\n");
-	
+
 	// log_to_serial("2\n");
 	idt_setup();
 	// log_to_serial("3\n");
@@ -283,7 +282,6 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	cli();
 	alloc_per_cpu_gdt(); // otherwise this does not get done on cpu1
 	sti();
-
 
 	kthread_setup();
 
@@ -298,51 +296,43 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	init_terminal();
 	// log_to_serial("terminal init finished!\n");
 
-	 log_to_serial("kheap_init() finished\n");
+	log_to_serial("kheap_init() finished\n");
 	keyboard_driver_init();
 	// sti();
 
 	CreateIdleThread(IdleThread); // do this before smp initialization and after kheap_init()
-	enable_supervisor_mem_protections();
+	//enable_supervisor_mem_protections();
 	smp_start();
 	ideinit();
 	binit();
 
 	log_to_serial("beginning ext2 init!\n");
-	for (uint64_t i = 0; i < UINT32_MAX; i++)
-	{}
-	ext2_driver_init();
 	
+	ext2_driver_init();
+
 	log_hexval("GDT SIZE", global_Settings.original_GDT_size);
 	log_hexval("addr", global_Settings.original_GDT);
 
 	printf("Ext2 initialized\n");
-	
-	
-
+	for (uint32_t i = 0; i < UINT32_MAX;i++){};
 	log_to_serial("here!\n");
-	char* b = ext2_read_file("/test1");
-    CreateUserThread(420, b);
-    log_to_serial("here2!\n");
+	char *b = ext2_read_file("/test1");
+	CreateUserThread(420, b);
+	log_to_serial("here2!\n");
 
-
-	//char* user = 0x69000;
-    //unsigned char arr[] = {0xeb, 0xfe, 0x90, 0x90};
-    //uint64_t frame = physical_frame_request_4kb();
-    //map_4kb_page_kernel(user, frame, 10);
-    //memcpy(user, arr, 4);
-    //uint64_t ustack = physical_frame_request_4kb();
-	//cli();
-	//map_4kb_page_smp(user, frame, (PAGE_PRESENT | PAGE_WRITE | PAGE_USER));
-	//map_4kb_page_smp(0x40000000, ustack, (PAGE_PRESENT | PAGE_WRITE | PAGE_USER));
-	//log_to_serial("doing switch");
-    //switch_to_user_mode(0x40000000, user);
-
+	// char* user = 0x69000;
+	// unsigned char arr[] = {0xeb, 0xfe, 0x90, 0x90};
+	// uint64_t frame = physical_frame_request_4kb();
+	// map_4kb_page_kernel(user, frame, 10);
+	// memcpy(user, arr, 4);
+	// uint64_t ustack = physical_frame_request_4kb();
+	// cli();
+	// map_4kb_page_smp(user, frame, (PAGE_PRESENT | PAGE_WRITE | PAGE_USER));
+	// map_4kb_page_smp(0x40000000, ustack, (PAGE_PRESENT | PAGE_WRITE | PAGE_USER));
+	// log_to_serial("doing switch");
+	// switch_to_user_mode(0x40000000, user);
 
 	printf("\nKERNEL END\n");
-	log_to_serial("\nKERNEL END\n");
+	DEBUG_PRINT0("\nKERNEL END\n");
 	ExitThread();
-	
 }
-
-

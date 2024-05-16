@@ -12,6 +12,7 @@ isr_%1:
     push 0x0                ; we push a dummy error code to maintain stack equivalence with isr_errocode_%1
     push %1                 ; save interrupt # for later use
 
+
     save_gpr                ; push all general purpose registers to stack
     mov rdi, rsp            ; with System V ABI the first parameter to a function is in rdi. We pass the stack pointer here
     cld                     ; C code following the sysV ABI requires DF to be clear on function entry

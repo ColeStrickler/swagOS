@@ -6,6 +6,7 @@
 #include <panic.h>
 #include <scheduler.h>
 #include <paging.h>
+#include <asm_routines.h>
 extern KernelSettings global_Settings;
 
 struct Thread *GetCurrentThread()
@@ -63,7 +64,7 @@ void CreatePageTables(struct Thread *thread)
         panic("CreatePageTables() --> bad pml4t");
 
     log_hexval("pml4t phys", thread->pml4t_phys);
-    log_hexval("pml4t phys", thread->pml4t_va);
+    log_hexval("pml4t va", thread->pml4t_va);
     // Map top 4gb from kernel into the user address space, will avoid DMIO
     uva_copy_kernel(thread);
     log_to_serial("done create pt\n");
@@ -137,23 +138,11 @@ void CreateUserThread(uint32_t pid, uint8_t* elf)
             stack_alloc += 0x10000; // point stack to top of allocation
             init_thread->kstack = stack_alloc;
 
-            //log_hexval("KSTACK:", stack_alloc);
+            log_hexval("KSTACK:", stack_alloc);
             CreatePageTables(init_thread);
            // log_hexval("PT:", init_thread->pml4t_va);
             log_hexval("mapped", is_frame_mapped_thread(init_thread, KERNEL_HH_START));
 
-
-           /*
-            Leading theory is that we are not properly doing something with the page tables. Which is quite strange
-
-
-            Some of the addresses we write in are overwriting each other. 
-           */
-            //memcpy(init_thread->pml4t_va, global_Settings.pml4t_kernel, PGSIZE);
-
-
-            //load_page_table(init_thread->pml4t_phys);
-            //log_to_serial("pt loaded!");
         
             struct cpu_context_t *ctx = &init_thread->execution_context;
             if (ctx == NULL)
@@ -195,7 +184,6 @@ void CreateUserThread(uint32_t pid, uint8_t* elf)
             break;
         }
     }
-    
     release_Spinlock(&global_Settings.threads.lock);
 }
 
@@ -253,7 +241,6 @@ void CreateKernelThread(void (*entry)(void *), uint32_t pid)
             break;
         }
     }
-
     release_Spinlock(&global_Settings.threads.lock);
 }
 
@@ -326,11 +313,13 @@ void Wakeup(void *channel)
         }
     }
     release_Spinlock(&global_Settings.threads.lock);
+    
 }
 
 
 void ExitThread()
-{
+{   
+    DEBUG_PRINT("EXIT THREAD()");
     Thread* t = GetCurrentThread();
     memset(t, 0x00, sizeof(Thread));
     InvokeScheduler(NULL);

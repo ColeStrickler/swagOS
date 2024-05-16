@@ -121,6 +121,8 @@ void build_IDT(void);
 
 void idt_setup();
 
+void LogTrapFrame(trapframe64_t *tf);
+
 /*
     External declarations of our ISRs
 */
