@@ -525,7 +525,7 @@ void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thre
     uint64_t pt_index = (virtual_address >> 12) & 0x1FF;
 
     uint64_t flags = PAGE_USER | PAGE_WRITE | PAGE_PRESENT;
-    log_hexval("flags!", flags);
+
     // table physical addresses
     uint64_t pml4t_addr = ((uint64_t*)((uint64_t)&thread->pgdir.pml4t & ~KERNEL_HH_START));
 	uint64_t pdpt_addr = ((uint64_t*)((uint64_t)&thread->pgdir.pdpt & ~KERNEL_HH_START));
@@ -652,7 +652,7 @@ bool is_frame_mapped_thread(struct Thread* t, uint64_t virtual_address)
 
     if (t->pgdir.pd[0][pt_index] & PTADDRMASK != 0)
     {
-        log_hexval("mapped to", t->pgdir.pd[pdt_index][pt_index] & PTADDRMASK);
+        log_hexval("mapped to", t->pgdir.pd[0][pt_index] & PTADDRMASK);
         return true;
     }
     return false;

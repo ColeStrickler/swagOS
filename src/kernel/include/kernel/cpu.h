@@ -17,7 +17,12 @@
 #define GDT_TSS_HIGH 0x6
 #define GDT_SIZE 0x4c
 #define GDTR_DESC_OFFSET 0x42
+#define uint unsigned int
 
+#define SEG(type, base, lim, dpl) (uint64_t)    \
+{ ((lim) >> 12) & 0xffff, (uint)(base) & 0xffff,      \
+  ((uint)(base) >> 16) & 0xff, type, 1, dpl, 1,       \
+  (uint)(lim) >> 28, 0, 0, 1, 1, (uint)(base) >> 24 }
 
 #define KERNEL_CS 0x8
 #define KERNEL_DS 0x10
@@ -58,16 +63,16 @@ typedef struct gdt_entry_bits {
 
 typedef struct gdt_st
 {
-    struct gdt_entry_bits null_desc;
-    struct gdt_entry_bits kernel_code;
-    struct gdt_entry_bits kernel_data;
-    struct gdt_entry_bits user_code;
-    struct gdt_entry_bits user_data;
-    struct gdt_entry_bits tss_low;
-    struct gdt_entry_bits tss_high;
+    uint64_t null_desc;
+    uint64_t kernel_code;
+    uint64_t kernel_data;
+    uint64_t user_code;
+    uint64_t user_data;
+    uint64_t tss_low;
+    uint64_t tss_high;
     struct gdtdesc desc1;
     struct gdtdesc desc2;
-}__attribute__((packed,aligned(8)))gdt_st;
+}__attribute__((packed,aligned(0x8)))gdt_st;
 
 
 
@@ -79,7 +84,7 @@ typedef struct CPU
     uint32_t cli_count;
     uint64_t lapic_base;
     struct Thread* current_thread;
-    gdt_st gdt;
+    __attribute__((aligned(0x10))) gdt_st gdt;
     tss_t tss;
     uint64_t kstack;
 } CPU;
@@ -93,6 +98,8 @@ void init_smp();
 CPU *get_cpu_byID(int id);
 
 void ctx_switch_tss(CPU *cpu, Thread *thread);
+
+void write_gdt(CPU *cpu);
 
 void alloc_per_cpu_gdt();
 

@@ -66,33 +66,13 @@ GDT:
     .Null: equ $ - GDT
         dq 0
     .Code: equ $ - GDT
-        dw 0                         ; Limit (low).
-        dw 0                         ; Base (low).
-        db 0                         ; Base (middle)
-        db 10011010b                 ; Access (exec/read).
-        db 00100000b                 ; Granularity, 64 bits flag, limit19:16.
-        db 0                         ; Base (high).
+        dq (1 <<44) | (1 << 47) | (1 << 41) | (1 << 43) | (1 << 53)  ;second entry=code=0x8
     .Data: equ $ - GDT
-        dw 0                         ; Limit (low).
-        dw 0                         ; Base (low).
-        db 0                         ; Base (middle)
-        db 10010010b                 ; Access (read/write).
-        db 00000000b                 ; Granularity.
-        db 0                         ; Base (high).
+        dq (1 << 44) | (1 << 47) | (1 << 41)	;third entry = data = 0x10
     .UserCode: equ $ - GDT
-        dw 0                         ; Limit (low).
-        dw 0                         ; Base (low).
-        db 0                         ; Base (middle)
-        db 11111010b                 ; Access (exec/read).
-        db 00100000b                 ; Granularity, 64 bits flag, limit19:16.
-        db 0                         ; Base (high).
+        dq (1 <<44) | (1 << 47) | (1 << 41) | (1 << 43) | (1 << 53) | (3 << 45) ;fourth entry=code=0x18
     .UserData: equ $ - GDT
-        dw 0                         ; Limit (low).
-        dw 0                         ; Base (low).
-        db 0                         ; Base (middle)
-        db 11110010b                 ; Access (read/write).
-        db 00000000b                 ; Granularity.
-        db 0                         ; Base (high).                                   
+        dq (1 << 44) | (1 << 47) | (1 << 41) | (3 << 45)                                  
     .TSS_LOW: equ $ - GDT
         dq 0
     .TSS_HIGH: equ $-GDT

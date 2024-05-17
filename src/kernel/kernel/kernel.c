@@ -203,7 +203,7 @@ void kthread_setup()
 	kthread->can_wakeup = true;
 	kthread->execution_context.i_cs = KERNEL_CS;
 	kthread->execution_context.i_ss = KERNEL_DS;
-	kthread->kstack = global_stack_top;
+//	kthread->kstack = global_stack_top;
 	get_current_cpu()->current_thread = kthread;
 	get_current_cpu()->kstack = global_stack_top;
 }
@@ -309,6 +309,9 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	log_to_serial("beginning ext2 init!\n");
 	
 	ext2_driver_init();
+
+	
+
 
 	log_hexval("GDT SIZE", global_Settings.original_GDT_size);
 	log_hexval("addr", global_Settings.original_GDT);

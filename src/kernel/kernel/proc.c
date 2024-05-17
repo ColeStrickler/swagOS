@@ -92,6 +92,7 @@ uint64_t CreateUserProcessStack(Thread* t)
 
    // while(is_frame_mapped_thread(t, USER_STACK_LOC + PGSIZE*i)){i++;}
     map_4kb_page_user(USER_STACK_LOC+PGSIZE*i, frame, t);
+   //map_4kb_page_smp(USER_STACK_LOC+PGSIZE*i, frame, PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
     return USER_STACK_LOC+(PGSIZE*i)+PGSIZE-8; // point to top of stack
 }
 
@@ -115,6 +116,7 @@ void load_page_table(uint64_t new_page_table) {
     asm volatile("cpuid" : : : "eax", "ebx", "ecx", "edx");
 }
 
+
 void CreateUserThread(uint32_t pid, uint8_t* elf)
 {
     //log_hexval("Attempting global thread_lock", (&global_Settings.threads.lock)->owner_cpu);
@@ -136,10 +138,11 @@ void CreateUserThread(uint32_t pid, uint8_t* elf)
             if (stack_alloc == NULL)
                 panic("CreateThread() --> kalloc() failed!\n");
             stack_alloc += 0x10000; // point stack to top of allocation
-            init_thread->kstack = stack_alloc;
+            //init_thread->kstack = stack_alloc;
 
             log_hexval("KSTACK:", stack_alloc);
             CreatePageTables(init_thread);
+            //init_thread->pml4t_phys = KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel);
            // log_hexval("PT:", init_thread->pml4t_va);
             log_hexval("mapped", is_frame_mapped_thread(init_thread, KERNEL_HH_START));
 

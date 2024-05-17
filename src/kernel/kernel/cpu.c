@@ -188,8 +188,7 @@ void set_tss(CPU *cpu, Thread* thread)
     tss_t *tss = &cpu->tss;
 
     // These fields are reserved and must be set to 0
-    tss->reserved0 = 0x00;
-    tss->reserved1 = 0x00;
+    tss->reserved = 0x00;
     tss->reserved2 = 0x00;
     tss->reserved3 = 0x00;
     tss->reserved4 = 0x00;
@@ -198,7 +197,7 @@ void set_tss(CPU *cpu, Thread* thread)
     // Rsp contain the stack for that privilege level.
     // We use only privilege level 0 and 3, so rsp1 and rsp2 can be left as 0
     // Every thread will have it's own rsp0 pointer
-    tss->rsp0 = (uint64_t)thread->kstack;
+    tss->rsp0 = (uint64_t)&thread->kstack[0x10000];
 
     /*
         IF WE GET AN ERROR CHECK THIS STACK SETUP, WE NEED TO ENSURE WE CAN REUSE THIS STACK VALUE
@@ -216,7 +215,7 @@ void set_tss(CPU *cpu, Thread* thread)
     tss->ist6 = 0x0;
     tss->ist7 = 0x0;
 
-    tss->io_bitmap_offset = 0x0;
+    tss->iopbOffset = 0x0;
 
     uint64_t *tss_low = &cpu->gdt.tss_low;
     uint64_t *tss_high = &cpu->gdt.tss_high;
@@ -242,7 +241,6 @@ void set_tss(CPU *cpu, Thread* thread)
     *tss_high = entry_high;
 }
 
-
 /*
     This function will set the stack pointer in the TSS to the thread's kernel stack.
 
@@ -250,7 +248,7 @@ void set_tss(CPU *cpu, Thread* thread)
 */
 void ctx_switch_tss(CPU* cpu, Thread* thread)
 {
-
+    write_gdt(cpu);
     set_tss(cpu, thread); 
     gdtdesc_t *desc = (gdtdesc_t *)&cpu->gdt.desc1;
     desc->ptr = &cpu->gdt;
@@ -259,6 +257,18 @@ void ctx_switch_tss(CPU* cpu, Thread* thread)
 }
 
 
+void write_gdt(CPU* cpu)
+{
+    cpu->gdt.null_desc = 0x0;
+    cpu->gdt.kernel_code = 0x00AF9B000000FFFF;
+    cpu->gdt.kernel_data = 0x00AF93000000FFFF;
+    cpu->gdt.user_code = 0x00AFFB000000FFFF;
+    cpu->gdt.user_data = 0x00AFF3000000FFFF;
+    cpu->gdt.tss_high = 0x0;
+    cpu->gdt.tss_low = 0x0;
+}
+
+extern uint64_t GDT_;
 void alloc_per_cpu_gdt()
 {
     CPU *cpu = get_current_cpu();
@@ -267,14 +277,18 @@ void alloc_per_cpu_gdt()
     if (global_Settings.original_GDT_size != GDT_SIZE)
         panic("alloc_per_cpu_gdt() --> GDT size mismatch!\n");
 
-    memcpy(&cpu->gdt, global_Settings.original_GDT, GDT_SIZE);
-    //set_tss(cpu);
+    //write_gdt(cpu);
     
-    gdt_st *gdt = (gdt_st *)&cpu->gdt;
-
+    memcpy(&cpu->gdt, GDT_, 0x4c);
+   // memcpy(ucode, &gdt->kernel_code, sizeof(uint64_t));
+   // memcpy(udata, &gdt->kernel_data, sizeof(uint64_t));
+   // gdt->user_code.DPL = 0x3;
+   // gdt->user_data.DPL = 0x3;
+    
+    
     //set_usercode(&gdt->user_code);
     //set_userdata(&gdt->user_data);
-    log_gdt(gdt);
+    log_gdt(&cpu->gdt);
 
     gdtdesc_t *desc = (gdtdesc_t *)&cpu->gdt.desc1;
     desc->ptr = &cpu->gdt;

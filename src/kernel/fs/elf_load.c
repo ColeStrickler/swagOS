@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <kernel.h>
-
+#include <paging.h>
 extern KernelSettings global_Settings;
 
 /*
@@ -84,7 +84,7 @@ bool ELF_load_segments(struct Thread* thread, unsigned char* elf)
             if (frame == UINT64_MAX)
                 panic("ELF_load_segments() failed! could not get 4kb frame.\n");
             // map the frame into the transfer space
-            map_4kb_page_kernel(VA_LOAD_TRANSFER, frame, 10);
+            map_4kb_page_smp(VA_LOAD_TRANSFER, frame, PAGE_PRESENT|PAGE_WRITE);
             *(char*)(VA_LOAD_TRANSFER) = 'V';
             log_to_serial("mapped\n");
 
@@ -96,15 +96,18 @@ bool ELF_load_segments(struct Thread* thread, unsigned char* elf)
                 log_hexval("check+offset", check_frame+check_offset);
                 panic("check_frame+check_offset!=frame");
             }
-            
+            map_4kb_page_user(ph->vaddr+copy_offset, frame, thread);
             log_to_serial("mapped to kernel pt\n");
             // zero the frame to rid old data
-            memset(VA_LOAD_TRANSFER, 0x00, PGSIZE);
+            log_hexval("VA_LOAD_TRANSFER", VA_LOAD_TRANSFER);
+            //memset(VA_LOAD_TRANSFER, 0x00, PGSIZE);
             log_to_serial("zeroed\n");
             //log_to_serial("zeroed\n");
             // copy the relevant data to the frame
             if (copy_offset < to_copy)
                 memcpy(VA_LOAD_TRANSFER, elf + ph->offset, (copy_offset + PGSIZE < ph->fileSize ? PGSIZE : ph->fileSize-copy_offset)); // need to make sure this is copying correctly
+            
+            
             //// map the frame into the thread's user space page table
             log_hexval("byte 0", ((uint8_t*)VA_LOAD_TRANSFER)[0]);
             log_hexval("byte 1", ((uint8_t*)VA_LOAD_TRANSFER)[1]);
@@ -115,7 +118,8 @@ bool ELF_load_segments(struct Thread* thread, unsigned char* elf)
             log_hexval("byte 6", ((uint8_t*)VA_LOAD_TRANSFER)[6]);
             log_hexval("byte 7", ((uint8_t*)VA_LOAD_TRANSFER)[7]);
             log_hexval("preparing map to user", ph->vaddr+copy_offset);
-            map_4kb_page_user(ph->vaddr+copy_offset, frame, thread);
+            
+            //map_4kb_page_smp(ph->vaddr+copy_offset, frame, PAGE_PRESENT|PAGE_WRITE|PAGE_USER);
             //log_to_serial("mapped to user pt\n");
             copy_offset+=PGSIZE;
         }

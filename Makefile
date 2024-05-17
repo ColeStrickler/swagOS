@@ -90,12 +90,12 @@ myos.iso: myos.bin
 build-disk : clean myos.iso
 	./scripts/mkdisk.sh
 
-
+# -enable-kvm -cpu host 
 qemu: build-disk
-	sudo qemu-system-x86_64 -enable-kvm -cpu host -serial file:out.log -m 4G -smp 1 -drive format=raw,file=./build/disk.img
-
+	sudo qemu-system-x86_64 -d int -no-reboot -D out.txt -serial file:out.log -m 4G -smp 1 -drive format=raw,file=./build/disk.img
+# -enable-kvm -cpu host
 debug: build-disk
-	qemu-system-x86_64 -enable-kvm -cpu host -s -S -serial file:out.log -m 4G -smp 1 -drive format=raw,file=./build/disk.img
+	qemu-system-x86_64 -d int -no-reboot -s -S -serial file:out.log -m 4G -smp 1 -drive format=raw,file=./build/disk.img | grep exception
 
 clean:
 	# beginning line with a hyphen tells make to ignore errors

@@ -115,8 +115,9 @@ void InvokeScheduler(struct cpu_context_t* ctx)
     apic_end_of_interrupt(); // move this back to idt?
 }
 
-void dummy()
+void dummy(Thread* thread)
 {
+    load_page_table(thread->pml4t_phys);
     return;
 }
 
@@ -164,8 +165,13 @@ void schedule(struct CPU* cpu, struct Thread* thread, PROCESS_STATE state)
     {
         log_gdt(&cpu->gdt);
         LogTrapFrame(&thread->execution_context);
-        load_page_table(thread->pml4t_phys);
-        dummy();
+        // loads pt
+        /*
+            We are getting errors in our load function so we test here
+        */
+        char x[] = {0xeb, 0xfe};
+        memcpy(0xeeec000, x, 2);
+        dummy(thread);
         switch_to_user_mode(thread->execution_context.i_rsp, thread->execution_context.i_rip);
     }
 
@@ -176,7 +182,7 @@ void schedule(struct CPU* cpu, struct Thread* thread, PROCESS_STATE state)
     /*
         thread->execution_context is a pointer to the top of the saved stack
     */
-   DEBUG_PRINT0("DOING SCHEDULE\n");
+   //DEBUG_PRINT0("DOING SCHEDULE\n");
 schedule_kernel:
     __asm__ __volatile__(
         "mov %0, %%rsp\n\t"

@@ -76,7 +76,7 @@ typedef struct Thread
     PROCESS_STATE status;
     THREAD_RUN_MODE run_mode;
     thread_pagetables_t pgdir;
-    uint64_t kstack;
+    uint64_t kstack[0x10000];
     uint32_t id;
     uint64_t* pml4t_va;
     uint64_t* pml4t_phys;

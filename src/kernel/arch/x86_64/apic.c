@@ -60,7 +60,7 @@ int apic_init()
         cpuSetMSR(IA32_APIC_BASE_MSR, apic_msr_lo, apic_msr_hi);
     }
    // log_hexval("later base",ReadBase()&APIC_BASE_SEL);
-    if (!x2_apic_available)
+    if (!x2_apic_available && false)
     {
         //apic_msr_lo
 

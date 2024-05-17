@@ -90,13 +90,11 @@ typedef struct trapframe64_t
 
 
 
-typedef struct tss
-{
-    uint32_t reserved0;
+typedef struct {
+    uint32_t reserved __attribute__((aligned(16)));
     uint64_t rsp0;
     uint64_t rsp1;
     uint64_t rsp2;
-    uint64_t reserved1;
     uint64_t reserved2;
     uint64_t ist1;
     uint64_t ist2;
@@ -106,9 +104,9 @@ typedef struct tss
     uint64_t ist6;
     uint64_t ist7;
     uint64_t reserved3;
-    uint16_t reserved4;
-    uint16_t io_bitmap_offset;
-}__attribute__((__packed__)) tss_t;
+    uint32_t reserved4;
+    uint32_t iopbOffset;
+} __attribute__((packed)) tss_t;
 
 
 /*
