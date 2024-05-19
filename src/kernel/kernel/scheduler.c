@@ -43,13 +43,13 @@ void SaveThreadContext(struct Thread* old_thread, struct cpu_context_t* ctx)
         and we can schedule any thread we want to it    
     */
     if (old_thread == idle_thread) 
+    {
+        DEBUG_PRINT("old_thread == idle_thread, RETURNING...", 0);
         return;
+    }
     
     if (old_thread->status != PROCESS_STATE_RUNNING && old_thread->status != PROCESS_STATE_SLEEPING)
     {
-        if (old_thread->id == 0x0)
-            return;
-        log_hexval("STATE", old_thread->status);
         panic("InvokeScheduler() --> old_thread was in unexpected state.\n");
     }
     //memcpy(&old_thread->execution_context, ctx, sizeof(struct cpu_context_t));
@@ -161,18 +161,18 @@ void schedule(struct CPU* cpu, struct Thread* thread, PROCESS_STATE state)
     
     apic_end_of_interrupt(); // move this back to idt?
     
-    if (thread->id == 420)
+    if (thread->run_mode == USER_THREAD && false)
     {
-        log_gdt(&cpu->gdt);
-        LogTrapFrame(&thread->execution_context);
+        //log_gdt(&cpu->gdt);
+        //LogTrapFrame(&thread->execution_context);
         // loads pt
         /*
             We are getting errors in our load function so we test here
         */
-        char x[] = {0xeb, 0xfe};
-        memcpy(0xeeec000, x, 2);
+
         dummy(thread);
         switch_to_user_mode(thread->execution_context.i_rsp, thread->execution_context.i_rip);
+        return;
     }
 
     

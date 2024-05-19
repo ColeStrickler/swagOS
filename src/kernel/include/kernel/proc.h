@@ -97,9 +97,9 @@ void CreateIdleThread(void (*entry)(void *));
 
 void CreatePageTables(Thread *thread);
 
-void CreateUserThread(uint32_t pid, uint8_t *elf);
+void CreateUserThread(uint8_t *elf);
 
-void CreateKernelThread(void (*entry)(void *), uint32_t pid);
+void CreateKernelThread(void (*entry)(void *));
 
 void ThreadSleep(void* sleep_channel, Spinlock *spin_lock);
 

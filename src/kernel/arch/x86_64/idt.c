@@ -252,18 +252,6 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
                 panic("isr_handler() --> APIC TIMER INTERRUPT BEFORE CALIBRATION.\n");
             global_Settings.tick_counter += 1;
 
-            if (get_current_cpu() && get_current_cpu()->current_thread && get_current_cpu()->current_thread->id == 420)
-            {
-                log_to_serial("Timer!\n");
-                LogTrapFrame(tf);
-                log_hexval("tss kstack", get_current_cpu()->tss.rsp0);
-                //LogTrapFrame(get_current_cpu()->tss.rsp0 + sizeof(trapframe64_t));
-                log_hexval("Current rsp", get_rsp());
-                log_hexval("tf addr", tf);   
-            }
-            
-
-            //
             InvokeScheduler((cpu_context_t*)tf);
             break;
         }

@@ -17,13 +17,13 @@ struct Thread *GetCurrentThread()
 void CreateIdleThread(void (*entry)(void *))
 {
     struct Thread *idle = &global_Settings.threads.thread_table[IDLE_THREAD];
-    idle->id = 0x1;
+    idle->id = IDLE_THREAD;
     idle->pml4t_phys = KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel);
     idle->pml4t_va = global_Settings.pml4t_kernel;
     //CreatePageTables(idle);
     idle->status = PROCESS_STATE_READY; // We will keep this so
     idle->can_wakeup = true;
-
+    idle->run_mode = KERNEL_THREAD;
     uint64_t stack_alloc = (uint64_t)kalloc(0x1000);
     if (stack_alloc == NULL)
         panic("CreateIdleThread() --> kalloc() failed!\n");
@@ -117,7 +117,7 @@ void load_page_table(uint64_t new_page_table) {
 }
 
 
-void CreateUserThread(uint32_t pid, uint8_t* elf)
+void CreateUserThread(uint8_t* elf)
 {
     //log_hexval("Attempting global thread_lock", (&global_Settings.threads.lock)->owner_cpu);
     acquire_Spinlock(&global_Settings.threads.lock);
@@ -128,7 +128,7 @@ void CreateUserThread(uint32_t pid, uint8_t* elf)
         {
             log_hexval("Creating new thread at index", i);
             struct Thread *init_thread = &thread_table[i];
-            init_thread->id = pid;
+            init_thread->id = i;
 
             // CreatePageTables(init_thread);
             init_thread->status = PROCESS_STATE_READY; // --> may want to do this later
@@ -153,6 +153,7 @@ void CreateUserThread(uint32_t pid, uint8_t* elf)
             
 
             ELF_load_segments(init_thread, elf);
+            
            // ctx->i_rip = test;
             /*
                 Need to set up the stack in such a way that we can pop off of it and run the process
@@ -161,7 +162,7 @@ void CreateUserThread(uint32_t pid, uint8_t* elf)
                 so that InvokeScheduler() can operate on it like any other.
             */
             
-
+            
            
             init_thread->can_wakeup = true;
             //ctx->i_rip = entry; entry is set by the elf loader call
@@ -187,14 +188,16 @@ void CreateUserThread(uint32_t pid, uint8_t* elf)
             break;
         }
     }
+    log_hexval("end create byte 0", ((uint8_t*)VA_LOAD_TRANSFER)[0]);
     release_Spinlock(&global_Settings.threads.lock);
+    
 }
 
 
 
 
 
-void CreateKernelThread(void (*entry)(void *), uint32_t pid)
+void CreateKernelThread(void (*entry)(void *))
 {
     acquire_Spinlock(&global_Settings.threads.lock);
     struct Thread *thread_table = &global_Settings.threads.thread_table[0];
@@ -204,7 +207,7 @@ void CreateKernelThread(void (*entry)(void *), uint32_t pid)
         {
             log_hexval("Creating new thread at index", i);
             struct Thread *init_thread = &thread_table[i];
-            init_thread->id = pid;
+            init_thread->id = i;
             // kernel thread
             init_thread->pml4t_phys = KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel);
             init_thread->pml4t_va = global_Settings.pml4t_kernel;

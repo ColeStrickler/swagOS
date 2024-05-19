@@ -317,10 +317,10 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	log_hexval("addr", global_Settings.original_GDT);
 
 	printf("Ext2 initialized\n");
-	for (uint32_t i = 0; i < UINT32_MAX;i++){};
+	//for (uint32_t i = 0; i < UINT32_MAX;i++){};
 	log_to_serial("here!\n");
 	char *b = ext2_read_file("/test1");
-	CreateUserThread(420, b);
+	CreateUserThread(b);
 	log_to_serial("here2!\n");
 
 	// char* user = 0x69000;
@@ -337,5 +337,6 @@ void kernel_main(uint64_t ptr_multiboot_info)
 
 	printf("\nKERNEL END\n");
 	DEBUG_PRINT0("\nKERNEL END\n");
-	ExitThread();
+	//ExitThread();
+	while(1){};
 }

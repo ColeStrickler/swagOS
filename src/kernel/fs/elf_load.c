@@ -11,11 +11,7 @@
 #include <paging.h>
 extern KernelSettings global_Settings;
 
-/*
-    When we copy an elf file to user space pages we will use these locations to do so. At any point in time, unless a load is occurring these locations are undefined
-*/ 
-#define VA_LOAD_ARRAY
-#define VA_LOAD_TRANSFER ((lapic_id()*PGSIZE)+ 0xeeec000)
+
 
 bool ELF_check_magic(void* elf)
 {
@@ -58,7 +54,7 @@ bool ELF_load_segments(struct Thread* thread, unsigned char* elf)
     for (uint16_t i = 0; i < header->phNum; i++)
     {
         //log_hexval("phNum", i);
-        
+        log_hexval("byte 0", ((uint8_t*)VA_LOAD_TRANSFER)[0]);
         elf64_program_header_t* ph = (elf64_program_header_t*)(elf + header->phOff + i * header->phEntrySize);
         //log_hexval("memSize", ph->memSize);
         //log_hexval("file size", ph->fileSize);
@@ -100,7 +96,7 @@ bool ELF_load_segments(struct Thread* thread, unsigned char* elf)
             log_to_serial("mapped to kernel pt\n");
             // zero the frame to rid old data
             log_hexval("VA_LOAD_TRANSFER", VA_LOAD_TRANSFER);
-            //memset(VA_LOAD_TRANSFER, 0x00, PGSIZE);
+            memset(VA_LOAD_TRANSFER, 0x00, PGSIZE);
             log_to_serial("zeroed\n");
             //log_to_serial("zeroed\n");
             // copy the relevant data to the frame
@@ -122,9 +118,12 @@ bool ELF_load_segments(struct Thread* thread, unsigned char* elf)
             //map_4kb_page_smp(ph->vaddr+copy_offset, frame, PAGE_PRESENT|PAGE_WRITE|PAGE_USER);
             //log_to_serial("mapped to user pt\n");
             copy_offset+=PGSIZE;
+            char* x = 0xeeec000;
+            
+            break;
         }
     }
-    
+    log_hexval("byte 0", ((uint8_t*)VA_LOAD_TRANSFER)[0]);
 
     log_hexval("HEADER ENTRY", header->entry);
     thread->execution_context.i_rip = header->entry;
