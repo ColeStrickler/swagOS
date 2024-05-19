@@ -57,7 +57,7 @@ void SaveThreadContext(struct Thread* old_thread, struct cpu_context_t* ctx)
  
     //old_thread->execution_context = ctx;
     old_thread->status = PROCESS_STATE_READY;
-    DEBUG_PRINT("CONTEXT SAVED RIP", ctx->i_rip);
+   // DEBUG_PRINT("CONTEXT SAVED RIP", ctx->i_rip);
     old_thread->can_wakeup = true;
 }
 
@@ -129,19 +129,12 @@ void schedule(struct CPU* cpu, struct Thread* thread, PROCESS_STATE state)
     if (cpu->current_thread)
         DEBUG_PRINT("Old thread rip", cpu->current_thread->execution_context.i_rip);
 
-    if (cpu->current_thread->id == 420)
-    {
-        
-    }
-
     cpu->current_thread = thread;
-    
-
     thread->status = state;
-    DEBUG_PRINT("Target Thread state", thread->status);
-    DEBUG_PRINT("CPU", cpu->id);
-    DEBUG_PRINT("Targeting RIP", thread->execution_context.i_rip);
-    DEBUG_PRINT("TARGETING RSP", thread->execution_context.i_rsp);
+    //DEBUG_PRINT("Target Thread state", thread->status);
+    //DEBUG_PRINT("CPU", cpu->id);
+    //DEBUG_PRINT("Targeting RIP", thread->execution_context.i_rip);
+    //DEBUG_PRINT("TARGETING RSP", thread->execution_context.i_rsp);
     //if (thread->id == 420)
     //{
     //    log_to_serial("Schedule()\n");
@@ -160,25 +153,6 @@ void schedule(struct CPU* cpu, struct Thread* thread, PROCESS_STATE state)
     cli();
     
     apic_end_of_interrupt(); // move this back to idt?
-    
-    if (thread->run_mode == USER_THREAD && false)
-    {
-        //log_gdt(&cpu->gdt);
-        //LogTrapFrame(&thread->execution_context);
-        // loads pt
-        /*
-            We are getting errors in our load function so we test here
-        */
-
-        dummy(thread);
-        switch_to_user_mode(thread->execution_context.i_rsp, thread->execution_context.i_rip);
-        return;
-    }
-
-    
-   
-
-
     /*
         thread->execution_context is a pointer to the top of the saved stack
     */

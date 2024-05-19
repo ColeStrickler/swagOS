@@ -11,6 +11,7 @@
 #define IDT_APIC_TIMER_INT    32
 #define IDT_KEYBOARD_INT      33
 #define IDT_PIT_INT           34
+#define IDT_SYSCALL           128
 #define IDT_APIC_SPURIOUS_INT 255
 
 
@@ -172,6 +173,7 @@ extern void isr_43();
 extern void isr_44();
 extern void isr_45();
 extern void isr_46();
+extern void isr_128();
 extern void isr_255();
 
 

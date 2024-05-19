@@ -211,7 +211,7 @@ void apic_write_reg(uint32_t reg_offset, uint32_t eax, uint32_t edx)
 
 void apic_end_of_interrupt()
 {
-    apic_write_reg(APIC_REG_EOI, 0x001, 0x00);
+    apic_write_reg(APIC_REG_EOI, 0x00, 0x00);
 }
 
 void set_pit_periodic(uint16_t count) {

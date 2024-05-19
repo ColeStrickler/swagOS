@@ -6,6 +6,7 @@ extern isr_handler
 %macro isr 1
 [global isr_%1]
 isr_%1:
+    cli
     ; This entry stub is called with the following registers already on the stack:
     ; ss, rsp, rflags, cs(padded to make qword), rip  --> in this order
     ; These registers are pushed and popped automatically by the CPU during ISR invocation
@@ -25,6 +26,7 @@ isr_%1:
 %macro isr_errorcode 1
 [global isr_errorcode_%1]
 isr_errorcode_%1:
+    cli
     ; This entry stub is called with the following registers already on the stack:
     ; ss, rsp, rflags, cs(padded to make qword), rip  --> in this order
     ; These registers are pushed and popped automatically by the CPU during ISR invocation
@@ -130,4 +132,5 @@ isr 43
 isr 44
 isr 45
 isr 46
+isr 128 
 isr 255

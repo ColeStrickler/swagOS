@@ -8,6 +8,7 @@
 #include <scheduler.h>
 #include <ide.h>
 #include <asm_routines.h>
+#include <syscalls.h>
 extern KernelSettings global_Settings;
 
 __attribute__((aligned(0x10))) InterruptDescriptor64 IDT[IDT_SIZE];
@@ -146,7 +147,7 @@ void build_IDT(void)
     SetIDT_Descriptor(29, (uint64_t)isr_29, false, false);
     SetIDT_Descriptor(30, (uint64_t)isr_30, false, false);
     SetIDT_Descriptor(31, (uint64_t)isr_31, false, false);
-    SetIDT_Descriptor(32, (uint64_t)isr_32, true, false);
+    SetIDT_Descriptor(32, (uint64_t)isr_32, true, true);
     SetIDT_Descriptor(33, (uint64_t)isr_33, false, false);
     SetIDT_Descriptor(34, (uint64_t)isr_34, false, false);
     SetIDT_Descriptor(35, (uint64_t)isr_35, false, false);
@@ -161,6 +162,7 @@ void build_IDT(void)
     SetIDT_Descriptor(44, (uint64_t)isr_44, false, false);
     SetIDT_Descriptor(45, (uint64_t)isr_45, false, false);
     SetIDT_Descriptor(46, (uint64_t)isr_46, false, false);
+    SetIDT_Descriptor(0x80, (uint64_t)isr_128, true, false);
 }
 
 
@@ -209,6 +211,9 @@ unsigned long get_rsp() {
 trapframe64_t* isr_handler(trapframe64_t* tf)
 {
     load_page_table(KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
+    if (read_rflags() & 0x200)     
+        DEBUG_PRINT("ISR", tf->isr_id);
+
     switch(tf->isr_id)
     {
         case 3:
@@ -226,7 +231,7 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
                 log_hexval("Bad INT3 stat", GetCurrentThread()->status);
                 break; 
             }
-            
+            apic_end_of_interrupt();
             break;
         }
         case 13:
@@ -236,7 +241,7 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
             DEBUG_PRINT("RIP", tf->i_rip);
             while(1)
                 panic("");
-
+            break;
         }
         case 14:
         {
@@ -265,17 +270,25 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         case IDT_PIT_INT:
         {
             global_Settings.tickCount++;
-            if (lapic_id())
-                log_hexval("PID id", lapic_id());
+            //if (lapic_id())
+            log_hexval("PID id", lapic_id());
             outb(0x20,0x20); outb(0xa0,0x20);    
             apic_end_of_interrupt();
             break;
         }
         case 46:
         {
-            //DEBUG_PRINT("idt intr!", 0);
+            DEBUG_PRINT("ide intr!", 0);
             ideintr();
             apic_end_of_interrupt();
+            break;
+        }
+        case IDT_SYSCALL:
+        {
+            syscall_handler((cpu_context_t*)tf);
+            //LogTrapFrame(tf);
+            apic_end_of_interrupt(); // must do this before we switch back page tables, 
+            load_page_table(get_current_cpu()->current_thread->pml4t_phys);
             break;
         }
         case IDT_APIC_SPURIOUS_INT:
