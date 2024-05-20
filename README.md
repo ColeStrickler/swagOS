@@ -13,7 +13,7 @@ Planned Features:
 - Full user mode shell
 - Finish Ext2 implementation
 - a GUI
-- toy compiler/interpreter for custom scripting language
+- toy compiler/interpreter for custom shell scripting language
 
 ![Capture](https://github.com/ColeStrickler/swagOS/assets/82488869/643cf819-5658-4233-8922-49f4a1124761)
 
