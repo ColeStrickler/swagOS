@@ -316,7 +316,6 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	log_hexval("GDT SIZE", global_Settings.original_GDT_size);
 	log_hexval("addr", global_Settings.original_GDT);
 
-	printf("Ext2 initialized\n");
 	//for (uint32_t i = 0; i < UINT32_MAX;i++){};
 	log_to_serial("here!\n");
 	char *b = ext2_read_file("/test1");
@@ -335,7 +334,7 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	// log_to_serial("doing switch");
 	// switch_to_user_mode(0x40000000, user);
 
-	printf("\nKERNEL END\n");
+	//printf("\nKERNEL END\n");
 	DEBUG_PRINT0("\nKERNEL END\n");
 	//ExitThread();
 	while(1){};

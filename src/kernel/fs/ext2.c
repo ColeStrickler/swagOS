@@ -113,7 +113,7 @@ uint32_t ext2_read_from_directory(char* filename, ext2_dir_entry* dir)
 		char *name = (char *)kalloc(dir->namelength + 1);
 		memcpy(name, &dir->reserved+1, dir->namelength);
 		name[dir->namelength] = 0;
-        printf("%s --> %d, %d\n", name, dir->inode, dir->reserved);
+       // printf("%s --> %d, %d\n", name, dir->inode, dir->reserved);
         
         
 		//kprintf("DIR: %s (%d)\n", name, dir->size);
@@ -123,7 +123,7 @@ uint32_t ext2_read_from_directory(char* filename, ext2_dir_entry* dir)
             ext2_inode_t inode;
 			/* If we are looking for a file, we had found it */
 			ext2_read_inode(&inode, dir->inode);
-			printf("Found inode %s! %d\n", filename, dir->inode);
+			//printf("Found inode %s! %d\n", filename, dir->inode);
 			kfree(name);
 			return dir->inode;
 		}
@@ -547,7 +547,7 @@ void ext2_get_bgd(uint32_t descriptor_index, ext2_block_group_desc* out)
     iobuf* b = bread(0, start_disk_sector);
     if (b == NULL)
         panic("ext2_get_bgd() --> bread() failure.\n");
-    printf("GOT B!\n");
+    //printf("GOT B!\n");
     uint32_t inner_index = ((descriptor_index*sizeof(ext2_block_group_desc)) % DISK_SECTOR_SIZE);
     memcpy(out, &b->data[inner_index], sizeof(ext2_block_group_desc));
     brelse(b);

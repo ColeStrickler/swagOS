@@ -162,7 +162,7 @@ void build_IDT(void)
     SetIDT_Descriptor(44, (uint64_t)isr_44, false, false);
     SetIDT_Descriptor(45, (uint64_t)isr_45, false, false);
     SetIDT_Descriptor(46, (uint64_t)isr_46, false, false);
-    SetIDT_Descriptor(0x80, (uint64_t)isr_128, true, false);
+    SetIDT_Descriptor(0x80, (uint64_t)sys_call_stub, true, false);
 }
 
 
@@ -281,14 +281,6 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
             DEBUG_PRINT("ide intr!", 0);
             ideintr();
             apic_end_of_interrupt();
-            break;
-        }
-        case IDT_SYSCALL:
-        {
-            syscall_handler((cpu_context_t*)tf);
-            //LogTrapFrame(tf);
-            apic_end_of_interrupt(); // must do this before we switch back page tables, 
-            load_page_table(get_current_cpu()->current_thread->pml4t_phys);
             break;
         }
         case IDT_APIC_SPURIOUS_INT:

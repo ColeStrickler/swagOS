@@ -176,5 +176,6 @@ extern void isr_46();
 extern void isr_128();
 extern void isr_255();
 
+extern void sys_call_stub();
 
 #endif

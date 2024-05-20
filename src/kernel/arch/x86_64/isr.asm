@@ -1,6 +1,7 @@
 [bits 64]
 
 extern isr_handler
+extern syscall_handler
 ; please see https://wiki.osdev.org/Interrupt_Service_Routines, https://wiki.osdev.org/Interrupts_Tutorial
 
 %macro isr 1
@@ -42,6 +43,28 @@ isr_errorcode_%1:
     add rsp, 16             ; reclaim both the error code and the interrupt # previously pushed onto the stack
     iretq                    ; interrupt return
 %endmacro
+
+
+%macro sys_call_stub 0
+[global sys_call_stub]
+sys_call_stub:
+    cli
+    ; This entry stub is called with the following registers already on the stack:
+    ; ss, rsp, rflags, cs(padded to make qword), rip  --> in this order
+    ; These registers are pushed and popped automatically by the CPU during ISR invocation
+    push 0x0                ; we push a dummy error code to maintain stack equivalence with isr_errocode_%1
+    push 0x80                ; save interrupt # for later use
+
+
+    save_gpr                ; push all general purpose registers to stack
+    mov rdi, rsp            ; with System V ABI the first parameter to a function is in rdi. We pass the stack pointer here
+    cld                     ; C code following the sysV ABI requires DF to be clear on function entry
+    call syscall_handler        
+    restore_gpr             ; restore all general purpose registers from stack
+    add rsp, 16             ; reclaim both the error code and the interrupt # previously pushed onto the stack
+    iretq                    ; interrupt return
+%endmacro
+
 
 
 
@@ -134,3 +157,4 @@ isr 45
 isr 46
 isr 128 
 isr 255
+sys_call_stub 

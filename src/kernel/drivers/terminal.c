@@ -12,10 +12,15 @@
 #include <spinlock.h>
 extern KernelSettings global_Settings;
 Spinlock terminal_lock;
+#define TERMINAL_COLOR global_Settings.TerminalDriver.color
+#define OG_COLOR 0xaa, 0x61, 0x3e
 
 
 
-
+void terminal_set_color(uint8_t r, uint8_t g, uint8_t b)
+{
+    global_Settings.TerminalDriver.color = RGB_COLOR(r,g,b);
+}
 
 void init_terminal()
 {
@@ -38,7 +43,7 @@ void init_terminal()
     if (terminal_buf == NULL)
         panic("init_terminal() --> could not allocate memory for terminal driver buffer.");
     driver->terminal_buf = terminal_buf;
-    
+    terminal_set_color(OG_COLOR);
 }
 
 uint8_t char_code_to_fontcode(char c)
@@ -244,21 +249,21 @@ void printf(const char* fmt, ...)
                     case 'd':
                     {
                         int arg = va_arg(args, int);
-                        handle_format_int(arg, RGB_COLOR(0xff, 0x00, 0x00));
+                        handle_format_int(arg, TERMINAL_COLOR);
                         i++;
                         break;
                     }
                     case 'u':
                     {
                         long arg = va_arg(args, long);
-                        handle_format_long(arg, RGB_COLOR(0xff, 0x00, 0x00));
+                        handle_format_long(arg, TERMINAL_COLOR);
                         i++;
                         break;
                     }
                     case 's':
                     {
                         char* arg = va_arg(args, char*);
-                        terminal_print_string(arg, RGB_COLOR(0xff, 0x00, 0x00));
+                        terminal_print_string(arg, TERMINAL_COLOR);
                         i++;
                         break;
                     }
@@ -272,7 +277,7 @@ void printf(const char* fmt, ...)
                 //log_to_serial("default\n");
                 //log_char_to_serial(c);
                 //log_to_serial("\n");
-                terminal_write_char(c, RGB_COLOR(0xff, 0x00, 0x00));
+                terminal_write_char(c, TERMINAL_COLOR);
                 i++;
                 break;
             }
