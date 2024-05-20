@@ -1,4 +1,4 @@
-This is my first attempt at writing an operating system from scratch.
+This is my first attempt at writing an operating system from scratch. 
 
 Current Features:
 - Partial Ext2 File system implementation
@@ -14,3 +14,6 @@ Planned Features:
 - Finish Ext2 implementation
 - a GUI
 - toy compiler/interpreter for custom scripting language
+
+
+At some point I will rewrite this in C++
