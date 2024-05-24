@@ -3,6 +3,7 @@
 #include <terminal.h>
 #include "syscalls.h"
 #include <serial.h>
+#include <asm_routines.h>
 #include <kernel.h>
 
 extern KernelSettings global_Settings;
@@ -125,9 +126,12 @@ void SYSHANDLER_tprintf(cpu_context_t* ctx)
     return;
 }
 
-void SYSHANDLER_exit()
+void SYSHANDLER_exit(cpu_context_t* ctx)
 {
-
+    Thread* t = GetCurrentThread();
+    ThreadFreeUserPages(t); // free all user mode pages
+    apic_end_of_interrupt();
+    ExitThread();
 }
 
 
@@ -140,7 +144,11 @@ void syscall_handler(cpu_context_t* ctx)
     //LogTrapFrame(ctx);
     switch(ctx->rdi)
     {
-        
+        case sys_exit:
+        {
+            SYSHANDLER_exit(ctx);
+            break;
+        }
         case 1:
         {
             printf("Hello from syscall %d\n", ctx->rsi);

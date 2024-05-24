@@ -28,6 +28,6 @@ void main()
     
 
 
-    while(1);
+    do_syscall0(sys_exit);
     //do_syscall1(sys, )
 }

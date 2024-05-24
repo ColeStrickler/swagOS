@@ -383,7 +383,6 @@ uint64_t physical_frame_request_4kb()
     uint64_t frame_2mb = physical_frame_request();
     if (frame_2mb == UINT64_MAX)
         return UINT64_MAX;
-    physical_frame_checkout(frame_2mb);
     
     frame_4kb = create_new_chunked_frame(frame_2mb);
     log_hexval("returning frame", frame_4kb);
@@ -546,6 +545,13 @@ void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thre
     if (thread->pgdir.pd[0][pt_index] & PTADDRMASK != NULL)
         panic("pd");
     thread->pgdir.pd[0][pt_index] = physical_address | flags;
+
+    struct thread_used_page_entry* page_entry = kalloc(sizeof(struct thread_used_page_entry));
+    page_entry->page_pa = physical_address;
+    if (page_entry == NULL)
+        panic("map_4kb_page_user() --> failed to allocate struct thread_used_page_entry\n");
+
+    insert_dll_entry_head(&thread->thread_pages, &page_entry->entry);
     return;
 }
 

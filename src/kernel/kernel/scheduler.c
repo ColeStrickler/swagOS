@@ -93,7 +93,7 @@ void InvokeScheduler(struct cpu_context_t* ctx)
     //else
     //    DEBUG_PRINT("Old thread null", 0x0);
     
-    uint32_t old_thread_id  = (old_thread == NULL ? 0 : old_thread->id);
+    uint32_t old_thread_id  = (old_thread == NULL ? 0 : (old_thread->id == UINT32_MAX ? MAX_NUM_THREADS : old_thread->id));
 
     /*
         These two for loops are just round-robin
@@ -120,7 +120,7 @@ void InvokeScheduler(struct cpu_context_t* ctx)
         schedule(current_cpu, &thread_table[i], PROCESS_STATE_RUNNING);
     }
 
-    if (old_thread == NULL || old_thread->status == PROCESS_STATE_SLEEPING) // If we already hold the Idle thread we can avoid this overhead
+    if (old_thread == NULL || old_thread->status == PROCESS_STATE_KILLED) // If we already hold the Idle thread we can avoid this overhead
     {
         DEBUG_PRINT("Doing Idle Thread on CPU", lapic_id());
         ScheduleIdleThread(old_thread, ctx);

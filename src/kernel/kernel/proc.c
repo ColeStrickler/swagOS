@@ -326,15 +326,30 @@ void Wakeup(void *channel)
 }
 
 
+/*
+    This function is used to free all pages allocated to a user mode process
+*/
+void ThreadFreeUserPages(Thread* t)
+{
+    thread_used_page_entry* entry = (thread_used_page_entry*)t->thread_pages.first;
+    while(entry != NULL && entry != &t->thread_pages)
+    {
+        try_free_chunked_frame(entry->page_pa);
+        void* old_entry = entry;
+        entry = (thread_used_page_entry*)entry->entry.next;
+        kfree(old_entry);
+    }
+}
+
+
 void ExitThread()
 {   
     DEBUG_PRINT("EXIT THREAD()");
     Thread* t = GetCurrentThread();
     
-
-
     t->status = PROCESS_STATE_KILLED;
     t->id = -1;
+    sti();
     while(1); // wait to be rescheduled
    //InvokeScheduler(NULL);
 }

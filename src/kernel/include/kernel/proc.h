@@ -66,6 +66,12 @@ typedef struct cpu_context_t
 }__attribute__((packed))cpu_context_t;
 
 
+typedef struct thread_used_page_entry
+{
+    struct dll_Entry entry;
+    uint64_t page_pa;
+}thread_used_page_entry;
+
 /*
     We use the Linux model where we schedule individual threads and threads
     belonging to the same process share a virtual address space/page table
@@ -81,6 +87,7 @@ typedef struct Thread
     uint64_t* pml4t_va;
     uint64_t* pml4t_phys;
     cpu_context_t execution_context;
+    struct dll_Head thread_pages;
     void* sleep_channel;  // will be NULL if process is not sleeping
 } Thread;
 
@@ -104,6 +111,8 @@ void CreateKernelThread(void (*entry)(void *));
 void ThreadSleep(void* sleep_channel, Spinlock *spin_lock);
 
 void Wakeup(void *channel);
+
+void ThreadFreeUserPages(Thread* t);
 
 void ExitThread();
 
