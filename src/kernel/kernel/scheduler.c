@@ -10,6 +10,15 @@
 extern KernelSettings global_Settings;
 
 
+/*
+    If there are no other threads available to be scheduled we just reschedule the old thread
+*/
+void HandleNoSchedule(Thread* old_thread)
+{
+     apic_end_of_interrupt(); // move this back to idt?
+    if (old_thread->run_mode == USER_THREAD)
+        load_page_table(old_thread->pml4t_phys);
+}
 
 
 void ScheduleIdleThread(struct Thread* old_thread, struct cpu_context_t* ctx)
@@ -48,8 +57,12 @@ void SaveThreadContext(struct Thread* old_thread, struct cpu_context_t* ctx)
         return;
     }
     
+    if (old_thread->status == PROCESS_STATE_KILLED)
+        return;
+
     if (old_thread->status != PROCESS_STATE_RUNNING && old_thread->status != PROCESS_STATE_SLEEPING)
     {
+        DEBUG_PRINT("State", old_thread->status);
         panic("InvokeScheduler() --> old_thread was in unexpected state.\n");
     }
     //memcpy(&old_thread->execution_context, ctx, sizeof(struct cpu_context_t));
@@ -91,6 +104,7 @@ void InvokeScheduler(struct cpu_context_t* ctx)
             continue;
         
         SaveThreadContext(old_thread, ctx);       
+        DEBUG_PRINT("Old id0", old_thread_id);
         DEBUG_PRINT("Doing process", thread_table[i].id);
         schedule(current_cpu, &thread_table[i], PROCESS_STATE_RUNNING);
     }
@@ -101,6 +115,7 @@ void InvokeScheduler(struct cpu_context_t* ctx)
             continue;
         
         SaveThreadContext(old_thread, ctx);
+        DEBUG_PRINT("Old id1", old_thread_id);
         DEBUG_PRINT("Doing process", thread_table[i].id);
         schedule(current_cpu, &thread_table[i], PROCESS_STATE_RUNNING);
     }
@@ -112,14 +127,10 @@ void InvokeScheduler(struct cpu_context_t* ctx)
     }
     release_Spinlock(&global_Settings.threads.lock);
    // DEBUG_PRINT("DONE SCHEDULING", lapic_id());
-    apic_end_of_interrupt(); // move this back to idt?
+
+    HandleNoSchedule(old_thread);
 }
 
-void dummy(Thread* thread)
-{
-    load_page_table(thread->pml4t_phys);
-    return;
-}
 
 void schedule(struct CPU* cpu, struct Thread* thread, PROCESS_STATE state)
 {
@@ -133,7 +144,7 @@ void schedule(struct CPU* cpu, struct Thread* thread, PROCESS_STATE state)
     thread->status = state;
     //DEBUG_PRINT("Target Thread state", thread->status);
     //DEBUG_PRINT("CPU", cpu->id);
-    //DEBUG_PRINT("Targeting RIP", thread->execution_context.i_rip);
+    DEBUG_PRINT("Targeting RIP", thread->execution_context.i_rip);
     //DEBUG_PRINT("TARGETING RSP", thread->execution_context.i_rsp);
     //if (thread->id == 420)
     //{
@@ -153,6 +164,10 @@ void schedule(struct CPU* cpu, struct Thread* thread, PROCESS_STATE state)
     cli();
     
     apic_end_of_interrupt(); // move this back to idt?
+
+
+    //if (thread->run_mode == USER_THREAD)
+      //  disable_supervisor_mem_protections();
     /*
         thread->execution_context is a pointer to the top of the saved stack
     */

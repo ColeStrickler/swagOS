@@ -114,7 +114,7 @@ void video_init()
     {
         if (!map_kernel_page(HUGEPGROUNDDOWN(framebuffer_addr), HUGEPGROUNDDOWN(framebuffer_addr), ALLOC_TYPE_DM_IO))
             panic("video_init() --> map_kernel_page() failure");
-        if (!is_frame_mapped_hugepages(HUGEPGROUNDDOWN(framebuffer_addr), global_Settings.pml4t_kernel))
+        if (!is_frame_mapped_kernel(HUGEPGROUNDDOWN(framebuffer_addr), global_Settings.pml4t_kernel))
             panic("video_init() --> is_frame_mapped_hugepages() failure");
         //log_hexval("check", ((char*)HUGEPGROUNDDOWN(framebuffer->framebuffer_addr + mapped))[0]);
         mapped += HUGEPGSIZE;

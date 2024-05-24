@@ -18,7 +18,8 @@
 #include <ext2.h>
 //#include <ahci.h>
 
-
+void enable_supervisor_mem_protections();
+void disable_supervisor_mem_protections();
 
 #define KERNEL_HH_START 0xffffffff80000000
 #define KERNEL_HEAP_START 0xffffffff00000000

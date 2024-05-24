@@ -49,6 +49,7 @@ void DEBUG_PRINT(const char *str, uint64_t hex);
 
 /* Forward declarations */
 void higher_half_entry(uint64_t);
+
 void kernel_main(uint64_t);
 
 Spinlock print_lock;
@@ -256,6 +257,17 @@ void enable_supervisor_mem_protections()
 		set_cr4_bit(CPU_CR4_SMAP_ENABLE);
 }
 
+void disable_supervisor_mem_protections()
+{
+	uint32_t eax, ebx, ecx, edx;
+	__cpuid_count(7, 0, eax, ebx, ecx, edx);
+	if (ebx & (1 << 7)) // CHECK SMEP AVAILABLE
+		clear_cr4_bit(CPU_CR4_SMEP_ENABLE);
+	if (ebx & (1 << 20)) // CHECK SMAP AVAILABLE
+		clear_cr4_bit(CPU_CR4_SMAP_ENABLE);
+}
+
+
 void test1()
 {
 	while (1)
@@ -301,7 +313,7 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	// sti();
 
 	CreateIdleThread(IdleThread); // do this before smp initialization and after kheap_init()
-	//enable_supervisor_mem_protections();
+	enable_supervisor_mem_protections();
 	smp_start();
 	ideinit();
 	binit();
@@ -336,6 +348,6 @@ void kernel_main(uint64_t ptr_multiboot_info)
 
 	//printf("\nKERNEL END\n");
 	DEBUG_PRINT0("\nKERNEL END\n");
-	//ExitThread();
+	ExitThread();
 	while(1){};
 }

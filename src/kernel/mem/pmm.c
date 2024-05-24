@@ -599,11 +599,12 @@ map_huge_page_user(uint64_t virtual_address, uint64_t physical_address, Thread* 
     This function returns true if the virtual address is currently mapped
     and returns false if the virtual address is not currently mapped
 */
-bool is_frame_mapped_hugepages(uint64_t virtual_address, uint64_t* pml4t_addr)
+bool is_frame_mapped_kernel(uint64_t virtual_address, uint64_t* pml4t_addr)
 {
     uint64_t pml4t_index = (virtual_address >> 39) & 0x1FF; 
 	uint64_t pdpt_index = (virtual_address >> 30) & 0x1FF; 
 	uint64_t pdt_index = (virtual_address >> 21) & 0x1FF;
+    uint64_t pt_index = (virtual_address >> 12) & 0x1FF;
     
 
     //log_hexval("pml4t index",   pml4t_index);
@@ -629,6 +630,14 @@ bool is_frame_mapped_hugepages(uint64_t virtual_address, uint64_t* pml4t_addr)
         //log_to_serial("is_frame_mapped_hugepages pdt entry null\n");
         return false;
     }
+
+    if (pdt[pdt_index] & PAGE_HUGE)
+        return true;
+
+    uint64_t pt = pdt[pdt_index] & PTADDRMASK;
+    if (pt == NULL)
+        return false;
+
     //log_hexval("pdt[pdt_index]", pdt[pdt_index]);
     return true;
 }
@@ -652,7 +661,6 @@ bool is_frame_mapped_thread(struct Thread* t, uint64_t virtual_address)
 
     if (t->pgdir.pd[0][pt_index] & PTADDRMASK != 0)
     {
-        log_hexval("mapped to", t->pgdir.pd[0][pt_index] & PTADDRMASK);
         return true;
     }
     return false;

@@ -42,7 +42,7 @@ int apic_init()
 
     int apic_globally_enabled = (apic_msr_lo & IA32_APIC_BASE_MSR_ENABLE);
     uint64_t lapic_base = ReadBase() & APIC_BASE_SEL;
-    if (!is_frame_mapped_hugepages(lapic_base, global_Settings.pml4t_kernel))
+    if (!is_frame_mapped_kernel(lapic_base, global_Settings.pml4t_kernel))
     {
         map_kernel_page(HUGEPGROUNDDOWN(lapic_base), HUGEPGROUNDDOWN(lapic_base), ALLOC_TYPE_DM_IO);
     }
@@ -95,7 +95,7 @@ void smp_apic_init()
 {
     uint32_t apic_msr_lo, apic_msr_hi;
     uint64_t lapic_base = ReadBase() & APIC_BASE_SEL;
-    if (!is_frame_mapped_hugepages(lapic_base, global_Settings.pml4t_kernel))
+    if (!is_frame_mapped_kernel(lapic_base, global_Settings.pml4t_kernel))
     {
         map_kernel_page(HUGEPGROUNDDOWN(lapic_base), HUGEPGROUNDDOWN(lapic_base), ALLOC_TYPE_DM_IO);
     }
@@ -253,7 +253,7 @@ static uint64_t dm_ioapic_address(io_apic* ioapic)
     /*
         For these direct mapped devices we will just direct map their addresses into the kernel page table
     */
-    if (!is_frame_mapped_hugepages(ioapic->io_apic_address, global_Settings.pml4t_kernel))
+    if (!is_frame_mapped_kernel(ioapic->io_apic_address, global_Settings.pml4t_kernel))
     {
         map_kernel_page(HUGEPGROUNDDOWN(ioapic->io_apic_address), HUGEPGROUNDDOWN(ioapic->io_apic_address), ALLOC_TYPE_DM_IO);
     }

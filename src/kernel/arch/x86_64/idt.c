@@ -211,8 +211,6 @@ unsigned long get_rsp() {
 trapframe64_t* isr_handler(trapframe64_t* tf)
 {
     load_page_table(KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
-    if (read_rflags() & 0x200)     
-        DEBUG_PRINT("ISR", tf->isr_id);
 
     switch(tf->isr_id)
     {
@@ -278,7 +276,7 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         }
         case 46:
         {
-            DEBUG_PRINT("ide intr!", 0);
+            //DEBUG_PRINT("ide intr!", 0);
             ideintr();
             apic_end_of_interrupt();
             break;

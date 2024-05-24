@@ -80,7 +80,7 @@ void kheap_init()
     while(i < 1024)
     {
         
-        if (is_frame_mapped_hugepages(HUGEPGROUNDDOWN(global_Settings.kernel_heap.va_start + (i*HUGEPGSIZE)+1), global_Settings.pml4t_kernel))
+        if (is_frame_mapped_kernel(HUGEPGROUNDDOWN(global_Settings.kernel_heap.va_start + (i*HUGEPGSIZE)+1), global_Settings.pml4t_kernel))
         {
             log_hexval("Frame", global_Settings.kernel_heap.va_start + (i*HUGEPGSIZE));
             panic("kheap_init() --> heap frame already mapped.\n");

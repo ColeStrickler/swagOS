@@ -128,6 +128,7 @@ void CreateUserThread(uint8_t* elf)
         {
             log_hexval("Creating new thread at index", i);
             struct Thread *init_thread = &thread_table[i];
+            memset(&init_thread->pgdir, 0x00, sizeof(thread_pagetables_t));
             init_thread->id = i;
 
             // CreatePageTables(init_thread);
@@ -205,8 +206,10 @@ void CreateKernelThread(void (*entry)(void *))
     {
         if (thread_table[i].status == PROCESS_STATE_NOT_INITIALIZED || thread_table[i].status == PROCESS_STATE_KILLED)
         {
+
             log_hexval("Creating new thread at index", i);
             struct Thread *init_thread = &thread_table[i];
+            memset(&init_thread->pgdir, 0x00, sizeof(thread_pagetables_t));
             init_thread->id = i;
             // kernel thread
             init_thread->pml4t_phys = KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel);
@@ -327,6 +330,11 @@ void ExitThread()
 {   
     DEBUG_PRINT("EXIT THREAD()");
     Thread* t = GetCurrentThread();
-    memset(t, 0x00, sizeof(Thread));
-    InvokeScheduler(NULL);
+    
+
+
+    t->status = PROCESS_STATE_KILLED;
+    t->id = -1;
+    while(1); // wait to be rescheduled
+   //InvokeScheduler(NULL);
 }

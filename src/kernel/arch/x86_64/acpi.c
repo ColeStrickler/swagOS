@@ -52,7 +52,7 @@ MADT* retrieveMADT(bool use_xsdt, void* sdp)
             map_kernel_page(HUGEPGROUNDDOWN((uint64_t)rsdt), HUGEPGROUNDDOWN((uint64_t)rsdt), ALLOC_TYPE_DM_IO);
 
     }
-    if (!is_frame_mapped_hugepages(rsdt, pml4t))
+    if (!is_frame_mapped_kernel(rsdt, pml4t))
     {
         panic("not mapped");
     }
@@ -78,7 +78,7 @@ MADT* retrieveMADT(bool use_xsdt, void* sdp)
         /*
             We will just direct map these frames into the kernel since they are reserved memory anyways
         */
-        if (!is_frame_mapped_hugepages(PGROUNDDOWN((uint64_t)madt), pml4t))
+        if (!is_frame_mapped_kernel(PGROUNDDOWN((uint64_t)madt), pml4t))
         {
             map_kernel_page(PGROUNDDOWN((uint64_t)madt), PGROUNDDOWN((uint64_t)madt), ALLOC_TYPE_DM_IO);
         }

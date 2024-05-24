@@ -116,7 +116,7 @@ void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thre
 
 void map_huge_page_user(uint64_t virtual_address, uint64_t physical_address, Thread *thread, int index);
 
-bool is_frame_mapped_hugepages(uint64_t virtual_address, uint64_t *pml4t_addr);
+bool is_frame_mapped_kernel(uint64_t virtual_address, uint64_t *pml4t_addr);
 
 bool is_frame_mapped_thread(Thread *t, uint64_t virtual_address);
 
