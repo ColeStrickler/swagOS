@@ -91,7 +91,7 @@ uint64_t CreateUserProcessStack(Thread* t)
     int i = 0;
 
    // while(is_frame_mapped_thread(t, USER_STACK_LOC + PGSIZE*i)){i++;}
-    map_4kb_page_user(USER_STACK_LOC+PGSIZE*i, frame, t);
+    map_4kb_page_user(USER_STACK_LOC+PGSIZE*i, frame, t, 512, 512);
    //map_4kb_page_smp(USER_STACK_LOC+PGSIZE*i, frame, PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
     return USER_STACK_LOC+(PGSIZE*i)+PGSIZE-8; // point to top of stack
 }

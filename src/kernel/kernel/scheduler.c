@@ -15,7 +15,7 @@ extern KernelSettings global_Settings;
 */
 void HandleNoSchedule(Thread* old_thread)
 {
-     apic_end_of_interrupt(); // move this back to idt?
+    apic_end_of_interrupt(); // move this back to idt?
     if (old_thread->run_mode == USER_THREAD)
         load_page_table(old_thread->pml4t_phys);
 }

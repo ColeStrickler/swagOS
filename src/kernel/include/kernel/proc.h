@@ -7,9 +7,12 @@
 #include <spinlock.h>
 #include <sleeplock.h>
 #include <elf_load.h>
+
 #define MAX_NUM_THREADS 64
 #define IDLE_THREAD MAX_NUM_THREADS
 #define USER_STACK_LOC 0xfffffc000
+#define USER_HEAP_START (0xffffffff00000000 - 0x1000)
+#define USER_HEAP_END (USER_HEAP_START - (1024*1024*1024))
 
 typedef enum {
     PROCESS_STATE_NOT_INITIALIZED,
@@ -87,6 +90,7 @@ typedef struct Thread
     uint64_t* pml4t_va;
     uint64_t* pml4t_phys;
     cpu_context_t execution_context;
+    uint64_t user_heap_bitmap[512];
     struct dll_Head thread_pages;
     void* sleep_channel;  // will be NULL if process is not sleeping
 } Thread;

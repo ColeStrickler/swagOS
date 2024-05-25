@@ -383,6 +383,7 @@ uint64_t physical_frame_request_4kb()
     uint64_t frame_2mb = physical_frame_request();
     if (frame_2mb == UINT64_MAX)
         return UINT64_MAX;
+
     
     frame_4kb = create_new_chunked_frame(frame_2mb);
     log_hexval("returning frame", frame_4kb);
@@ -515,7 +516,7 @@ void map_4kb_page_smp(uint64_t virtual_address, uint64_t physical_address, uint3
 
 
 
-void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thread* thread)
+void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thread* thread, uint64_t pdt_table_index, uint64_t pd_table_index)
 {
 
     uint64_t pml4t_index = (virtual_address >> 39) & 0x1FF; 
@@ -523,28 +524,30 @@ void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thre
     uint64_t pdt_index = (virtual_address >> 21) & 0x1FF; 
     uint64_t pt_index = (virtual_address >> 12) & 0x1FF;
 
+
     uint64_t flags = PAGE_USER | PAGE_WRITE | PAGE_PRESENT;
 
     // table physical addresses
     uint64_t pml4t_addr = ((uint64_t*)((uint64_t)&thread->pgdir.pml4t & ~KERNEL_HH_START));
 	uint64_t pdpt_addr = ((uint64_t*)((uint64_t)&thread->pgdir.pdpt & ~KERNEL_HH_START));
-	uint64_t pdt_addr = (uint64_t*)((uint64_t)&thread->pgdir.pdt[1] & ~KERNEL_HH_START);
-    uint64_t pt_addr = ((uint64_t*)((uint64_t)&thread->pgdir.pd[0] & ~KERNEL_HH_START));
+	uint64_t pdt_addr = (uint64_t*)((uint64_t)&thread->pgdir.pdt[pdt_table_index] & ~KERNEL_HH_START);
+    uint64_t pt_addr = ((uint64_t*)((uint64_t)&thread->pgdir.pd[pd_table_index] & ~KERNEL_HH_START));
 
 
     thread->pgdir.pml4t[pml4t_index] = ((uint64_t)pdpt_addr) | flags;
 	thread->pgdir.pdpt[pdpt_index] = ((uint64_t)pdt_addr) | flags;
-    if ((thread->pgdir.pdt[1][pdt_index] & PTADDRMASK) != NULL && (thread->pgdir.pdt[1][pdt_index] & PTADDRMASK) != pt_addr)
+    if ((thread->pgdir.pdt[pdt_table_index][pdt_index] & PTADDRMASK) != NULL && (thread->pgdir.pdt[pdt_table_index][pdt_index] & PTADDRMASK) != pt_addr)
     {
-        log_hexval("current", thread->pgdir.pdt[1][pdt_index] & PTADDRMASK);
+        log_hexval("current", thread->pgdir.pdt[pdt_table_index][pdt_index] & PTADDRMASK);
         log_hexval("ptaddr", pt_addr);
         panic("pdt");
     }
-    thread->pgdir.pdt[1][pdt_index] = ((uint64_t)pt_addr) | flags;
+    thread->pgdir.pdt[pdt_table_index][pdt_index] = ((uint64_t)pt_addr) | flags;
 
-    if (thread->pgdir.pd[0][pt_index] & PTADDRMASK != NULL)
+    if (thread->pgdir.pd[pd_table_index][pt_index] & PTADDRMASK != NULL)
         panic("pd");
-    thread->pgdir.pd[0][pt_index] = physical_address | flags;
+    thread->pgdir.pd[pd_table_index][pt_index] = physical_address | flags;
+    log_hexval("done mapping user", 0);
 
     struct thread_used_page_entry* page_entry = kalloc(sizeof(struct thread_used_page_entry));
     page_entry->page_pa = physical_address;
@@ -557,8 +560,7 @@ void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thre
 
 
 
-void 
-map_huge_page_user(uint64_t virtual_address, uint64_t physical_address, Thread* thread, int index)
+void map_huge_page_user(uint64_t virtual_address, uint64_t physical_address, Thread* thread, int index)
 {
     uint64_t pml4t_index = (virtual_address >> 39) & 0x1FF; 
     uint64_t pdpt_index = (virtual_address >> 30) & 0x1FF; 
@@ -657,15 +659,21 @@ bool is_frame_mapped_thread(struct Thread* t, uint64_t virtual_address)
     uint64_t pt_index = (virtual_address >> 12) & 0x1FF;
 
 
+    uint64_t* pdt_addr;
+    uint64_t* pt_addr;
+
+
     if (t->pgdir.pml4t[pml4t_index] & PTADDRMASK == NULL)
         return false;
     if (t->pgdir.pdpt[pdpt_index] & PTADDRMASK == NULL)
         return false;
-    if(t->pgdir.pdt[1][pdt_index] & PTADDRMASK == NULL)
+
+    pdt_addr = (t->pgdir.pdpt[pdpt_index] & PTADDRMASK) + KERNEL_HH_START;
+    if(pdt_addr[pdt_index] & PTADDRMASK == NULL)
         return false;
-
-
-    if (t->pgdir.pd[0][pt_index] & PTADDRMASK != 0)
+    
+    pt_addr = (pdt_addr[pdt_index] & PTADDRMASK) + KERNEL_HH_START;
+    if (pt_addr[pt_index] & PTADDRMASK != 0)
     {
         return true;
     }

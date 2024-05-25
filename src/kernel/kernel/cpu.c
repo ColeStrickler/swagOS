@@ -330,6 +330,6 @@ void dec_cli()
         panic("dec_cli() --> cpu->cli_count == zero.\n");
     // log_hexval("CLI", cpu->cli_count);
     cpu->cli_count -= 1;
-    if (cpu->cli_count == 0)
+    if (cpu->cli_count == 0 && !cpu->noINT)
         sti();
 }

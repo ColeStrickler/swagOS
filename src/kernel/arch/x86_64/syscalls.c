@@ -6,6 +6,10 @@
 #include <asm_routines.h>
 #include <kernel.h>
 
+
+
+
+
 extern KernelSettings global_Settings;
 extern KernelSettings global_Settings;
 
@@ -101,6 +105,92 @@ void FetchStruct(void* addr, void* out, uint32_t size)
 }
 
 
+void SYSHANDLER_exit(cpu_context_t* ctx)
+{
+    Thread* t = GetCurrentThread();
+    ThreadFreeUserPages(t); // free all user mode pages
+    apic_end_of_interrupt();
+    ExitThread();
+}
+
+
+void SYSHANDLER_sbrk(cpu_context_t* ctx)
+{
+    // rdi = syscall number
+    // rsi = number of bytes to allocate
+
+    uint64_t num_pages = (ctx->rsi / PGSIZE) + 1;
+    Thread* t = GetCurrentThread();
+    uint32_t curr_count = 0;
+    uint32_t i_start = 0;
+    uint32_t bit_start = 0;
+    uint32_t end_i = 0;
+    uint32_t end_bit = 0;
+
+    // Search for contiguous space in the heap
+    // We can definitely optimize this into an actual heap later
+    for (uint32_t i = 0; i < 512; i++)
+    {
+        uint64_t entry = t->user_heap_bitmap[i];
+        for (uint32_t bit = 0; bit < 64; bit++)
+        {
+            if (!((entry >> bit) & 0x1))
+            {
+                if (curr_count == 0)
+                {
+                    i_start = i;
+                    bit_start = bit;
+                }
+                curr_count++;
+            }
+            else
+                curr_count = 0;
+
+            if (curr_count == num_pages)
+            {
+                end_bit = bit;
+                end_i = i;
+                break;
+            }
+        }
+        if (curr_count == num_pages)
+            break;
+    }
+
+    // did not find adequate space
+    if (curr_count != num_pages)
+    {
+        log_hexval("Could not find adequate number of pages. Needed", num_pages);
+        ctx->rax = UINT64_MAX;
+        return;
+    }
+
+    // this will contain the pointer we return to the allocated space
+    uint64_t alloc_ptr = USER_HEAP_START - ((PGSIZE * bit_start) + ((64*PGSIZE)*i_start));
+    ctx->rax = alloc_ptr;
+    log_hexval("sbrk() returning address", alloc_ptr);
+    // we found adequate space, mark bits used and allocate pages
+    for (uint32_t i = i_start; i <= end_i; i++)
+    {
+        for (uint32_t bit = bit_start; bit <= end_bit; bit++)
+        {
+            uint64_t va = USER_HEAP_START - ((PGSIZE * bit) + ((64*PGSIZE)*i));
+            uint64_t pa = physical_frame_request_4kb();
+            if (pa == UINT64_MAX) // may want to free the partially allocated space here? or maybe just do that in the process cleanup
+            {
+                ctx->rax = UINT64_MAX;
+                return;
+            }
+            t->user_heap_bitmap[i] |= (1 << bit); // set bit in bitmap
+            log_hexval("mapping pt table index", (USER_HEAP_START - va)/HUGEPGSIZE);
+            map_4kb_page_user(va, pa, t, 3, 2 + (USER_HEAP_START - va)/HUGEPGSIZE); // map page to process page table
+        }
+    }
+    log_hexval("returning from SYSHANDLER_sbrk()", 0x0);
+    return;
+}
+
+
 
 void SYSHANDLER_tprintf(cpu_context_t* ctx)
 {
@@ -126,13 +216,7 @@ void SYSHANDLER_tprintf(cpu_context_t* ctx)
     return;
 }
 
-void SYSHANDLER_exit(cpu_context_t* ctx)
-{
-    Thread* t = GetCurrentThread();
-    ThreadFreeUserPages(t); // free all user mode pages
-    apic_end_of_interrupt();
-    ExitThread();
-}
+
 
 
 
@@ -140,8 +224,9 @@ void SYSHANDLER_exit(cpu_context_t* ctx)
 void syscall_handler(cpu_context_t* ctx)
 {
     load_page_table(KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
+    NoINT_Enable(); // no interrupts will be handled recursively
     log_hexval("syscall_handler()", ctx->rdi);
-    //LogTrapFrame(ctx);
+    LogTrapFrame(ctx);
     switch(ctx->rdi)
     {
         case sys_exit:
@@ -149,9 +234,9 @@ void syscall_handler(cpu_context_t* ctx)
             SYSHANDLER_exit(ctx);
             break;
         }
-        case 1:
+        case sys_sbrk:
         {
-            printf("Hello from syscall %d\n", ctx->rsi);
+            SYSHANDLER_sbrk(ctx);
             break;
         }
         case sys_tprintf:
@@ -168,7 +253,7 @@ void syscall_handler(cpu_context_t* ctx)
             break;;
     }
 
-    //log_to_serial("END OF SYSCALL\n");
+    cli();
     apic_end_of_interrupt(); // we have to do this before we switch page tables as apic isnt currently mapped in user mode processes
     
     load_page_table(get_current_cpu()->current_thread->pml4t_phys);

@@ -112,7 +112,7 @@ bool uva_copy_kernel(Thread *thread);
 
 void map_4kb_page_smp(uint64_t virtual_address, uint64_t physical_address, uint32_t flags);
 
-void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thread *thread);
+void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thread *thread, uint64_t pdt_table_index, uint64_t pt_table_index);
 
 void map_huge_page_user(uint64_t virtual_address, uint64_t physical_address, Thread *thread, int index);
 

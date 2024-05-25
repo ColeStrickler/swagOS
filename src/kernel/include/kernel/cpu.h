@@ -87,6 +87,7 @@ typedef struct CPU
     __attribute__((aligned(0x10))) gdt_st gdt;
     tss_t tss;
     uint64_t kstack;
+    bool noINT;
 } CPU;
 
 void log_gdt(gdt_st *gdt);

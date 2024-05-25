@@ -115,6 +115,8 @@ typedef struct {
 
     We only add ones that may need to be called from elsewhere here
 */
+void NoINT_Enable();
+void NoINT_Disable();
 void lidt();
 void build_IDT(void);
 

@@ -92,7 +92,7 @@ bool ELF_load_segments(struct Thread* thread, unsigned char* elf)
                 log_hexval("check+offset", check_frame+check_offset);
                 panic("check_frame+check_offset!=frame");
             }
-            map_4kb_page_user(ph->vaddr+copy_offset, frame, thread);
+            map_4kb_page_user(ph->vaddr+copy_offset, frame, thread, 1, 0);
             log_to_serial("mapped to kernel pt\n");
             // zero the frame to rid old data
             log_hexval("VA_LOAD_TRANSFER", VA_LOAD_TRANSFER);
