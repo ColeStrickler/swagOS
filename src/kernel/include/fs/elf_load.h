@@ -6,7 +6,7 @@
 /*
     When we copy an elf file to user space pages we will use these locations to do so. At any point in time, unless a load is occurring these locations are undefined
 */ 
-#define VA_LOAD_TRANSFER ((lapic_id()*PGSIZE)+ 0xeeec000)
+#define VA_LOAD_TRANSFER ((lapic_id()*0x1000)+ 0xeeec000)
 enum ELF_TYPE {
     ET_NONE         = 0,        // no file type
     ET_REL          = 1,        // relocatable file
