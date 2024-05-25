@@ -110,7 +110,11 @@ void SYSHANDLER_exit(cpu_context_t* ctx)
     Thread* t = GetCurrentThread();
     ThreadFreeUserPages(t); // free all user mode pages
     apic_end_of_interrupt();
-    ExitThread();
+    t->status = PROCESS_STATE_KILLED;
+    t->id = -1;
+    get_current_cpu()->noINT = false;
+    sti();
+    while(1);
 }
 
 
@@ -255,7 +259,6 @@ void syscall_handler(cpu_context_t* ctx)
 
     cli();
     apic_end_of_interrupt(); // we have to do this before we switch page tables as apic isnt currently mapped in user mode processes
-    
     load_page_table(get_current_cpu()->current_thread->pml4t_phys);
     return;
 }

@@ -344,11 +344,12 @@ void ThreadFreeUserPages(Thread* t)
 
 void ExitThread()
 {   
-    DEBUG_PRINT("EXIT THREAD()");
-    Thread* t = GetCurrentThread();
     
+    Thread* t = GetCurrentThread();
+    DEBUG_PRINT0("EXIT THREAD()", t->id);
     t->status = PROCESS_STATE_KILLED;
     t->id = -1;
+    get_current_cpu()->noINT = false;
     sti();
     while(1); // wait to be rescheduled
    //InvokeScheduler(NULL);

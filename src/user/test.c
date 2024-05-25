@@ -38,7 +38,7 @@ void main()
 
 
 
-    for (uint16_t i = 0; i < 16; i++)
+    for (uint16_t i = 0; i < 50; i++)
     {
         char* new_heap = (char*)do_syscall1(sys_sbrk, stlen(test3) + 1);
         if (new_heap == UINT64_MAX)
@@ -56,5 +56,4 @@ void main()
 
 
     do_syscall0(sys_exit);
-    //do_syscall1(sys, )
 }
