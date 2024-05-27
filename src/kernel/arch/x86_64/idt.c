@@ -222,6 +222,8 @@ unsigned long get_rsp() {
 trapframe64_t* isr_handler(trapframe64_t* tf)
 {
     load_page_table(KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
+    
+
     NoINT_Enable(); // no interrupts will be handled recursively, we turn back off in apic_end_of_interrupt();
 
     switch(tf->isr_id)

@@ -87,7 +87,7 @@ bool FetchQword(void* addr, uint64_t* out)
 }
 
 
-void FetchStruct(void* addr, void* out, uint32_t size)
+void FetchStruct(void* addr, void* out, uint32_t size, uint64_t pagetable)
 {
     Thread* calling_thread = GetCurrentThread();
     if (!is_frame_mapped_thread(calling_thread, addr) || !is_frame_mapped_thread(calling_thread, (uint64_t)addr + size)) // make sure that the address is mapped
@@ -95,7 +95,7 @@ void FetchStruct(void* addr, void* out, uint32_t size)
     if (is_frame_mapped_kernel(addr, global_Settings.pml4t_kernel)) // disallow fetching of kernel data to be used in syscalls
         return false;
 
-    load_page_table(calling_thread->pml4t_phys);
+    load_page_table(pagetable);
     disable_supervisor_mem_protections();
     memcpy(out, addr, size);
     enable_supervisor_mem_protections();
@@ -196,7 +196,7 @@ void SYSHANDLER_sbrk(cpu_context_t* ctx)
 
 
 
-void SYSHANDLER_tprintf(cpu_context_t* ctx)
+void SYSHANDLER_tprintf(cpu_context_t* ctx, uint64_t user_pagetable)
 {
     // rdi = syscall number
     // rsi = string address
@@ -213,7 +213,7 @@ void SYSHANDLER_tprintf(cpu_context_t* ctx)
     char buf[PGSIZE+1]; // +1 to always ensure NULL at end
     memset(buf, 0x00, PGSIZE+1);
 
-    FetchStruct(ctx->rsi, buf, ctx->rdx);
+    FetchStruct(ctx->rsi, buf, ctx->rdx, user_pagetable);
     printf(buf);
     log_hexval("done", ctx->rsi);
     ctx->rax = 0; // no error
@@ -228,6 +228,9 @@ void SYSHANDLER_tprintf(cpu_context_t* ctx)
 void syscall_handler(cpu_context_t* ctx)
 {
     load_page_table(KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
+    Thread* t = GetCurrentThread();
+    uint64_t user_pt = t->pml4t_phys;
+    t->pml4t_phys = KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel);// do this to allow interrupts during syscall handling
     NoINT_Enable(); // no interrupts will be handled recursively
     log_hexval("syscall_handler()", ctx->rdi);
     LogTrapFrame(ctx);
@@ -245,7 +248,7 @@ void syscall_handler(cpu_context_t* ctx)
         }
         case sys_tprintf:
         {
-            SYSHANDLER_tprintf(ctx);
+            SYSHANDLER_tprintf(ctx, user_pt);
             break;
         }
         case sys_tchangecolor:
@@ -256,10 +259,10 @@ void syscall_handler(cpu_context_t* ctx)
         default:
             break;;
     }
-
-    cli();
+    log_to_serial("here\n");
+    t->pml4t_phys = user_pt;
     apic_end_of_interrupt(); // we have to do this before we switch page tables as apic isnt currently mapped in user mode processes
-    load_page_table(get_current_cpu()->current_thread->pml4t_phys);
+    load_page_table(user_pt);
     return;
 }
 
