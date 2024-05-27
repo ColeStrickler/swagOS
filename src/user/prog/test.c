@@ -1,7 +1,4 @@
-
-#include "syscall.h"
-
-
+#include "userlib.h"
 
 
  
@@ -35,25 +32,25 @@ void main()
 
     
     
+    
 
 
-
-    for (uint16_t i = 0; i < 50; i++)
+    for (uint16_t i = 0; i < 5; i++)
     {
-        char* new_heap = (char*)do_syscall1(sys_sbrk, stlen(test3) + 1);
+        char* new_heap = (char*)malloc(strlen(test3)+1);
         if (new_heap == UINT64_MAX)
         {
-            do_syscall2(sys_tprintf, error, stlen(error));
+            printf(error);
             while(1);
         }
         copystr(new_heap, test3);
-        do_syscall2(sys_tprintf, new_heap, stlen(new_heap));
-        do_syscall3(sys_tchangecolor, 0xef, 0x44, 0xff);
-        do_syscall2(sys_tprintf, test2, stlen(test2));
-        do_syscall3(sys_tchangecolor, 0x65, 0xaa, 0x11);
+        printf(new_heap);
+        FontChangeColor(0x66, 0x55, 0x44);
+        printf(test2);
+        FontChangeColor(0x65, 0xaa, 0x11);
     }
     
 
 
-    do_syscall0(sys_exit);
+    Exit();
 }

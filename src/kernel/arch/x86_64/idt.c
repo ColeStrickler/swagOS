@@ -257,6 +257,8 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         {
             DEBUG_PRINT("PF CPU", lapic_id());
             DEBUG_PRINT("Page Fault Interrupt", tf->i_rip);
+            DEBUG_PRINT("Stack", tf->i_rsp);
+            DEBUG_PRINT("Faulting address", get_cr2());
             while(1)
                 panic("");
         }

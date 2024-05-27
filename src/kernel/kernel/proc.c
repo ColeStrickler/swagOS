@@ -85,15 +85,17 @@ void test()
 
 uint64_t CreateUserProcessStack(Thread* t)
 {
-    uint64_t frame = physical_frame_request();
-    if (frame == UINT64_MAX)
-        panic("CreateUserProcessStack() --> got null frame\n");
-    int i = 0;
-
-   // while(is_frame_mapped_thread(t, USER_STACK_LOC + PGSIZE*i)){i++;}
-    map_4kb_page_user(USER_STACK_LOC+PGSIZE*i, frame, t, 512, 512);
+    
+    for (uint32_t i = 0; i < 5; i++)
+    {
+        uint64_t frame = physical_frame_request();
+        if (frame == UINT64_MAX)
+            panic("CreateUserProcessStack() --> got null frame\n");
+        map_4kb_page_user(USER_STACK_LOC-(i*PGSIZE), frame, t, 512, 512);
+    }
+    
    //map_4kb_page_smp(USER_STACK_LOC+PGSIZE*i, frame, PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
-    return USER_STACK_LOC+(PGSIZE*i)+PGSIZE-8; // point to top of stack
+    return USER_STACK_LOC+PGSIZE-8; // point to top of stack
 }
 
 
@@ -340,6 +342,15 @@ void ThreadFreeUserPages(Thread* t)
         kfree(old_entry);
     }
 }
+
+/*
+    This function is used to free all pages allocated to a user mode process
+*/
+void ThreadFreeFileDescriptors(Thread* t)
+{
+
+}
+
 
 
 void ExitThread()

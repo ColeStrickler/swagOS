@@ -330,8 +330,9 @@ void kernel_main(uint64_t ptr_multiboot_info)
 
 	//for (uint32_t i = 0; i < UINT32_MAX;i++){};
 	log_to_serial("here!\n");
-	char *b = ext2_read_file("/test1");
-	CreateUserThread(b);
+	char *b = ext2_read_file("/test");
+	if (b != NULL)
+		CreateUserThread(b);
 	log_to_serial("here2!\n");
 
 	// char* user = 0x69000;

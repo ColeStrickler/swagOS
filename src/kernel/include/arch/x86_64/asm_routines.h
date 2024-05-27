@@ -103,3 +103,15 @@ ltr(unsigned short sel)
 {
   asm volatile("ltr %0" : : "r" (sel));
 }
+
+static inline
+unsigned long get_cr2() {
+    unsigned long faulting_address;
+    __asm__ __volatile__ (
+        "mov %%cr2, %0" // Move value of CR2 to faulting_address variable
+        : "=r" (faulting_address) // Output: constraint "=r" specifies a general-purpose register
+        : // No input operands
+        : // No clobbered registers
+    );
+    return faulting_address;
+}

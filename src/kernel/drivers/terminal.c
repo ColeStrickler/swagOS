@@ -263,6 +263,8 @@ void printf(const char* fmt, ...)
                     case 's':
                     {
                         char* arg = va_arg(args, char*);
+                        
+
                         terminal_print_string(arg, TERMINAL_COLOR);
                         i++;
                         break;
