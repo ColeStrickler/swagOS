@@ -26,11 +26,13 @@ bool FetchByte(void* addr, uint8_t* out)
     if (is_frame_mapped_kernel(addr, global_Settings.pml4t_kernel)) // disallow fetching of kernel data to be used in syscalls
         return false;
 
+    inc_cli();
     load_page_table(calling_thread->pml4t_phys);
     disable_supervisor_mem_protections();
     out = *(uint8_t*)addr;
     enable_supervisor_mem_protections();
     load_page_table(KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
+    dec_cli();
 
     return true;
 }
@@ -43,11 +45,13 @@ bool FetchHword(void* addr, uint16_t* out)
     if (is_frame_mapped_kernel(addr, global_Settings.pml4t_kernel) || !is_frame_mapped_thread(calling_thread, (uint64_t)addr + sizeof(uint16_t))) // disallow fetching of kernel data to be used in syscalls
         return false;
 
+    inc_cli();
     load_page_table(calling_thread->pml4t_phys);
     disable_supervisor_mem_protections();
     out = *(uint16_t*)addr;
     enable_supervisor_mem_protections();
     load_page_table(KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
+    dec_cli();
 
     return true;
 }
@@ -60,11 +64,13 @@ bool FetchDword(void* addr, uint32_t* out)
     if (is_frame_mapped_kernel(addr, global_Settings.pml4t_kernel)) // disallow fetching of kernel data to be used in syscalls
         return false;
 
+    inc_cli();
     load_page_table(calling_thread->pml4t_phys);
     disable_supervisor_mem_protections();
     out = *(uint32_t*)addr;
     enable_supervisor_mem_protections();
     load_page_table(KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
+    dec_cli();
 
     return true;
 }
@@ -77,11 +83,13 @@ bool FetchQword(void* addr, uint64_t* out)
     if (is_frame_mapped_kernel(addr, global_Settings.pml4t_kernel)) // disallow fetching of kernel data to be used in syscalls
         return false;
 
+    inc_cli();
     load_page_table(calling_thread->pml4t_phys);
     disable_supervisor_mem_protections();
     out = *(uint64_t*)addr;
     enable_supervisor_mem_protections();
     load_page_table(KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
+    dec_cli();
 
     return true;
 }
@@ -95,11 +103,13 @@ void FetchStruct(void* addr, void* out, uint32_t size, uint64_t pagetable)
     if (is_frame_mapped_kernel(addr, global_Settings.pml4t_kernel)) // disallow fetching of kernel data to be used in syscalls
         return false;
 
+    inc_cli();
     load_page_table(pagetable);
     disable_supervisor_mem_protections();
     memcpy(out, addr, size);
     enable_supervisor_mem_protections();
     load_page_table(KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
+    dec_cli();
 
     return true;
 }
@@ -201,6 +211,7 @@ void SYSHANDLER_tprintf(cpu_context_t* ctx, uint64_t user_pagetable)
     // rdi = syscall number
     // rsi = string address
     // rdx = string length
+    // rcx = arg1 --> only used for printf1 while we debug
 
     log_hexval("strlen", ctx->rdx);
     log_hexval("str start addr", ctx->rsi);    
@@ -214,12 +225,58 @@ void SYSHANDLER_tprintf(cpu_context_t* ctx, uint64_t user_pagetable)
     memset(buf, 0x00, PGSIZE+1);
 
     FetchStruct(ctx->rsi, buf, ctx->rdx, user_pagetable);
-    printf(buf);
-    log_hexval("done", ctx->rsi);
+    log_to_serial(buf);
+    printf(buf, ctx->rcx);
     ctx->rax = 0; // no error
     return;
 }
 
+
+void SYSHANDLER_open(cpu_context_t* ctx, uint64_t user_pagetable)
+{
+    // rdi = syscall number
+    // rsi = path address
+    // rdx = path length
+
+    Thread* t = GetCurrentThread();
+    char req_path[MAX_PATH];
+    memset(req_path, 0x00, MAX_PATH);
+    FetchStruct(ctx->rsi, req_path, ctx->rdx, user_pagetable);
+    
+
+    uint32_t min_fd = UINT32_MAX;
+
+    for (uint32_t i = 0; i < MAX_FILE_DESC; i++)
+    {
+        if (!strcmp(req_path, t->fd[i].path))
+        {
+            t->fd[i].in_use = true;
+            ctx->rax = i;
+            return;
+        }
+        else
+        {
+            if (!t->fd->in_use)
+            {
+                if (i < min_fd)
+                    min_fd = i;
+            }
+        }
+    }
+
+    // we must re-enable interrupts to handle disk, otherwise we will never receive the interrupt
+    apic_end_of_interrupt();
+    if (ext2_file_exists(req_path))
+    {
+        t->fd[min_fd].in_use = true;
+        ctx->rax = min_fd;
+        log_hexval("returning fd", min_fd);
+        return;
+    }
+
+    ctx->rax = UINT64_MAX;
+    return;
+}
 
 
 
@@ -228,12 +285,15 @@ void SYSHANDLER_tprintf(cpu_context_t* ctx, uint64_t user_pagetable)
 void syscall_handler(cpu_context_t* ctx)
 {
     load_page_table(KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
+    bool do_eoi = true;
     Thread* t = GetCurrentThread();
     uint64_t user_pt = t->pml4t_phys;
     t->pml4t_phys = KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel);// do this to allow interrupts during syscall handling
     NoINT_Enable(); // no interrupts will be handled recursively
     log_hexval("syscall_handler()", ctx->rdi);
     LogTrapFrame(ctx);
+
+
     switch(ctx->rdi)
     {
         case sys_exit:
@@ -251,17 +311,30 @@ void syscall_handler(cpu_context_t* ctx)
             SYSHANDLER_tprintf(ctx, user_pt);
             break;
         }
+        case sys_open:
+        {
+            SYSHANDLER_open(ctx, user_pt);
+            do_eoi = false;
+            break;
+        }
         case sys_tchangecolor:
         {
             terminal_set_color(ctx->rsi, ctx->rdx, ctx->rcx);
             break;
         }
+        case sys_debugvalue:
+        {
+            log_hexval("SYSCALL DEBUG VALUE", ctx->rsi);
+            break;
+        }
         default:
             break;;
     }
-    log_to_serial("here\n");
+    
     t->pml4t_phys = user_pt;
-    apic_end_of_interrupt(); // we have to do this before we switch page tables as apic isnt currently mapped in user mode processes
+    if (do_eoi)
+        apic_end_of_interrupt(); // we have to do this before we switch page tables as apic isnt currently mapped in user mode processes
+    log_to_serial("here\n");
     load_page_table(user_pt);
     return;
 }

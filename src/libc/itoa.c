@@ -12,12 +12,11 @@ void reverse(char str[], int length) {
 }
 
 
-// Function to convert an integer to a string
 char* itoa(int num, char* str, int base) {
     int i = 0;
     int isNegative = 0;
 
-    // Handle 0 explicitly, otherwise the empty string is printed for 0
+    // Handle 0 explicitly, otherwise an empty string is printed for 0
     if (num == 0) {
         str[i++] = '0';
         str[i] = '\0';

@@ -75,6 +75,17 @@ typedef struct thread_used_page_entry
     uint64_t page_pa;
 }thread_used_page_entry;
 
+
+#define MAX_PATH 260
+#define MAX_FILE_DESC 16
+typedef struct file_descriptor
+{
+    bool in_use;
+    char path[MAX_PATH];
+} file_descriptor;
+
+
+
 /*
     We use the Linux model where we schedule individual threads and threads
     belonging to the same process share a virtual address space/page table
@@ -91,6 +102,7 @@ typedef struct Thread
     uint64_t* pml4t_phys;
     cpu_context_t execution_context;
     uint64_t user_heap_bitmap[512];
+    file_descriptor fd[MAX_FILE_DESC];
     struct dll_Head thread_pages;
     void* sleep_channel;  // will be NULL if process is not sleeping
 } Thread;

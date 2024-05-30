@@ -28,26 +28,20 @@ void main()
     char* test2 = "test numba 2\n";
     char* test3 = "will print from malloc 3\n";
 
+    char* fmt = "wtf %u\n";
     char* error = "ERROR\n";
 
     
-    
-    
+    int fd = open("/test");
+   // dbg_val(fd);
+    FontChangeColor(0, 0, 0xff);
+    printf0("meme\n");
 
-
-    for (uint16_t i = 0; i < 5; i++)
+    for (int i = 0; i < 16; i++)
     {
-        char* new_heap = (char*)malloc(strlen(test3)+1);
-        if (new_heap == UINT64_MAX)
-        {
-            printf(error);
-            while(1);
-        }
-        copystr(new_heap, test3);
-        printf(new_heap);
-        FontChangeColor(0x66, 0x55, 0x44);
-        printf(test2);
-        FontChangeColor(0x65, 0xaa, 0x11);
+        
+        printf1("got fd %d\n", (uint64_t)0);
+        printf1("an unsigned long %u\n", -5);
     }
     
 

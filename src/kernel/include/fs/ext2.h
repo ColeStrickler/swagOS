@@ -138,6 +138,8 @@ typedef struct EXT2_DRIVER {
     ext2_inode_t root_inode;
 } EXT2_DRIVER;
 
+bool ext2_file_exists(char *filepath);
+
 unsigned char *ext2_read_file(char *filepath);
 
 void ext2_driver_init();

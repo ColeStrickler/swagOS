@@ -10,6 +10,8 @@
 #define sys_tprintf     2
 #define sys_open        3
 #define sys_tchangecolor 0x1000
+#define sys_debugvalue   0x1111
+
 
 uint64_t do_syscall0(uint64_t syscall_id);
 uint64_t do_syscall1(uint64_t syscall_id, uint64_t rsi);

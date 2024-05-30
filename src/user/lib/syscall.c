@@ -19,6 +19,10 @@ uint64_t do_syscall2(uint64_t syscall_id, uint64_t rsi, uint64_t rdx)
     do_syscall(syscall_id, rsi, rdx, 0, 0, 0);
 }
 
+
+/*
+    for some reason rcx is not getting passed!
+*/
 uint64_t do_syscall3(uint64_t syscall_id, uint64_t rsi, uint64_t rdx, uint64_t rcx)
 {
     do_syscall(syscall_id, rsi, rdx, rcx, 0, 0);

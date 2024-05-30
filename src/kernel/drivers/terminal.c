@@ -19,6 +19,7 @@ Spinlock terminal_lock;
 
 void terminal_set_color(uint8_t r, uint8_t g, uint8_t b)
 {
+    log_hexval("B", b);
     global_Settings.TerminalDriver.color = RGB_COLOR(r,g,b);
 }
 

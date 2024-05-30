@@ -359,6 +359,28 @@ unsigned char** ext2_read_double_indirect(uint32_t blockno, uint32_t* size)
 }
 
 
+
+bool ext2_file_exists(char* filepath)
+{
+    ext2_inode_t file_inode;
+
+    if (ext2_find_file_inode(filepath, &file_inode) == UINT32_MAX)
+    {
+        DEBUG_PRINT0("Could not find file inode!\n");
+        return false;
+    }
+
+    if ((file_inode.mode & 0xF000) != INODE_TYPE_FILE)
+    {
+        // not a file
+        DEBUG_PRINT0("ext2_read_file() --> inode not INODE_TYPE_FILE");
+        return false;
+    }
+    return true;
+}
+
+
+
 /*
     This will return a read file in a buffer that must be kfree()'d
 
