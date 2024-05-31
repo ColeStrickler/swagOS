@@ -36,6 +36,15 @@ int open(const char* filepath)
     return (int)do_syscall2(sys_open, filepath, strlen(filepath));
 }
 
+int fork()
+{
+    return (int)do_syscall0(sys_fork);
+}
+
+void exec(const char* filepath, ...)
+{
+    return;
+}
 
 /*
     returns -1 on failure, 0 on success

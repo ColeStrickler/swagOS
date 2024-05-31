@@ -23,6 +23,7 @@ void copystr(char* a, char* b)
 
 void main()
 {
+    
     uint64_t x = 0xfffff;
     char* test = "test system call print\n";
     char* test2 = "test numba 2\n";
@@ -32,7 +33,8 @@ void main()
     char* error = "ERROR\n";
 
     FontChangeColor(0, 0, 0xff);
-
+    printf0("yolo!\n");
+   // while(1);
     char* buf = malloc(0x100);
 
     char* file = "/test";

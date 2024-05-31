@@ -232,7 +232,7 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         {
             // INT3
             //log_to_serial("INT3\n");
-            if (GetCurrentThread()->status == PROCESS_STATE_SLEEPING)
+            if (GetCurrentThread()->status == THREAD_STATE_SLEEPING)
             {
                 DEBUG_PRINT("Sleeping, invoking scheduler!", lapic_id());
                 InvokeScheduler((cpu_context_t*)tf);

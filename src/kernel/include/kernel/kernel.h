@@ -34,7 +34,7 @@ typedef struct KernelSettings
     uint16_t cpu_count;
     uint64_t original_GDT;
     uint64_t original_GDT_size;
-    struct GlobalThreadTable threads;
+    struct GlobalProcessTable proc_table;
 
     uint32_t ticksIn10ms;
     struct x8664_Settings settings_x8664;

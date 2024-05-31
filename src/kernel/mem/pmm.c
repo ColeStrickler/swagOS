@@ -464,20 +464,20 @@ void map_4kb_page_kernel(uint64_t virtual_address, uint64_t physical_address, PA
 
 
 
-bool uva_copy_kernel(Thread* thread)
+bool uva_copy_kernel(Process* proc)
 {
     uint64_t pml4t_index = (KERNEL_HH_START >> 39) & 0x1FF; // 511
 	uint64_t pdpt_index = (KERNEL_HH_START >> 30) & 0x1FF;	// 510
 	uint64_t pdt_index = (KERNEL_HH_START >> 21) & 0x1FF;	// 0
 
 
-    thread->pgdir.pml4t[511] = KERNEL_PML4T_PHYS(&thread->pgdir.pdpt) | (PAGE_PRESENT | PAGE_WRITE);
-    thread->pgdir.pdpt[510] = KERNEL_PML4T_PHYS(thread->pgdir.pdt[0]) | (PAGE_PRESENT | PAGE_WRITE);
+    proc->pgdir.pml4t[511] = KERNEL_PML4T_PHYS(&proc->pgdir.pdpt) | (PAGE_PRESENT | PAGE_WRITE);
+    proc->pgdir.pdpt[510] = KERNEL_PML4T_PHYS(proc->pgdir.pdt[0]) | (PAGE_PRESENT | PAGE_WRITE);
     
 
     for (uint32_t i = 0; i < 512; i++)
     {
-        thread->pgdir.pdt[0][i] = (i * HUGEPGSIZE) | PAGE_HUGE | PAGE_PRESENT | PAGE_WRITE;
+        proc->pgdir.pdt[0][i] = (i * HUGEPGSIZE) | PAGE_HUGE | PAGE_PRESENT | PAGE_WRITE;
        // map_huge_page_user(KERNEL_HH_START + i*HUGEPGSIZE, i*HUGEPGSIZE, thread);
     }
     
@@ -516,7 +516,7 @@ void map_4kb_page_smp(uint64_t virtual_address, uint64_t physical_address, uint3
 
 
 
-void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thread* thread, uint64_t pdt_table_index, uint64_t pd_table_index)
+void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thread* t, uint64_t pdt_table_index, uint64_t pd_table_index)
 {
 
     uint64_t pml4t_index = (virtual_address >> 39) & 0x1FF; 
@@ -524,6 +524,9 @@ void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thre
     uint64_t pdt_index = (virtual_address >> 21) & 0x1FF; 
     uint64_t pt_index = (virtual_address >> 12) & 0x1FF;
 
+    Process* thread = t->owner_proc;
+    if (thread == NULL)
+        return;
 
     uint64_t flags = PAGE_USER | PAGE_WRITE | PAGE_PRESENT;
 
@@ -532,6 +535,9 @@ void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thre
 	uint64_t pdpt_addr = ((uint64_t*)((uint64_t)&thread->pgdir.pdpt & ~KERNEL_HH_START));
 	uint64_t pdt_addr = (uint64_t*)((uint64_t)&thread->pgdir.pdt[pdt_table_index] & ~KERNEL_HH_START);
     uint64_t pt_addr = ((uint64_t*)((uint64_t)&thread->pgdir.pd[pd_table_index] & ~KERNEL_HH_START));
+
+
+    
 
 
     thread->pgdir.pml4t[pml4t_index] = ((uint64_t)pdpt_addr) | flags;
@@ -554,19 +560,21 @@ void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thre
     if (page_entry == NULL)
         panic("map_4kb_page_user() --> failed to allocate struct thread_used_page_entry\n");
 
-    insert_dll_entry_head(&thread->thread_pages, &page_entry->entry);
+    insert_dll_entry_head(&t->thread_pages, &page_entry->entry);
     return;
 }
 
 
 
-void map_huge_page_user(uint64_t virtual_address, uint64_t physical_address, Thread* thread, int index)
+void map_huge_page_user(uint64_t virtual_address, uint64_t physical_address, Thread* t, int index)
 {
     uint64_t pml4t_index = (virtual_address >> 39) & 0x1FF; 
     uint64_t pdpt_index = (virtual_address >> 30) & 0x1FF; 
     uint64_t pdt_index = (virtual_address >> 21) & 0x1FF; 
 
-
+    Process* thread = t->owner_proc;
+    if (thread == NULL)
+        return;
     uint64_t pdt_i = index;
     uint64_t* pml4t_va = &thread->pgdir.pml4t;
     uint64_t* pdpt_va = &thread->pgdir.pdpt;
@@ -578,6 +586,9 @@ void map_huge_page_user(uint64_t virtual_address, uint64_t physical_address, Thr
     uint64_t pt_p = KERNEL_PML4T_PHYS(pdt_va);
 
     uint32_t flags = (PAGE_PRESENT | PAGE_WRITE);
+
+    
+
 
 
     thread->pgdir.pml4t[pml4t_index] = pdpt_p | flags;
@@ -651,7 +662,7 @@ bool is_frame_mapped_kernel(uint64_t virtual_address, uint64_t* pml4t_addr)
 }
 
 
-bool is_frame_mapped_thread(struct Thread* t, uint64_t virtual_address)
+bool is_frame_mapped_thread(struct Thread* thread, uint64_t virtual_address)
 {
     uint64_t pml4t_index = (virtual_address >> 39) & 0x1FF; 
 	uint64_t pdpt_index = (virtual_address >> 30) & 0x1FF; 
@@ -659,24 +670,36 @@ bool is_frame_mapped_thread(struct Thread* t, uint64_t virtual_address)
     uint64_t pt_index = (virtual_address >> 12) & 0x1FF;
 
 
+    uint64_t* pdpt_addr;
     uint64_t* pdt_addr;
     uint64_t* pt_addr;
 
-
-    if (t->pgdir.pml4t[pml4t_index] & PTADDRMASK == NULL)
+    struct Process* t = thread->owner_proc;
+    if (t == NULL)
         return false;
-    if (t->pgdir.pdpt[pdpt_index] & PTADDRMASK == NULL)
+    log_to_serial("1\n");
+
+    if ((t->pgdir.pml4t[pml4t_index] & PTADDRMASK) == NULL)
         return false;
 
-    pdt_addr = (t->pgdir.pdpt[pdpt_index] & PTADDRMASK) + KERNEL_HH_START;
-    if(pdt_addr[pdt_index] & PTADDRMASK == NULL)
+    pdpt_addr = (t->pgdir.pml4t[pml4t_index] & PTADDRMASK) + KERNEL_HH_START;
+    
+    if ((pdpt_addr[pdpt_index] & PTADDRMASK) == NULL)
         return false;
     
+
+    pdt_addr = (pdpt_addr[pdpt_index] & PTADDRMASK) + KERNEL_HH_START;
+    if(pdt_addr[pdt_index] & PTADDRMASK == NULL)
+        return false;
+    log_hexval("3\n", pdt_addr);
     pt_addr = (pdt_addr[pdt_index] & PTADDRMASK) + KERNEL_HH_START;
+    log_hexval("3.5", pt_addr);
     if (pt_addr[pt_index] & PTADDRMASK != 0)
     {
+        log_to_serial("4\n");
         return true;
     }
+    log_to_serial("5\n");
     return false;
 }
 

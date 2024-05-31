@@ -11,6 +11,8 @@
 #define sys_open        3
 #define sys_read        4
 //#define sys_write     5 --> we do not yet have a write filesyststem implementation
+#define sys_fork        6
+#define sys_exec        7
 #define sys_tchangecolor 0x1000
 #define sys_debugvalue   0x1111
 

@@ -139,7 +139,7 @@ void SYSHANDLER_exit(cpu_context_t* ctx)
     Thread* t = GetCurrentThread();
     ThreadFreeUserPages(t); // free all user mode pages
     apic_end_of_interrupt();
-    t->status = PROCESS_STATE_KILLED;
+    t->status = THREAD_STATE_KILLED;
     t->id = -1;
     get_current_cpu()->noINT = false;
     sti();
@@ -367,6 +367,14 @@ void SYSHANDLER_read(cpu_context_t* ctx, uint64_t user_pagetable)
     return;
 }
 
+void SYSHANDLER_fork(cpu_context_t* ctx, uint64_t user_pagetable)
+{
+    
+
+
+}
+
+
 
 
 
@@ -374,6 +382,7 @@ void SYSHANDLER_read(cpu_context_t* ctx, uint64_t user_pagetable)
 void syscall_handler(cpu_context_t* ctx)
 {
     load_page_table(KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
+    log_hexval("syscall_handler()", ctx->rdi);
     bool do_eoi = true;
     Thread* t = GetCurrentThread();
     uint64_t user_pt = t->pml4t_phys;
@@ -410,6 +419,11 @@ void syscall_handler(cpu_context_t* ctx)
         {
             SYSHANDLER_read(ctx, user_pt);
             do_eoi = false;
+            break;
+        }
+        case sys_fork:
+        {
+            SYSHANDLER_fork(ctx, user_pt);
             break;
         }
         case sys_tchangecolor:

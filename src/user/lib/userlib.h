@@ -16,7 +16,11 @@ void Exit();
 
 int open(const char *filepath);
 
+int fork();
+
 int read(int fd, void *out, uint32_t size, uint32_t read_offset);
+
+int fork();
 
 void dbg_val(uint64_t val);
 

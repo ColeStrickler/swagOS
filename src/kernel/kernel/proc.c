@@ -16,18 +16,18 @@ struct Thread *GetCurrentThread()
 
 void CreateIdleThread(void (*entry)(void *))
 {
-    struct Thread *idle = &global_Settings.threads.thread_table[IDLE_THREAD];
+    struct Thread *idle = &global_Settings.proc_table.thread_table[IDLE_THREAD];
     idle->id = IDLE_THREAD;
     idle->pml4t_phys = KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel);
     idle->pml4t_va = global_Settings.pml4t_kernel;
     //CreatePageTables(idle);
-    idle->status = PROCESS_STATE_READY; // We will keep this so
+    idle->status = THREAD_STATE_READY; // We will keep this so
     idle->can_wakeup = true;
     idle->run_mode = KERNEL_THREAD;
     uint64_t stack_alloc = (uint64_t)kalloc(0x1000);
     if (stack_alloc == NULL)
         panic("CreateIdleThread() --> kalloc() failed!\n");
-    stack_alloc += 0x100; // point stack to top of allocation
+    stack_alloc += 0x1000; // point stack to top of allocation
 
     struct cpu_context_t *ctx = &idle->execution_context;
 
@@ -42,15 +42,15 @@ void CreateIdleThread(void (*entry)(void *))
     ctx->rbp = 0x0;
 }
 
-void CreatePageTables(struct Thread *thread)
+void CreatePageTables(struct Process* proc, struct Thread *thread)
 {
     /*
         Create PML4T
     */
-    thread->pml4t_va = &thread->pgdir.pml4t[0];
+    thread->pml4t_va = &proc->pgdir.pml4t[0];
     if (thread->pml4t_va == NULL)
         panic("CreatePageTables() --> kalloc() returned NULL for pml4t!\n");
-    memset(&thread->pgdir, 0x00, sizeof(thread_pagetables_t));
+    memset(&proc->pgdir, 0x00, sizeof(thread_pagetables_t));
     uint64_t frame;
     uint64_t offset;
 
@@ -60,14 +60,18 @@ void CreatePageTables(struct Thread *thread)
     */
     virtual_to_physical(thread->pml4t_va, global_Settings.pml4t_kernel, &frame, &offset);
     thread->pml4t_phys = frame + offset;
-    if (thread->pml4t_phys != KERNEL_PML4T_PHYS(&thread->pgdir.pml4t[0]))
+    if (thread->pml4t_phys != KERNEL_PML4T_PHYS(&proc->pgdir.pml4t[0]))
         panic("CreatePageTables() --> bad pml4t");
 
     log_hexval("pml4t phys", thread->pml4t_phys);
     log_hexval("pml4t va", thread->pml4t_va);
     // Map top 4gb from kernel into the user address space, will avoid DMIO
-    uva_copy_kernel(thread);
+    uva_copy_kernel(proc);
+
+    //load_page_table(thread->pml4t_phys);
     log_to_serial("done create pt\n");
+    //load_page_table(KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
+
 
 
 }
@@ -88,7 +92,7 @@ uint64_t CreateUserProcessStack(Thread* t)
     
     for (uint32_t i = 0; i < 5; i++)
     {
-        uint64_t frame = physical_frame_request();
+        uint64_t frame = physical_frame_request_4kb();
         if (frame == UINT64_MAX)
             panic("CreateUserProcessStack() --> got null frame\n");
         map_4kb_page_user(USER_STACK_LOC-(i*PGSIZE), frame, t, 512, 512);
@@ -119,22 +123,22 @@ void load_page_table(uint64_t new_page_table) {
 }
 
 
-void CreateUserThread(uint8_t* elf)
+int ForkUserThread(uint64_t user_pagetable, cpu_context_t* ctx)
 {
-    //log_hexval("Attempting global thread_lock", (&global_Settings.threads.lock)->owner_cpu);
-    acquire_Spinlock(&global_Settings.threads.lock);
-    struct Thread *thread_table = &global_Settings.threads.thread_table[0];
+        //log_hexval("Attempting global thread_lock", (&global_Settings.threads.lock)->owner_cpu);
+    acquire_Spinlock(&global_Settings.proc_table.lock);
+    struct Thread *thread_table = &global_Settings.proc_table.thread_table[0];
     for (uint32_t i = 0; i < MAX_NUM_THREADS; i++)
     {
-        if (thread_table[i].status == PROCESS_STATE_NOT_INITIALIZED || thread_table[i].status == PROCESS_STATE_KILLED)
+        if (thread_table[i].status == THREAD_STATE_NOT_INITIALIZED || thread_table[i].status == THREAD_STATE_KILLED)
         {
             log_hexval("Creating new thread at index", i);
             struct Thread *init_thread = &thread_table[i];
-            memset(&init_thread->pgdir, 0x00, sizeof(thread_pagetables_t));
+            //memset(&init_thread->pgdir, 0x00, sizeof(thread_pagetables_t));
             init_thread->id = i;
 
             // CreatePageTables(init_thread);
-            init_thread->status = PROCESS_STATE_READY; // --> may want to do this later
+            init_thread->status = THREAD_STATE_READY; // --> may want to do this later
             init_thread->run_mode = USER_THREAD;
             // we will want to only use this for the kernel stack
             uint64_t stack_alloc = (uint64_t)kalloc(0x10000);
@@ -144,7 +148,10 @@ void CreateUserThread(uint8_t* elf)
             //init_thread->kstack = stack_alloc;
 
             log_hexval("KSTACK:", stack_alloc);
-            CreatePageTables(init_thread);
+            //CreatePageTables(init_thread);
+            init_thread->pml4t_phys = user_pagetable;
+            init_thread->pml4t_va = user_pagetable + KERNEL_HH_START;
+
             //init_thread->pml4t_phys = KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel);
            // log_hexval("PT:", init_thread->pml4t_va);
             log_hexval("mapped", is_frame_mapped_thread(init_thread, KERNEL_HH_START));
@@ -154,8 +161,8 @@ void CreateUserThread(uint8_t* elf)
             if (ctx == NULL)
                 panic("CreateThread() --> failed to allocatged cpu_context_t for new task!\n");
             
-
-            ELF_load_segments(init_thread, elf);
+            init_thread->execution_context = *ctx;
+            //ELF_load_segments(init_thread, elf);
             
            // ctx->i_rip = test;
             /*
@@ -191,8 +198,126 @@ void CreateUserThread(uint8_t* elf)
             break;
         }
     }
+    release_Spinlock(&global_Settings.proc_table.lock);
+    
+}
+
+
+/*
+    Finds a free thread in the thread table if one exists, returns NULL on failure
+
+    NOTE: does not lock the Process table lock, this needs to be done before calling this function
+*/
+Thread* FindFreeThread()
+{
+    struct Thread *thread_table = &global_Settings.proc_table.thread_table[0];
+    for (uint32_t i = 0; i < MAX_NUM_THREADS; i++)
+    {
+        if (thread_table[i].status == THREAD_STATE_NOT_INITIALIZED || thread_table[i].status == THREAD_STATE_KILLED)
+        {
+            struct Thread *thread = &thread_table[i];
+            return thread;
+        }
+    }
+    return NULL;
+}
+
+/*
+    Finds a free process in the process table if one exists, returns NULL on failure
+
+    NOTE: does not lock the Process table lock, this needs to be done before calling this function
+*/
+Process* FindFreeProcess()
+{
+    struct Process *proc_table = &global_Settings.proc_table.proc_table[0];
+    for (uint32_t i = 0; i < MAX_NUM_PROC; i++)
+    {
+        if (proc_table[i].thread_count == 0)
+        {
+            struct Process *proc = &proc_table[i];
+            return proc;
+        }
+    }
+    return NULL;
+}
+
+
+
+
+bool CreateUserProcess(uint8_t* elf)
+{
+
+    acquire_Spinlock(&global_Settings.proc_table.lock);
+    log_hexval("CREATE USER PROC", elf);
+    Process* init_proc = FindFreeProcess();
+    Thread* init_thread = FindFreeThread();
+    if (init_thread == NULL || init_proc == NULL)
+    {
+        release_Spinlock(&global_Settings.proc_table.lock);
+        log_to_serial("CreateUserProcess() --> unable to find free proc or thread!\n");
+        return false;
+    }
+    init_proc->thread_count++;
+    init_thread->owner_proc = init_proc;
+
+    ThreadEntry* thread_entry = kalloc(sizeof(ThreadEntry));
+    if (thread_entry == NULL)
+        panic("CreateUserProcess() --> unable to allocate ThreadEntry!\n");
+    thread_entry->thread = init_thread;
+    insert_dll_entry_head(&init_proc->threads, &thread_entry->entry);
+
+   // log_hexval("Creating new thread at index", i);
+
+    init_thread->id = 1;
+
+    // CreatePageTables(init_thread);
+    init_thread->status = THREAD_STATE_READY; // --> may want to do this later
+    init_thread->run_mode = USER_THREAD;
+    // we will want to only use this for the kernel stack
+
+    CreatePageTables(init_proc, init_thread);
+    //init_thread->pml4t_phys = KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel);
+    // log_hexval("PT:", init_thread->pml4t_va);
+    log_hexval("mapped", is_frame_mapped_thread(init_thread, KERNEL_HH_START));
+
+    struct cpu_context_t *ctx = &init_thread->execution_context;
+    if (ctx == NULL)
+        panic("CreateThread() --> failed to allocatged cpu_context_t for new task!\n");
+            
+
+    ELF_load_segments(init_thread, elf);
+    
+    /*
+        Need to set up the stack in such a way that we can pop off of it and run the proces
+        We can do this like we did in isr.asm and then point init_thread->execution_context to the top of all this
+        so that InvokeScheduler() can operate on it like any other.
+    */
+                  
+    init_thread->can_wakeup = true;
+    //ctx->i_rip = entry; entry is set by the elf loader call
+    ctx->i_rsp = CreateUserProcessStack(init_thread);     // stack_alloc; NEED TO SET THIS TO USER STACK
+    ctx->i_rflags = 0x202; // IF | Reserved
+
+    ctx->i_cs = USER_CS;
+    ctx->i_ss = USER_DS;
+    if (!is_frame_mapped_thread(init_thread, ctx->i_rip))
+        panic("rip not mapped\n");
+    if (!is_frame_mapped_thread(init_thread, ctx->i_rsp))
+        panic("rsp not mapped\n");
+            
+
+    // pass args and other things
+    ctx->rdi = 0x0;
+    ctx->rsi = 0x0;
+    ctx->rbp = 0x0;
+
+            
+
+    log_hexval("Created!", ctx->i_rip);
+    
+    
     log_hexval("end create byte 0", ((uint8_t*)VA_LOAD_TRANSFER)[0]);
-    release_Spinlock(&global_Settings.threads.lock);
+    release_Spinlock(&global_Settings.proc_table.lock);
     
 }
 
@@ -202,22 +327,26 @@ void CreateUserThread(uint8_t* elf)
 
 void CreateKernelThread(void (*entry)(void *))
 {
-    acquire_Spinlock(&global_Settings.threads.lock);
-    struct Thread *thread_table = &global_Settings.threads.thread_table[0];
+    acquire_Spinlock(&global_Settings.proc_table.lock);
+    struct Thread *thread_table = &global_Settings.proc_table.thread_table[0];
     for (uint32_t i = 0; i < MAX_NUM_THREADS; i++)
     {
-        if (thread_table[i].status == PROCESS_STATE_NOT_INITIALIZED || thread_table[i].status == PROCESS_STATE_KILLED)
+        if (thread_table[i].status == THREAD_STATE_NOT_INITIALIZED || thread_table[i].status == THREAD_STATE_KILLED)
         {
 
             log_hexval("Creating new thread at index", i);
             struct Thread *init_thread = &thread_table[i];
-            memset(&init_thread->pgdir, 0x00, sizeof(thread_pagetables_t));
+
+            /*
+                moved pgdir to Process structure
+            */
+            //memset(&init_thread->pgdir, 0x00, sizeof(thread_pagetables_t)); 
             init_thread->id = i;
             // kernel thread
             init_thread->pml4t_phys = KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel);
             init_thread->pml4t_va = global_Settings.pml4t_kernel;
 
-            init_thread->status = PROCESS_STATE_READY;
+            init_thread->status = THREAD_STATE_READY;
             init_thread->run_mode = KERNEL_THREAD;
 
             // allocate kernel stack
@@ -252,14 +381,14 @@ void CreateKernelThread(void (*entry)(void *))
             break;
         }
     }
-    release_Spinlock(&global_Settings.threads.lock);
+    release_Spinlock(&global_Settings.proc_table.lock);
 }
 
 void ThreadSleep(void *sleep_channel, struct Spinlock *spin_lock)
 {
     struct Thread *thread = GetCurrentThread();
     thread->sleep_channel = sleep_channel;
-    thread->status = PROCESS_STATE_SLEEPING;
+    thread->status = THREAD_STATE_SLEEPING;
     thread->can_wakeup = false; // must save context first
 
     if (spin_lock == NULL || sleep_channel == NULL || thread == NULL)
@@ -267,18 +396,18 @@ void ThreadSleep(void *sleep_channel, struct Spinlock *spin_lock)
 
     uint32_t sleeping_cpu = get_current_cpu()->id;
 
-    if (spin_lock != &global_Settings.threads.lock)
+    if (spin_lock != &global_Settings.proc_table.lock)
         release_Spinlock(spin_lock);
     // log_hexval("CLI", get_current_cpu()->cli_count);
     //  We currently have this set up to sleep if thread->status is PROCESS_STATE_SLEEPING
     //  If we want to add software debugging in the future we will need to edit this
     DEBUG_PRINT("Sleeping", sleeping_cpu);
-    if (thread->status == PROCESS_STATE_SLEEPING) // woke up early
+    if (thread->status == THREAD_STATE_SLEEPING) // woke up early
         __asm__ __volatile__("int3");
     else
     {
         DEBUG_PRINT("SKIPPING SLEEP", thread->id);
-        if (spin_lock != &global_Settings.threads.lock)
+        if (spin_lock != &global_Settings.proc_table.lock)
             acquire_Spinlock(spin_lock);
         thread->sleep_channel = NULL;
         return;
@@ -287,7 +416,7 @@ void ThreadSleep(void *sleep_channel, struct Spinlock *spin_lock)
     DEBUG_PRINT("Woken up!", lapic_id());
     thread->sleep_channel = NULL;
 
-    if (spin_lock != &global_Settings.threads.lock)
+    if (spin_lock != &global_Settings.proc_table.lock)
         acquire_Spinlock(spin_lock);
 
     // We release spinlock because we will acquire the process table lock
@@ -300,12 +429,12 @@ void ThreadSleep(void *sleep_channel, struct Spinlock *spin_lock)
 
 void Wakeup(void *channel)
 {
-    struct Thread *thread_table = &global_Settings.threads.thread_table[0];
-    acquire_Spinlock(&global_Settings.threads.lock);
+    struct Thread *thread_table = &global_Settings.proc_table.thread_table[0];
+    acquire_Spinlock(&global_Settings.proc_table.lock);
     for (uint32_t i = 0; i < MAX_NUM_THREADS; i++)
     {
         Thread *t = &thread_table[i];
-        if (t->status == PROCESS_STATE_SLEEPING && t->sleep_channel == channel)
+        if (t->status == THREAD_STATE_SLEEPING && t->sleep_channel == channel)
         {
             DEBUG_PRINT("waking up", t->id);
             /*
@@ -317,13 +446,13 @@ void Wakeup(void *channel)
             {
             };
 
-            t->status = PROCESS_STATE_READY;
+            t->status = THREAD_STATE_READY;
 
 
             DEBUG_PRINT("waking up", t->id);
         }
     }
-    release_Spinlock(&global_Settings.threads.lock);
+    release_Spinlock(&global_Settings.proc_table.lock);
     
 }
 
@@ -358,7 +487,7 @@ void ExitThread()
     
     Thread* t = GetCurrentThread();
     DEBUG_PRINT0("EXIT THREAD()", t->id);
-    t->status = PROCESS_STATE_KILLED;
+    t->status = THREAD_STATE_KILLED;
     t->id = -1;
     get_current_cpu()->noINT = false;
     sti();

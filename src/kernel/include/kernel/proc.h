@@ -8,19 +8,20 @@
 #include <sleeplock.h>
 #include <elf_load.h>
 
-#define MAX_NUM_THREADS 64
+#define MAX_NUM_THREADS 300
 #define IDLE_THREAD MAX_NUM_THREADS
+#define MAX_NUM_PROC    64
 #define USER_STACK_LOC 0xfffffc000
 #define USER_HEAP_START (0xffffffff00000000 - 0x1000)
 #define USER_HEAP_END (USER_HEAP_START - (1024*1024*1024))
 
 typedef enum {
-    PROCESS_STATE_NOT_INITIALIZED,
-    PROCESS_STATE_READY,
-    PROCESS_STATE_RUNNING,
-    PROCESS_STATE_KILLED,
-    PROCESS_STATE_SLEEPING
-} PROCESS_STATE;
+    THREAD_STATE_NOT_INITIALIZED,
+    THREAD_STATE_READY,
+    THREAD_STATE_RUNNING,
+    THREAD_STATE_KILLED,
+    THREAD_STATE_SLEEPING
+} THREAD_STATE;
 
 typedef enum {
     KERNEL_THREAD,
@@ -85,6 +86,10 @@ typedef struct file_descriptor
 } file_descriptor;
 
 
+#define USER_STACK_SIZE (0x1000 * 5)
+
+
+
 
 /*
     We use the Linux model where we schedule individual threads and threads
@@ -93,9 +98,8 @@ typedef struct file_descriptor
 typedef struct Thread
 {
     bool can_wakeup;
-    PROCESS_STATE status;
+    THREAD_STATE status;
     THREAD_RUN_MODE run_mode;
-    thread_pagetables_t pgdir;
     uint64_t kstack[0x10000];
     uint32_t id;
     uint64_t* pml4t_va;
@@ -104,12 +108,33 @@ typedef struct Thread
     uint64_t user_heap_bitmap[512];
     file_descriptor fd[MAX_FILE_DESC];
     struct dll_Head thread_pages;
+    struct Process* owner_proc;
     void* sleep_channel;  // will be NULL if process is not sleeping
 } Thread;
 
 
-typedef struct GlobalThreadTable{
+/*
+    Keep track of all threads used in a process so we can issue kill signals
+*/
+typedef struct ThreadEntry
+{
+    struct dll_Entry entry;
+    Thread* thread;
+} ThreadEntry;
+
+
+typedef struct Process
+{
+    struct dll_Head threads;
+    uint32_t thread_count;
+    thread_pagetables_t pgdir;
+} Process;
+
+
+typedef struct GlobalProcessTable
+{
     struct Spinlock lock;
+    struct Process proc_table[MAX_NUM_PROC];
     struct Thread thread_table[MAX_NUM_THREADS+1]; // +1 so we can use MAX_NUM_THREADS to select IDLE_THREAD
     uint32_t thread_count;
 } GlobalThreadTable;
@@ -118,9 +143,9 @@ Thread *GetCurrentThread();
 
 void CreateIdleThread(void (*entry)(void *));
 
-void CreatePageTables(Thread *thread);
+void CreatePageTables(Process *proc, Thread *thread);
 
-void CreateUserThread(uint8_t *elf);
+bool CreateUserProcess(uint8_t *elf);
 
 void CreateKernelThread(void (*entry)(void *));
 

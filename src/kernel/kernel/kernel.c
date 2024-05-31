@@ -184,7 +184,7 @@ void setup_global_data()
 	log_hexval("PML4TADDR", pml4t_addr);
 	init_Spinlock(&global_Settings.PMM.lock, "PMM");
 	init_Spinlock(&global_Settings.serial_lock, "SERIAL");
-	init_Spinlock(&global_Settings.threads.lock, "gThreads");
+	init_Spinlock(&global_Settings.proc_table.lock, "gThreads");
 	init_Spinlock(&print_lock, "PRINT");
 }
 
@@ -195,12 +195,13 @@ void setup_global_data()
 void kthread_setup()
 {
 	// Initialize kernel main thread
-	global_Settings.threads.thread_count = 1;
-	struct Thread *kthread = &global_Settings.threads.thread_table[0];
+	global_Settings.proc_table.thread_count = 1;
+	
+	struct Thread *kthread = &global_Settings.proc_table.thread_table[0];
 	kthread->id = 0;
 	kthread->pml4t_phys = KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel);
 	kthread->pml4t_va = global_Settings.pml4t_kernel;
-	kthread->status = PROCESS_STATE_RUNNING;
+	kthread->status = THREAD_STATE_RUNNING;
 	kthread->can_wakeup = true;
 	kthread->execution_context.i_cs = KERNEL_CS;
 	kthread->execution_context.i_ss = KERNEL_DS;
@@ -295,10 +296,13 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	alloc_per_cpu_gdt(); // otherwise this does not get done on cpu1
 	sti();
 
-	kthread_setup();
+	
 
 	// log_to_serial("apic setup finished\n");
 	kheap_init(); // we use spinlocks here and mess with interrupt flags so do this after we initialize interrupt stuff
+
+
+	kthread_setup(); // do this after heap init 
 
 	// log_to_serial("keyboard driver init finished\n");
 
@@ -332,7 +336,7 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	log_to_serial("here!\n");
 	char *b = ext2_read_file("/test");
 	if (b != NULL)
-		CreateUserThread(b);
+		CreateUserProcess(b);
 	log_to_serial("here2!\n");
 
 	// char* user = 0x69000;

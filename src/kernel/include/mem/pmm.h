@@ -97,7 +97,8 @@ bool map_kernel_page(uint64_t va, uint64_t pa, PAGE_ALLOC_TYPE type);
 
 void map_4kb_page_kernel(uint64_t virtual_address, uint64_t physical_address, PAGE_ALLOC_TYPE type);
 
-bool uva_copy_kernel(Thread *thread);
+bool uva_copy_kernel(Process *proc);
+
 
 void map_4kb_page_smp(uint64_t virtual_address, uint64_t physical_address, uint32_t flags);
 
