@@ -41,3 +41,8 @@ void dbg_val(uint64_t val)
 {
     do_syscall1(sys_debugvalue, val);
 }
+
+void dbg_val5(uint64_t rsi, uint64_t rdx, uint64_t rcx, uint64_t r8, uint64_t r9)
+{
+    do_syscall(sys_debugvalue, rsi, rdx, rcx, r8, r9);
+}

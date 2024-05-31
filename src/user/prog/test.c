@@ -31,6 +31,8 @@ void main()
     char* fmt = "wtf %u\n";
     char* error = "ERROR\n";
 
+    dbg_val5(0x00, 0x11, 0x22, 0x33, 0x44);
+
     
     int fd = open("/test");
    // dbg_val(fd);
@@ -40,8 +42,7 @@ void main()
     for (int i = 0; i < 16; i++)
     {
         
-        printf1("got fd %d\n", (uint64_t)0);
-        printf1("an unsigned long %u\n", -5);
+        printf1("got fd %d\n", (uint64_t)fd);
     }
     
 

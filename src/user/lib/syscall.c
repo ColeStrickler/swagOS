@@ -53,6 +53,7 @@ uint64_t do_syscall(uint64_t syscall_id, uint64_t rsi, uint64_t rdx, uint64_t rc
         "mov %%rax, %0;"  // Store the result from rax into the result variable
         : "=r" (result)   // Output operand
         : "r" (syscall_id), "r" (rsi), "r" (rdx), "r" (rcx), "r" (r8), "r" (r9) // Input operands
+        : "rax", "rdi", "rsi", "rdx", "r10", "r8", "r9" // Clobbered registers
     );
     return result;
 }

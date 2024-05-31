@@ -324,7 +324,11 @@ void syscall_handler(cpu_context_t* ctx)
         }
         case sys_debugvalue:
         {
-            log_hexval("SYSCALL DEBUG VALUE", ctx->rsi);
+            log_hexval("SYSCALL DEBUG RSI", ctx->rsi);
+            log_hexval("SYSCALL DEBUG RDX", ctx->rdx);
+            log_hexval("SYSCALL DEBUG RCX", ctx->rcx);
+            log_hexval("SYSCALL DEBUG R8", ctx->r8);
+            log_hexval("SYSCALL DEBUG R9", ctx->r9);
             break;
         }
         default:
