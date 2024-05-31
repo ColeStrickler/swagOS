@@ -76,6 +76,19 @@ uint64_t ext2_get_file_size(ext2_inode_t* inode)
     return ((ext2_driver.extended_fields_available ? (inode->sizeHigh << 32) : 0) | inode->size);
 }
 
+
+uint64_t PathToFileSize(char* filepath)
+{
+    if (ext2_file_exists(filepath))
+    {
+        ext2_inode_t inode;
+        ext2_find_file_inode(filepath, &inode);
+        return ext2_get_file_size(&inode);
+    }
+    return UINT64_MAX;
+}
+
+
 void ext2_read_block(void* out, uint32_t block)
 {
     uint32_t offset = 0;
@@ -390,9 +403,9 @@ bool ext2_file_exists(char* filepath)
 */
 unsigned char* ext2_read_file(char* filepath)
 {
-    //DEBUG_PRINT0(filepath);
+    DEBUG_PRINT0(filepath);
     ext2_inode_t file_inode;
-
+    
     if (ext2_find_file_inode(filepath, &file_inode) == UINT32_MAX)
     {
         DEBUG_PRINT0("Could not find file inode!\n");

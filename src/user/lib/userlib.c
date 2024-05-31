@@ -37,6 +37,16 @@ int open(const char* filepath)
 }
 
 
+/*
+    returns -1 on failure, 0 on success
+*/
+int read(int fd, void* out, uint32_t size, uint32_t read_offset)
+{
+    return (int)do_syscall4(sys_read, fd, out, size, read_offset);
+}
+
+
+
 void dbg_val(uint64_t val)
 {
     do_syscall1(sys_debugvalue, val);

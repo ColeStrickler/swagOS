@@ -16,6 +16,8 @@ void Exit();
 
 int open(const char *filepath);
 
+int read(int fd, void *out, uint32_t size, uint32_t read_offset);
+
 void dbg_val(uint64_t val);
 
 void dbg_val5(uint64_t rsi, uint64_t rdx, uint64_t rcx, uint64_t r8, uint64_t r9);

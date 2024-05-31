@@ -95,7 +95,7 @@ bool FetchQword(void* addr, uint64_t* out)
 }
 
 
-void FetchStruct(void* addr, void* out, uint32_t size, uint64_t pagetable)
+bool FetchStruct(void* addr, void* out, uint32_t size, uint64_t pagetable)
 {
     Thread* calling_thread = GetCurrentThread();
     if (!is_frame_mapped_thread(calling_thread, addr) || !is_frame_mapped_thread(calling_thread, (uint64_t)addr + size)) // make sure that the address is mapped
@@ -107,6 +107,25 @@ void FetchStruct(void* addr, void* out, uint32_t size, uint64_t pagetable)
     load_page_table(pagetable);
     disable_supervisor_mem_protections();
     memcpy(out, addr, size);
+    enable_supervisor_mem_protections();
+    load_page_table(KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
+    dec_cli();
+
+    return true;
+}
+
+bool WriteStruct(void* addr, void* src, uint32_t size, uint64_t pagetable)
+{
+    Thread* calling_thread = GetCurrentThread();
+    if (!is_frame_mapped_thread(calling_thread, addr) || !is_frame_mapped_thread(calling_thread, (uint64_t)addr + size)) // make sure that the address is mapped
+        return false;
+    if (is_frame_mapped_kernel(addr, global_Settings.pml4t_kernel)) // disallow fetching of kernel data to be used in syscalls
+        return false;
+
+    inc_cli();
+    load_page_table(pagetable);
+    disable_supervisor_mem_protections();
+    memcpy(addr, src, size);
     enable_supervisor_mem_protections();
     load_page_table(KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
     dec_cli();
@@ -270,11 +289,81 @@ void SYSHANDLER_open(cpu_context_t* ctx, uint64_t user_pagetable)
     {
         t->fd[min_fd].in_use = true;
         ctx->rax = min_fd;
+
+        memset(t->fd[min_fd].path, 0x00, MAX_PATH);
+        memcpy(t->fd[min_fd].path, req_path, strlen(req_path));
+
         log_hexval("returning fd", min_fd);
         return;
     }
 
     ctx->rax = UINT64_MAX;
+    return;
+}
+
+/*
+    Do we need to synchronize fd access? or let this be done in user mode
+*/
+void SYSHANDLER_read(cpu_context_t* ctx, uint64_t user_pagetable)
+{
+    // rdi = syscall number
+    // rsi = file descriptor
+    // rdx = destination address
+    // rcx = amount to read
+    // r8 = read start offset
+    Thread* t = GetCurrentThread();
+    file_descriptor* fd = &t->fd[ctx->rsi];
+    
+
+    if (!fd->in_use)
+    {
+        ctx->rax = UINT64_MAX;
+        return;
+    }
+
+    // we must re-enable interrupts to handle disk, otherwise we will never receive the interrupt
+    apic_end_of_interrupt();
+    uint64_t file_size = PathToFileSize(fd->path);
+    if (file_size == UINT64_MAX || ctx->r8 + ctx->rcx >= file_size)
+    {
+        ctx->rax = UINT64_MAX;
+        return;
+    }
+
+    /*
+        We can make this faster by adding ext2 functionality to read only from certain offsets
+        instead of reading the entire file into the buffer
+    */
+    unsigned char* buf = ext2_read_file(fd->path);
+    if (buf == NULL)
+    {
+        ctx->rax = UINT64_MAX;
+        return;
+    }
+    
+
+
+    char tmp_buf[0x200];
+    uint64_t to_read = ctx->rcx;
+    uint64_t num_read = 0;
+    uint64_t write_dst = ctx->rdx;
+    while(num_read < to_read) // can we do the page table switches here since we enabled interrupts?
+    {
+        // because we do not map heap into user page table we have to use a middle man buffer
+        // this can definitely be optimized
+        uint32_t rw_size = (to_read - num_read < 0x200 ? to_read - num_read : 0x200);
+        memcpy(tmp_buf, &buf[num_read], rw_size);
+        if (!WriteStruct(write_dst + num_read, tmp_buf, rw_size, user_pagetable))
+        {
+            kfree(buf);
+            ctx->rax = UINT64_MAX;
+            return;
+        }
+        num_read += rw_size;
+    }
+    
+    kfree(buf);
+    ctx->rax = 0;
     return;
 }
 
@@ -314,6 +403,12 @@ void syscall_handler(cpu_context_t* ctx)
         case sys_open:
         {
             SYSHANDLER_open(ctx, user_pt);
+            do_eoi = false;
+            break;
+        }
+        case sys_read:
+        {
+            SYSHANDLER_read(ctx, user_pt);
             do_eoi = false;
             break;
         }

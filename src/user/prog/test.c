@@ -31,19 +31,36 @@ void main()
     char* fmt = "wtf %u\n";
     char* error = "ERROR\n";
 
-    dbg_val5(0x00, 0x11, 0x22, 0x33, 0x44);
+    FontChangeColor(0, 0, 0xff);
 
+    char* buf = malloc(0x100);
+
+    char* file = "/test";
     
     int fd = open("/test");
-   // dbg_val(fd);
-    FontChangeColor(0, 0, 0xff);
-    printf0("meme\n");
-
-    for (int i = 0; i < 16; i++)
+    if (fd == -1)
     {
-        
-        printf1("got fd %d\n", (uint64_t)fd);
+        printf0("open() failed!\n");
+        Exit();
     }
+    
+    printf0("Successfully opened!\n");
+    if (read(fd, buf, 0x100, 0) == -1)
+    {
+        printf0("read() failed!\n");
+        Exit();
+    }
+    printf0("Read success!\n");
+    if (buf[0] == 0x7f && buf[1] == 'E' && buf[2] == 'L' && buf[3] == 'F')
+    {
+        printf0("Got ELF file signature!\n");
+    }
+    else
+    {
+        printf0("Failed to get ELF signature.\n");
+    }
+
+    
     
 
 
