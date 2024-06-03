@@ -132,12 +132,6 @@ void page_bitmap_whiteout()
 {
     for (uint16_t i = 0; i < 512; i++)
         global_Settings.PMM.PhysicalPageBitmap[i] = UINT64_MAX;
-
-    
-    
-    if ((global_Settings.PMM.PhysicalPageBitmap[0] & ((uint64_t)1 << 22)) == 0)
-        panic("whiteout failure");
-
 }
 
 /*
@@ -185,6 +179,11 @@ void physical_frame_checkout(uint64_t physical_address)
     //log_hexval("Entry Index:", entry_index);
     //log_hexval("Inner Entry Index", inner_entry_index);
 
+    //log_hexval("i", entry_index);
+    //log_hexval("j", inner_entry_index);
+
+    if (global_Settings.PMM.PhysicalPageBitmap[entry_index] & ((uint64_t)1 << inner_entry_index))
+        panic("physical_frame_checkout() --> attempted to checkout frame that was in use.\n");
 
     // setting the bit to 1 marks the page in use
     global_Settings.PMM.PhysicalPageBitmap[entry_index] |= ((uint64_t)1 << inner_entry_index);
@@ -210,19 +209,27 @@ uint64_t physical_frame_request()
         return UINT64_MAX; // -1
     }
     
-    for (uint32_t i = 0; i < 512; i++)
+    for (uint64_t i = 0; i < 512; i++)
     {
         // 64 bits per 8 bytes
-        for (uint32_t j = 0; j < 64; j++)
+        for (uint64_t j = 0; j < 64; j++)
         {
             if (!(global_Settings.PMM.PhysicalPageBitmap[i] & ((uint64_t)1 << j)))
             {
                 // each uint64_t has 64 bits each accounting for 2mb each
                 uint64_t valid_frame =  (i*64*(HUGEPGSIZE))+(j*HUGEPGSIZE);
+                //log_hexval("i", i);
+                //log_hexval("j", j);
+                //log_hexval("valid frame", valid_frame);
                 physical_frame_checkout(valid_frame);
                 //log_to_serial("spinlock release1\n");
                 release_Spinlock(&global_Settings.PMM.lock);
                 //log_to_serial("spinlock released!!!!!!!\n");
+                if (valid_frame < (1024*1024*1024))
+                {
+                    log_hexval("valid frame", valid_frame);
+                    panic("physical_frame_request() --> returned unmovable kernel frame\n");
+                }
                 return valid_frame;
             }
         }
@@ -555,12 +562,15 @@ void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thre
     thread->pgdir.pd[pd_table_index][pt_index] = physical_address | flags;
     log_hexval("done mapping user", 0);
 
-    struct thread_used_page_entry* page_entry = kalloc(sizeof(struct thread_used_page_entry));
+    struct proc_used_page_entry* page_entry = kalloc(sizeof(struct proc_used_page_entry));
     page_entry->page_pa = physical_address;
+    page_entry->page_va = virtual_address;
+    page_entry->pdt_table_index = pdt_table_index;
+    page_entry->pd_table_index = pd_table_index;
     if (page_entry == NULL)
         panic("map_4kb_page_user() --> failed to allocate struct thread_used_page_entry\n");
 
-    insert_dll_entry_head(&t->thread_pages, &page_entry->entry);
+    insert_dll_entry_head(&thread->used_pages, &page_entry->entry);
     return;
 }
 
@@ -691,6 +701,14 @@ bool is_frame_mapped_thread(struct Thread* thread, uint64_t virtual_address)
     pdt_addr = (pdpt_addr[pdpt_index] & PTADDRMASK) + KERNEL_HH_START;
     if(pdt_addr[pdt_index] & PTADDRMASK == NULL)
         return false;
+    
+    if (pdt_addr[pdt_index] & PAGE_HUGE)
+    {
+        log_hexval("mapped to\n", pdt_addr[pdt_index]);
+        return true;
+    }
+
+
     log_hexval("3\n", pdt_addr);
     pt_addr = (pdt_addr[pdt_index] & PTADDRMASK) + KERNEL_HH_START;
     log_hexval("3.5", pt_addr);
@@ -772,15 +790,20 @@ void virtual_to_physical(uint64_t virtual_address, uint64_t* pml4t_addr, uint64_
 */
 bool check_kernel_frame(uint64_t physical_frame)
 {
-    uint64_t lower_limit = global_Settings.PMM.kernel_loadaddr;
-    uint64_t upper_limit = global_Settings.PMM.kernel_phystop;
-
     // we currently are going to allocate the first 1gb to the kernel
-    if ((physical_frame >= lower_limit && physical_frame <= upper_limit) || physical_frame < (1024*1024*1024))
+    if (physical_frame < (1024*1024*1024))
         return true;
     return false;
 }
 
+void unmap_4kb_page_kernel(uint64_t virtual_address)
+{
+    uint64_t pml4t_index = (virtual_address >> 39) & 0x1FF; 
+    uint64_t pdpt_index = (virtual_address >> 30) & 0x1FF; 
+    uint64_t pdt_index = (virtual_address >> 21) & 0x1FF; 
+    uint64_t pt_index = (virtual_address >> 12) & 0x1FF;
+    global_Settings.pt_kernel[pdt_index][pt_index] = 0;
+}
 
 
 bool check_physical_page_in_use(uint64_t physical_address)
@@ -931,4 +954,3 @@ void free_hugeframe_range(uint64_t start, uint64_t end)
         physical_frame_free(pg_frame);
     }
 }
-

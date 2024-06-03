@@ -25,7 +25,7 @@ void* malloc(uint32_t size)
     return do_syscall1(sys_sbrk, size);
 }
 
-void Exit()
+void ExitThread()
 {
     do_syscall0(sys_exit);
 }

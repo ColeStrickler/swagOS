@@ -56,6 +56,11 @@ Spinlock print_lock;
 
 void DEBUG_PRINT(const char *str, uint64_t hex)
 {
+	if (print_lock.owner_cpu == UINT32_MAX)
+	{
+		log_hexval(str, hex);
+		return;
+	}
 	acquire_Spinlock(&print_lock);
 	log_hexval(str, hex);
 	release_Spinlock(&print_lock);

@@ -65,7 +65,7 @@ struct HeapSection get_buddy(struct KernelHeap* heap, uint32_t index)
 
 void kheap_init()
 {
-
+    log_to_serial("kheap_init()\n");
     /*
         We mapped 1gb for the kernel, so we will start the heap immediately after the kernel and it will grow upwards
         to the top of virtual memory

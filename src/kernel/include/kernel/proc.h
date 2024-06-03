@@ -70,11 +70,14 @@ typedef struct cpu_context_t
 }__attribute__((packed))cpu_context_t;
 
 
-typedef struct thread_used_page_entry
+typedef struct proc_used_page_entry
 {
     struct dll_Entry entry;
+    uint64_t page_va;
     uint64_t page_pa;
-}thread_used_page_entry;
+    uint64_t pdt_table_index;
+    uint64_t pd_table_index
+}proc_used_page_entry;
 
 
 #define MAX_PATH 260
@@ -107,7 +110,6 @@ typedef struct Thread
     cpu_context_t execution_context;
     uint64_t user_heap_bitmap[512];
     file_descriptor fd[MAX_FILE_DESC];
-    struct dll_Head thread_pages;
     struct Process* owner_proc;
     void* sleep_channel;  // will be NULL if process is not sleeping
 } Thread;
@@ -127,13 +129,16 @@ typedef struct Process
 {
     struct dll_Head threads;
     uint32_t thread_count;
+    uint32_t pid;
     thread_pagetables_t pgdir;
+    struct dll_Head used_pages;
 } Process;
 
 
 typedef struct GlobalProcessTable
 {
     struct Spinlock lock;
+    uint32_t pid_alloc;
     struct Process proc_table[MAX_NUM_PROC];
     struct Thread thread_table[MAX_NUM_THREADS+1]; // +1 so we can use MAX_NUM_THREADS to select IDLE_THREAD
     uint32_t thread_count;

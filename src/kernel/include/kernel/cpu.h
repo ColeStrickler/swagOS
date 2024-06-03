@@ -112,7 +112,7 @@ void switch_to_user_mode(uint64_t stack_addr, uint64_t code_addr);
 
 void load_page_table(uint64_t new_page_table);
 
-
+int ForkUserProcess(Thread *old_thread);
 
 /*
     We access this structure in smp_boot.asm so if we need to edit this

@@ -16,6 +16,9 @@
 
 
 void syscall_handler(cpu_context_t *ctx);
+bool FetchStruct(void *addr, void *out, uint32_t size, uint64_t pagetable);
+bool WriteStruct(void *addr, void *src, uint32_t size, uint64_t pagetable);
+
 
 #endif
 

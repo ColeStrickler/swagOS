@@ -131,11 +131,18 @@ void InvokeScheduler(struct cpu_context_t* ctx)
     HandleNoSchedule(old_thread);
 }
 
+void dummy()
+{
+    return;
+}
 
 void schedule(struct CPU* cpu, struct Thread* thread, THREAD_STATE state)
 {
     if (thread->execution_context.i_rip == 0)
         return;
+
+    if (thread->id == 10)
+        dummy();
 
     if (cpu->current_thread)
         DEBUG_PRINT("Old thread rip", cpu->current_thread->execution_context.i_rip);

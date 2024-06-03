@@ -228,7 +228,7 @@ void handle_format_long(long arg, uint32_t color)
 
 void printf(const char* fmt, ...)
 {
-    //acquire_Spinlock(&terminal_lock);
+    acquire_Spinlock(&terminal_lock);
     uint32_t i = 0;
     va_list args;
     va_start(args, fmt);
@@ -286,7 +286,7 @@ void printf(const char* fmt, ...)
             }
         }
     }
-    //release_Spinlock(&terminal_lock);
+    release_Spinlock(&terminal_lock);
 }
 
 

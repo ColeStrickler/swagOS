@@ -285,7 +285,6 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         {
             global_Settings.tickCount++;
             //if (lapic_id())
-            log_hexval("PID id", lapic_id());
             outb(0x20,0x20); outb(0xa0,0x20);    
             apic_end_of_interrupt();
             break;

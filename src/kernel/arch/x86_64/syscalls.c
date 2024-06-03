@@ -98,7 +98,7 @@ bool FetchQword(void* addr, uint64_t* out)
 bool FetchStruct(void* addr, void* out, uint32_t size, uint64_t pagetable)
 {
     Thread* calling_thread = GetCurrentThread();
-    if (!is_frame_mapped_thread(calling_thread, addr) || !is_frame_mapped_thread(calling_thread, (uint64_t)addr + size)) // make sure that the address is mapped
+    if (!is_frame_mapped_thread(calling_thread, addr) || !is_frame_mapped_thread(calling_thread, (uint64_t)addr + size-1)) // make sure that the address is mapped
         return false;
     if (is_frame_mapped_kernel(addr, global_Settings.pml4t_kernel)) // disallow fetching of kernel data to be used in syscalls
         return false;
@@ -107,6 +107,7 @@ bool FetchStruct(void* addr, void* out, uint32_t size, uint64_t pagetable)
     load_page_table(pagetable);
     disable_supervisor_mem_protections();
     memcpy(out, addr, size);
+    log_hexval("label", ((char*)addr)[0]);
     enable_supervisor_mem_protections();
     load_page_table(KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
     dec_cli();
@@ -117,7 +118,7 @@ bool FetchStruct(void* addr, void* out, uint32_t size, uint64_t pagetable)
 bool WriteStruct(void* addr, void* src, uint32_t size, uint64_t pagetable)
 {
     Thread* calling_thread = GetCurrentThread();
-    if (!is_frame_mapped_thread(calling_thread, addr) || !is_frame_mapped_thread(calling_thread, (uint64_t)addr + size)) // make sure that the address is mapped
+    if (!is_frame_mapped_thread(calling_thread, addr) || !is_frame_mapped_thread(calling_thread, (uint64_t)addr + size -1)) // make sure that the address is mapped
         return false;
     if (is_frame_mapped_kernel(addr, global_Settings.pml4t_kernel)) // disallow fetching of kernel data to be used in syscalls
         return false;
@@ -137,7 +138,8 @@ bool WriteStruct(void* addr, void* src, uint32_t size, uint64_t pagetable)
 void SYSHANDLER_exit(cpu_context_t* ctx)
 {
     Thread* t = GetCurrentThread();
-    ThreadFreeUserPages(t); // free all user mode pages
+    // Free pages if last thread in a process
+    //ThreadFreeUserPages(t); // free all user mode pages
     apic_end_of_interrupt();
     t->status = THREAD_STATE_KILLED;
     t->id = -1;
@@ -244,6 +246,7 @@ void SYSHANDLER_tprintf(cpu_context_t* ctx, uint64_t user_pagetable)
     memset(buf, 0x00, PGSIZE+1);
 
     FetchStruct(ctx->rsi, buf, ctx->rdx, user_pagetable);
+    log_to_serial("buf:\n");
     log_to_serial(buf);
     printf(buf, ctx->rcx);
     ctx->rax = 0; // no error
@@ -369,9 +372,20 @@ void SYSHANDLER_read(cpu_context_t* ctx, uint64_t user_pagetable)
 
 void SYSHANDLER_fork(cpu_context_t* ctx, uint64_t user_pagetable)
 {
-    
+    // rdi = syscall number
 
+    Thread* current_thread = GetCurrentThread();
+    int child_pid = ForkUserProcess(current_thread);
+    if (child_pid == -1)
+    {
+        ctx->rax = UINT64_MAX; // failure
+        return;
+    }
+    log_hexval("child pid", child_pid);
 
+    ctx->rax = child_pid;
+
+    return;
 }
 
 
@@ -386,9 +400,9 @@ void syscall_handler(cpu_context_t* ctx)
     bool do_eoi = true;
     Thread* t = GetCurrentThread();
     uint64_t user_pt = t->pml4t_phys;
+    t->execution_context = *ctx;
     t->pml4t_phys = KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel);// do this to allow interrupts during syscall handling
     NoINT_Enable(); // no interrupts will be handled recursively
-    log_hexval("syscall_handler()", ctx->rdi);
     LogTrapFrame(ctx);
 
 
@@ -423,6 +437,9 @@ void syscall_handler(cpu_context_t* ctx)
         }
         case sys_fork:
         {
+            log_hexval("fork from tid", GetCurrentThread()->id);
+            if (GetCurrentThread()->id == 10)
+                break;
             SYSHANDLER_fork(ctx, user_pt);
             break;
         }

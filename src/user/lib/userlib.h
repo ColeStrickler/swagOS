@@ -12,7 +12,7 @@ void FontChangeColor(uint8_t r, uint8_t g, uint8_t b);
 
 void* malloc(uint32_t size);
 
-void Exit();
+void ExitThread();
 
 int open(const char *filepath);
 

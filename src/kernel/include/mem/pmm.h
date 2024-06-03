@@ -30,7 +30,8 @@ typedef enum PAGE_ALLOC_TYPE
     ALLOC_TYPE_KERNEL_HEAP2,
     ALLOC_TYPE_DM_IO,
     ALLOC_TYPE_USER_BINARY,
-    ALLOC_TYPE_USER_HEAP
+    ALLOC_TYPE_USER_HEAP,
+    ALLOC_TYPE_TEMPORARY
 } PAGE_ALLOC_TYPE;
 
 // Allow 4kb pages to be checked out of a 2mb chunk
@@ -96,6 +97,8 @@ uint64_t physical_frame_request_4kb();
 bool map_kernel_page(uint64_t va, uint64_t pa, PAGE_ALLOC_TYPE type);
 
 void map_4kb_page_kernel(uint64_t virtual_address, uint64_t physical_address, PAGE_ALLOC_TYPE type);
+
+void unmap_4kb_page_kernel(uint64_t virtual_address);
 
 bool uva_copy_kernel(Process *proc);
 
