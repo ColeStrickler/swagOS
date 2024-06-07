@@ -53,7 +53,7 @@ bool ELF_load_segments(struct Thread* thread, unsigned char* elf)
 
     for (uint16_t i = 0; i < header->phNum; i++)
     {
-        log_hexval("phNum", i);
+        //log_hexval("phNum", i);
         
         elf64_program_header_t* ph = (elf64_program_header_t*)(elf + header->phOff + i * header->phEntrySize);
         //log_hexval("memSize", ph->memSize);

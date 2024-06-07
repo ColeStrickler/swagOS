@@ -39,13 +39,14 @@ void main()
     }
     else if (pid == 0)
     {
-        dbg_val(0x69);
         printf0(child);
+        
     }
     else
     {
-        dbg_val(pid);
+        exec("/meme", 0);
         printf1(parent, pid);
+        
     }
 
     ExitThread();

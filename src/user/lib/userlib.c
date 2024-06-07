@@ -41,8 +41,26 @@ int fork()
     return (int)do_syscall0(sys_fork);
 }
 
-void exec(const char* filepath, ...)
+void exec(const char* filepath, int argc, ...)
 {
+    char* arg_array[16];
+    va_list args;         // Declare a variable to hold the argument list
+    va_start(args, argc); 
+
+
+    /*
+        Build arg array
+    */
+    uint32_t len = 0;
+    for (int i = 0; i < argc; i++)
+    {
+        char* arg = va_arg(args, char*);
+        arg_array[i] = malloc(len + 1);
+        memcpy(arg_array[0], filepath, len);
+        arg_array[i][len] = 0x0;
+    }
+
+    do_syscall2(sys_exec, filepath, &arg_array[0]);
     return;
 }
 

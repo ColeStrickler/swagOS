@@ -57,8 +57,15 @@ void SaveThreadContext(struct Thread* old_thread, struct cpu_context_t* ctx)
         return;
     }
     
+    /*
+        If old thread was killed, clear its resources so it is not rescheduled
+    */
     if (old_thread->status == THREAD_STATE_KILLED)
+    {
+        memset(old_thread, sizeof(Thread), 0x00);
         return;
+    }
+
 
     if (old_thread->status != THREAD_STATE_RUNNING && old_thread->status != THREAD_STATE_SLEEPING)
     {
@@ -141,7 +148,7 @@ void schedule(struct CPU* cpu, struct Thread* thread, THREAD_STATE state)
     if (thread->execution_context.i_rip == 0)
         return;
 
-    if (thread->id == 10)
+    if (thread->id == 16)
         dummy();
 
     if (cpu->current_thread)

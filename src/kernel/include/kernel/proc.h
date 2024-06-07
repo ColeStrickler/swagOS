@@ -79,7 +79,7 @@ typedef struct proc_used_page_entry
     uint64_t pd_table_index
 }proc_used_page_entry;
 
-
+#define MAX_ARG_COUNT 16
 #define MAX_PATH 260
 #define MAX_FILE_DESC 16
 typedef struct file_descriptor
@@ -109,7 +109,7 @@ typedef struct Thread
     uint64_t* pml4t_phys;
     cpu_context_t execution_context;
     uint64_t user_heap_bitmap[512];
-    file_descriptor fd[MAX_FILE_DESC];
+   
     struct Process* owner_proc;
     void* sleep_channel;  // will be NULL if process is not sleeping
 } Thread;
@@ -132,6 +132,7 @@ typedef struct Process
     uint32_t pid;
     thread_pagetables_t pgdir;
     struct dll_Head used_pages;
+    file_descriptor fd[MAX_FILE_DESC];
 } Process;
 
 

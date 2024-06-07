@@ -382,7 +382,7 @@ bool ext2_file_exists(char* filepath)
         DEBUG_PRINT0("Could not find file inode!\n");
         return false;
     }
-
+    log_to_serial("found node!\n");
     if ((file_inode.mode & 0xF000) != INODE_TYPE_FILE)
     {
         // not a file

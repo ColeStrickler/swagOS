@@ -21,7 +21,7 @@ bool isValidCharString(char* start, uint32_t size)
 bool FetchByte(void* addr, uint8_t* out)
 {
     Thread* calling_thread = GetCurrentThread();
-    if (!is_frame_mapped_thread(calling_thread, addr) || !is_frame_mapped_thread(calling_thread, (uint64_t)addr + sizeof(uint8_t))) // make sure that the address is mapped
+    if (!is_frame_mapped_thread(calling_thread, addr) || !is_frame_mapped_thread(calling_thread, (uint64_t)addr + sizeof(uint8_t)-1)) // make sure that the address is mapped
         return false;
     if (is_frame_mapped_kernel(addr, global_Settings.pml4t_kernel)) // disallow fetching of kernel data to be used in syscalls
         return false;
@@ -42,7 +42,7 @@ bool FetchHword(void* addr, uint16_t* out)
     Thread* calling_thread = GetCurrentThread();
     if (!is_frame_mapped_thread(calling_thread, addr)) // make sure that the address is mapped
         return false;
-    if (is_frame_mapped_kernel(addr, global_Settings.pml4t_kernel) || !is_frame_mapped_thread(calling_thread, (uint64_t)addr + sizeof(uint16_t))) // disallow fetching of kernel data to be used in syscalls
+    if (is_frame_mapped_kernel(addr, global_Settings.pml4t_kernel) || !is_frame_mapped_thread(calling_thread, (uint64_t)addr + sizeof(uint16_t)-1)) // disallow fetching of kernel data to be used in syscalls
         return false;
 
     inc_cli();
@@ -59,7 +59,7 @@ bool FetchHword(void* addr, uint16_t* out)
 bool FetchDword(void* addr, uint32_t* out)
 {
     Thread* calling_thread = GetCurrentThread();
-    if (!is_frame_mapped_thread(calling_thread, addr) || !is_frame_mapped_thread(calling_thread, (uint64_t)addr + sizeof(uint32_t))) // make sure that the address is mapped
+    if (!is_frame_mapped_thread(calling_thread, addr) || !is_frame_mapped_thread(calling_thread, (uint64_t)addr + sizeof(uint32_t)-1)) // make sure that the address is mapped
         return false;
     if (is_frame_mapped_kernel(addr, global_Settings.pml4t_kernel)) // disallow fetching of kernel data to be used in syscalls
         return false;
@@ -78,19 +78,22 @@ bool FetchDword(void* addr, uint32_t* out)
 bool FetchQword(void* addr, uint64_t* out)
 {
     Thread* calling_thread = GetCurrentThread();
-    if (!is_frame_mapped_thread(calling_thread, addr) || !is_frame_mapped_thread(calling_thread, (uint64_t)addr + sizeof(uint64_t))) // make sure that the address is mapped
+    if (!is_frame_mapped_thread(calling_thread, addr) || !is_frame_mapped_thread(calling_thread, (uint64_t)addr + sizeof(uint64_t)-1)) // make sure that the address is mapped
         return false;
     if (is_frame_mapped_kernel(addr, global_Settings.pml4t_kernel)) // disallow fetching of kernel data to be used in syscalls
         return false;
 
+    
     inc_cli();
     load_page_table(calling_thread->pml4t_phys);
     disable_supervisor_mem_protections();
+    log_to_serial("FetchQword() fetching\n");
     out = *(uint64_t*)addr;
+    log_to_serial("FetchQword() done fetching\n");
     enable_supervisor_mem_protections();
     load_page_table(KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
     dec_cli();
-
+    
     return true;
 }
 
@@ -107,13 +110,40 @@ bool FetchStruct(void* addr, void* out, uint32_t size, uint64_t pagetable)
     load_page_table(pagetable);
     disable_supervisor_mem_protections();
     memcpy(out, addr, size);
-    log_hexval("label", ((char*)addr)[0]);
     enable_supervisor_mem_protections();
     load_page_table(KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
     dec_cli();
 
     return true;
 }
+
+bool FetchString(void* addr, void* out, uint32_t max_len, uint64_t pagetable)
+{
+    Thread* calling_thread = GetCurrentThread();
+    if (!is_frame_mapped_thread(calling_thread, addr) || !is_frame_mapped_thread(calling_thread, (uint64_t)addr + max_len-1)) // make sure that the address is mapped
+        return false;
+    if (is_frame_mapped_kernel(addr, global_Settings.pml4t_kernel)) // disallow fetching of kernel data to be used in syscalls
+        return false;
+
+    inc_cli();
+    load_page_table(pagetable);
+    disable_supervisor_mem_protections();
+    char* str = addr;
+    char* buf = out;
+    for (uint32_t i = 0; i < max_len; i++)
+    {
+        log_hexval("here", i);
+        if (!str[i])
+            break;
+        buf[i] = str[i];
+    }
+    enable_supervisor_mem_protections();
+    load_page_table(KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
+    dec_cli();
+    log_to_serial("done!\n");
+    return true;
+}
+
 
 bool WriteStruct(void* addr, void* src, uint32_t size, uint64_t pagetable)
 {
@@ -133,6 +163,7 @@ bool WriteStruct(void* addr, void* src, uint32_t size, uint64_t pagetable)
 
     return true;
 }
+
 
 
 void SYSHANDLER_exit(cpu_context_t* ctx)
@@ -260,7 +291,7 @@ void SYSHANDLER_open(cpu_context_t* ctx, uint64_t user_pagetable)
     // rsi = path address
     // rdx = path length
 
-    Thread* t = GetCurrentThread();
+    Process* t = GetCurrentThread()->owner_proc;
     char req_path[MAX_PATH];
     memset(req_path, 0x00, MAX_PATH);
     FetchStruct(ctx->rsi, req_path, ctx->rdx, user_pagetable);
@@ -314,7 +345,7 @@ void SYSHANDLER_read(cpu_context_t* ctx, uint64_t user_pagetable)
     // rdx = destination address
     // rcx = amount to read
     // r8 = read start offset
-    Thread* t = GetCurrentThread();
+    Process* t = GetCurrentThread()->owner_proc;
     file_descriptor* fd = &t->fd[ctx->rsi];
     
 
@@ -388,6 +419,82 @@ void SYSHANDLER_fork(cpu_context_t* ctx, uint64_t user_pagetable)
     return;
 }
 
+void SYSHANDLER_exec(cpu_context_t* ctx, uint64_t user_pagetable)
+{
+    // rdi = syscall number
+    // rsi = path of program to execute
+    // rdx = argument array 
+
+    Thread* current_thread = GetCurrentThread();
+    char program_path[MAX_PATH];
+    memset(program_path, 0x00, MAX_PATH);
+    if (!FetchString(ctx->rsi, program_path, MAX_PATH, user_pagetable))
+    {
+        ctx->rax = UINT64_MAX;
+        return;
+    }
+
+    log_to_serial("got path: ");
+    log_to_serial(program_path);
+    log_to_serial("\n");
+
+    char** args[MAX_ARG_COUNT+1];
+    memset(args, 0x00, (MAX_ARG_COUNT+1)*sizeof(char*));
+    uint32_t arg_num = 1;
+    
+    // set first argument to the program path of the program to execute
+    char* path_arg = kalloc(MAX_PATH);
+    memset(path_arg, 0x00, MAX_PATH);
+    memcpy(path_arg, program_path, MAX_PATH);
+
+    for (uint32_t i = 0; i < MAX_ARG_COUNT && false; i++)
+    {
+        char buf[0x100];
+        memset(buf, 0x00, 0x100);
+
+        uint64_t arg_addr;
+        log_hexval("Getting addr", arg_addr);
+        if(!FetchQword(ctx->rdx + i*sizeof(char*), &arg_addr))
+        {
+            ctx->rax = UINT64_MAX;
+            return;
+        }
+        log_hexval("Got arg addr", arg_addr);
+        if (arg_addr == 0)
+            break;
+
+        if (!FetchString(arg_addr, buf, MAX_PATH, user_pagetable))
+        {
+            ctx->rax = UINT64_MAX;
+            return;
+        }
+
+        uint32_t len = strlen(buf);
+        if (!len)
+            break;
+
+        // copy string to argument array
+        char* arg = kalloc(len);
+        if (!arg)
+            panic("SYSHANDLER_exec() --> kalloc failed to allocate arg.\n");
+
+        memcpy(arg, buf, len);
+        arg[len] = 0x0; // null the arg
+        args[arg_num] = arg;
+        arg_num++;
+    }
+
+    
+    apic_end_of_interrupt();
+    ExecUserProcess(current_thread, program_path, args);
+    return;
+}
+
+
+void SYSHANDLER_cacheflush(cpu_context_t* ctx, uint64_t user_pagetable)
+{
+
+}
 
 
 
@@ -438,9 +545,18 @@ void syscall_handler(cpu_context_t* ctx)
         case sys_fork:
         {
             log_hexval("fork from tid", GetCurrentThread()->id);
-            if (GetCurrentThread()->id == 10)
-                break;
             SYSHANDLER_fork(ctx, user_pt);
+            break;
+        }
+        case sys_exec:
+        {
+            SYSHANDLER_exec(ctx, user_pt);
+            do_eoi = false;
+            break;
+        }
+        case sys_cacheflush:
+        {
+            SYSHANDLER_cacheflush(ctx, user_pt);
             break;
         }
         case sys_tchangecolor:
@@ -464,8 +580,8 @@ void syscall_handler(cpu_context_t* ctx)
     t->pml4t_phys = user_pt;
     if (do_eoi)
         apic_end_of_interrupt(); // we have to do this before we switch page tables as apic isnt currently mapped in user mode processes
-    log_to_serial("here\n");
     load_page_table(user_pt);
+    memcpy(ctx, &t->execution_context, sizeof(cpu_context_t));
     return;
 }
 
