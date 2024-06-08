@@ -4,7 +4,8 @@
 #include <elf_load.h>
 
 extern KernelSettings global_Settings;
-
+Spinlock disk_lock;
+bool can_use_disk = true;
 #define DIV_FLOOR(x, y) ((x) / (y))
 #define DIV_CEIL(x, y) (((x) + (y) - 1) / (y))
 
@@ -54,10 +55,10 @@ uint64_t ext2_GetInodeOffset(uint32_t inode)
 void read_disk_sector(void* out, uint32_t sector, uint32_t byte_count)
 {
     iobuf* b = bread(0, sector);
-    //log_to_serial("bread done\n");
+    //DEBUG_PRINT("bread done", GetCurrentThread()->id);
     memcpy(out, b->data, byte_count);
     brelse(b);
-    //log_to_serial("brelse done\n");
+    //DEBUG_PRINT("brelse done", GetCurrentThread()->id);
 }
 
 /*
@@ -91,6 +92,7 @@ uint64_t PathToFileSize(char* filepath)
 
 void ext2_read_block(void* out, uint32_t block)
 {
+    //log_to_serial("read block()\n");
     uint32_t offset = 0;
     uint32_t sector = ext2_block_to_disk_sector(block);
     for (uint32_t j = 0; j < ext2_driver.block_size / DISK_SECTOR_SIZE; j++)
@@ -99,6 +101,7 @@ void ext2_read_block(void* out, uint32_t block)
         sector++;
         offset += DISK_SECTOR_SIZE;
     }
+    //log_to_serial("read block() done\n");
 }
 
 
@@ -209,13 +212,16 @@ uint32_t ext2_find_file_inode(char* path, ext2_inode_t* inode_out)
     {
         if (!inode_num)
             return UINT32_MAX;
+        DEBUG_PRINT0("KFREE(OG)");
         kfree(og);
+        DEBUG_PRINT0("KFREE(OG) DONE");
         DEBUG_PRINT("Inode Num", inode_num);
         /*
             WE ARE MESSING UP HERE WHEN WE TRY TO GET THE FILE INODE
             THERE IS SOMETHING IN BETWEEN THAT WEE NEED TO DO
         */
         ext2_read_inode(inode_out, inode_num);
+        DEBUG_PRINT0("READ INODE");
         return 0;
     }
 
@@ -382,7 +388,7 @@ bool ext2_file_exists(char* filepath)
         DEBUG_PRINT0("Could not find file inode!\n");
         return false;
     }
-    log_to_serial("found node!\n");
+   // log_to_serial("found node!\n");
     if ((file_inode.mode & 0xF000) != INODE_TYPE_FILE)
     {
         // not a file
@@ -403,7 +409,6 @@ bool ext2_file_exists(char* filepath)
 */
 unsigned char* ext2_read_file(char* filepath)
 {
-    DEBUG_PRINT0(filepath);
     ext2_inode_t file_inode;
     
     if (ext2_find_file_inode(filepath, &file_inode) == UINT32_MAX)
@@ -411,7 +416,7 @@ unsigned char* ext2_read_file(char* filepath)
         DEBUG_PRINT0("Could not find file inode!\n");
         return NULL;
     }
-
+    DEBUG_PRINT("Got inode", GetCurrentThread()->id);
     if ((file_inode.mode & 0xF000) != INODE_TYPE_FILE)
     {
         // not a file
@@ -420,17 +425,17 @@ unsigned char* ext2_read_file(char* filepath)
     }
 
     unsigned char* ret_buf = kalloc(ext2_get_file_size(&file_inode));
-
+    
     if (ret_buf == NULL)
         panic("ext2_read_file() --> kalloc() failure!");
-
+    log_to_serial("allocated ret buf\n");
     uint64_t buf_offset = 0;
     for (uint16_t i = 0; i < 12; i++)
     {
         uint32_t block = file_inode.blocks[i];
         if (!block)
             return ret_buf; // EOF
-        DEBUG_PRINT("READING BLOCK FROM FILE", i);
+        //DEBUG_PRINT("READING BLOCK FROM FILE", i);
         ext2_read_block(ret_buf+buf_offset, block);
         buf_offset += ext2_driver.block_size;
     }
@@ -460,7 +465,7 @@ unsigned char* ext2_read_file(char* filepath)
 
     if (file_inode.blocks[14])
         DEBUG_PRINT0("HERE!\n");
-    
+    DEBUG_PRINT("ext2_read_file() done", GetCurrentThread()->id);
     return ret_buf;
 }
 
@@ -470,6 +475,9 @@ unsigned char* ext2_read_file(char* filepath)
 
 void ext2_driver_init()
 {
+    init_Spinlock(&disk_lock, "disk_lock");
+    log_to_serial("init disk lock success\n");
+
     iobuf* buf = bread(0, SUPERBLOCK_SECTOR);
     iobuf* buf2 = bread(0, SUPERBLOCK_SECTOR+1);
     if (buf == NULL || buf2 == NULL)

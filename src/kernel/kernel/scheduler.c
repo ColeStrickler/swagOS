@@ -56,29 +56,34 @@ void SaveThreadContext(struct Thread* old_thread, struct cpu_context_t* ctx)
         DEBUG_PRINT("old_thread == idle_thread, RETURNING...", 0);
         return;
     }
-    
-    /*
-        If old thread was killed, clear its resources so it is not rescheduled
-    */
-    if (old_thread->status == THREAD_STATE_KILLED)
+    log_hexval("status", old_thread->status);
+    switch (old_thread->status)
     {
-        memset(old_thread, sizeof(Thread), 0x00);
-        return;
+        case THREAD_STATE_KILLED:
+        {
+            memset(old_thread, sizeof(Thread), 0x00);
+            break;
+        }
+        case THREAD_STATE_SLEEPING:
+        {
+            old_thread->execution_context = *ctx;
+            if (old_thread->can_wakeup) // this is set when wakeup() triggers
+                old_thread->status = THREAD_STATE_READY; // we are setting this too early, before whole ExecUserProcessIsDone()
+            break;
+        }
+        case THREAD_STATE_RUNNING:
+        {
+            old_thread->execution_context = *ctx;
+            old_thread->status = THREAD_STATE_READY;
+            break;
+        }
+        default:
+        {
+            DEBUG_PRINT("State", old_thread->status);
+            DEBUG_PRINT("Id", old_thread->id);
+            panic("InvokeScheduler() --> old_thread was in unexpected state.\n");
+        }
     }
-
-
-    if (old_thread->status != THREAD_STATE_RUNNING && old_thread->status != THREAD_STATE_SLEEPING)
-    {
-        DEBUG_PRINT("State", old_thread->status);
-        panic("InvokeScheduler() --> old_thread was in unexpected state.\n");
-    }
-    //memcpy(&old_thread->execution_context, ctx, sizeof(struct cpu_context_t));
-    old_thread->execution_context = *ctx;
- 
-    //old_thread->execution_context = ctx;
-    old_thread->status = THREAD_STATE_READY;
-   // DEBUG_PRINT("CONTEXT SAVED RIP", ctx->i_rip);
-    old_thread->can_wakeup = true;
 }
 
 
@@ -107,22 +112,27 @@ void InvokeScheduler(struct cpu_context_t* ctx)
     */
     for (uint32_t i = old_thread_id+1; i < MAX_NUM_THREADS; i++)
     {
+        if (thread_table[i].status == THREAD_STATE_SLEEPING && thread_table[i].can_wakeup)
+            thread_table[i].status = THREAD_STATE_READY;
+
         if (thread_table[i].status != THREAD_STATE_READY)
             continue;
         
         SaveThreadContext(old_thread, ctx);       
-        DEBUG_PRINT("Old id0", old_thread_id);
+        //DEBUG_PRINT("Old id0", old_thread_id);
         DEBUG_PRINT("Doing process", thread_table[i].id);
         schedule(current_cpu, &thread_table[i], THREAD_STATE_RUNNING);
     }
 
     for (uint32_t i = 0; i < old_thread_id; i++)
     {
+        if (thread_table[i].status == THREAD_STATE_SLEEPING && thread_table[i].can_wakeup)
+            thread_table[i].status = THREAD_STATE_READY;
         if (thread_table[i].status != THREAD_STATE_READY)
             continue;
         
         SaveThreadContext(old_thread, ctx);
-        DEBUG_PRINT("Old id1", old_thread_id);
+        //DEBUG_PRINT("Old id1", old_thread_id);
         DEBUG_PRINT("Doing process", thread_table[i].id);
         schedule(current_cpu, &thread_table[i], THREAD_STATE_RUNNING);
     }
@@ -148,8 +158,6 @@ void schedule(struct CPU* cpu, struct Thread* thread, THREAD_STATE state)
     if (thread->execution_context.i_rip == 0)
         return;
 
-    if (thread->id == 16)
-        dummy();
 
     if (cpu->current_thread)
         DEBUG_PRINT("Old thread rip", cpu->current_thread->execution_context.i_rip);

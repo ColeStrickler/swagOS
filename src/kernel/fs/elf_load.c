@@ -32,9 +32,10 @@ bool ELF_check_file_class(void* elf)
 
 
 /*
-    This function will load an ELF file's segments into the page tables of a user level thread
+    This function will load an ELF file's segments into the page tables of a user level thread,
+    returns header->entry
 */
-bool ELF_load_segments(struct Thread* thread, unsigned char* elf)
+uint64_t ELF_load_segments(struct Thread* thread, unsigned char* elf)
 {
     log_to_serial("ELF_load_segments()\n");
     elf64_header_t* header = (elf64_header_t*)elf;
@@ -48,7 +49,7 @@ bool ELF_load_segments(struct Thread* thread, unsigned char* elf)
         frame. We use dedicated memory regions and we cannot have one CPU be interrupted mid load and 
         schedule another load. This will cause undefined behavior
     */
-    inc_cli();
+    //inc_cli();
 
 
     for (uint16_t i = 0; i < header->phNum; i++)
@@ -122,7 +123,8 @@ bool ELF_load_segments(struct Thread* thread, unsigned char* elf)
     //log_hexval("byte 0", ((uint8_t*)VA_LOAD_TRANSFER)[0]);
     
     log_hexval("HEADER ENTRY", header->entry);
-    thread->execution_context.i_rip = header->entry;
-    dec_cli();
-    return true;
+    //thread->execution_context.i_rip = header->entry;
+    
+   // dec_cli();
+    return header->entry;
 }

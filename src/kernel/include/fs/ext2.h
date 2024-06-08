@@ -124,6 +124,7 @@ typedef struct {
 
 
 typedef struct EXT2_DRIVER {
+    Spinlock lock;
     uint32_t total_inodes;
     uint32_t total_blocks;
     uint32_t block_size;

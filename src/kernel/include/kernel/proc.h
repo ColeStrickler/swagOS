@@ -7,7 +7,7 @@
 #include <spinlock.h>
 #include <sleeplock.h>
 #include <elf_load.h>
-
+#include "errno.h"
 
 #define MAX_NUM_THREADS 300
 #define IDLE_THREAD MAX_NUM_THREADS
@@ -113,8 +113,7 @@ typedef struct Thread
     uint64_t* pml4t_va;
     uint64_t* pml4t_phys;
     cpu_context_t execution_context;
-    uint64_t user_heap_bitmap[512];
-   
+    enum ERROR errno;
     struct Process* owner_proc;
     void* sleep_channel;  // will be NULL if process is not sleeping
 } Thread;
@@ -129,6 +128,16 @@ typedef struct ThreadEntry
     Thread* thread;
 } ThreadEntry;
 
+typedef struct HeapAllocEntry
+{
+    struct dll_Entry entry;
+    uint64_t start;
+    uint64_t end;
+    uint32_t bit_start;
+    uint32_t bit_end;
+    uint32_t i_start;
+    uint32_t i_end;
+} HeapAllocEntry;
 
 typedef struct Process
 {
@@ -137,6 +146,8 @@ typedef struct Process
     uint32_t pid;
     thread_pagetables_t pgdir;
     struct dll_Head used_pages;
+    struct dll_Head heap_allocations;
+    uint64_t user_heap_bitmap[512];
     file_descriptor fd[MAX_FILE_DESC];
 } Process;
 
@@ -156,7 +167,7 @@ void CreateIdleThread(void (*entry)(void *));
 
 void CreatePageTables(Process *proc, Thread *thread);
 
-int ExecUserProcess(Thread *thread, char *filepath, struct exec_args *args);
+int ExecUserProcess(Thread *thread, char *filepath, struct exec_args *args, cpu_context_t* ctx);
 
 bool CreateUserProcess(uint8_t *elf);
 
@@ -169,6 +180,10 @@ void Wakeup(void *channel);
 void ThreadFreeUserPages(Thread* t);
 
 void ExitThread();
+
+void SetErrNo(Thread *thread, enum ERROR err_no);
+
+char *GetErrNo(Thread *thread);
 
 #endif
 

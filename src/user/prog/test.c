@@ -29,24 +29,46 @@ void main()
     char* parent = "Spawned child process with pid %d\n";
     char* test3 = "will print from malloc 3\n";
 
-    char* fmt = "wtf %u\n";
+    char* coc = "Child of child\n";
+
+    char* fmt = "wtf %d\n";
     char* error = "ERROR\n";
+    int fd = open("/test");
+    char buf[0x1000];
+    printf1(fmt, fd);
+
+
     int pid = fork();
-    if (pid == -1)
-    {
-        dbg_val(-1);
-        //printf0(error);
-    }
-    else if (pid == 0)
+    if (!pid)
     {
         printf0(child);
+        exec("/meme", 2, "swag");
     }
     else
     {
-        exec("/meme", 2, "swag");
-        printf1(parent, pid);
-        
+        //printf0(parent);
+        exec("/meme", 1);
     }
+        
+
+        //exec("/meme", 0);
+    
+    
+   // if (pid == -1)
+   // {
+   //     dbg_val(-1);
+   //     //printf0(error);
+   // }
+   // else if (pid == 0)
+   // {
+   //     printf0(child);
+   // }
+   // else
+   // {
+   //     
+   //     printf1(parent, pid);
+   //     
+   // }
 
     ExitThread();
 }

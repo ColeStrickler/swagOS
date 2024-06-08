@@ -30,9 +30,9 @@ bool retrieve_multiboot_mem_basicinfo(uint64_t addr)
 		{
 			struct multiboot_tag_basic_meminfo* mb_info = (struct multiboot_tag_basic_meminfo*)tag;
             
-            log_to_serial("Lower Memory:");
+            //log_to_serial("Lower Memory:");
             log_hex_to_serial(mb_info->mem_lower * 1024);
-            log_to_serial("\nUpper Memory:");
+            //log_to_serial("\nUpper Memory:");
             log_hex_to_serial(mb_info->mem_upper*1024);
 
 
@@ -383,7 +383,7 @@ uint64_t physical_frame_request_4kb()
         Do not allocate new chunked frame unless we need to
     */
     frame_4kb = check_available_chunked_frame();
-    log_hexval("returning frame", frame_4kb);
+    //log_hexval("returning frame", frame_4kb);
     if (frame_4kb != UINT64_MAX)
         return frame_4kb;
 
@@ -551,8 +551,8 @@ void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thre
 	thread->pgdir.pdpt[pdpt_index] = ((uint64_t)pdt_addr) | flags;
     if ((thread->pgdir.pdt[pdt_table_index][pdt_index] & PTADDRMASK) != NULL && (thread->pgdir.pdt[pdt_table_index][pdt_index] & PTADDRMASK) != pt_addr)
     {
-        log_hexval("current", thread->pgdir.pdt[pdt_table_index][pdt_index] & PTADDRMASK);
-        log_hexval("ptaddr", pt_addr);
+        //log_hexval("current", thread->pgdir.pdt[pdt_table_index][pdt_index] & PTADDRMASK);
+        //log_hexval("ptaddr", pt_addr);
         panic("pdt");
     }
     thread->pgdir.pdt[pdt_table_index][pdt_index] = ((uint64_t)pt_addr) | flags;
@@ -560,11 +560,11 @@ void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thre
     if (thread->pgdir.pd[pd_table_index][pt_index] & PTADDRMASK != NULL)
         panic("pd");
     thread->pgdir.pd[pd_table_index][pt_index] = physical_address | flags;
-    log_hexval("done mapping user", 0);
+    //log_hexval("done mapping user", 0);
 
     struct proc_used_page_entry* page_entry = kalloc(sizeof(struct proc_used_page_entry));
     page_entry->page_pa = physical_address;
-    page_entry->page_va = virtual_address;
+    page_entry->page_va = PGROUNDDOWN(virtual_address);
     page_entry->pdt_table_index = pdt_table_index;
     page_entry->pd_table_index = pd_table_index;
     if (page_entry == NULL)
@@ -606,7 +606,7 @@ void map_huge_page_user(uint64_t virtual_address, uint64_t physical_address, Thr
 
     if (thread->pgdir.pdt[pdt_i][pdt_index] & PTADDRMASK != NULL)
     {
-        log_hexval("val", thread->pgdir.pdt[pdt_i][pdt_index]);
+        //log_hexval("val", thread->pgdir.pdt[pdt_i][pdt_index]);
         panic("not null huge");
     }
     
@@ -687,7 +687,7 @@ bool is_frame_mapped_thread(struct Thread* thread, uint64_t virtual_address)
     struct Process* t = thread->owner_proc;
     if (t == NULL)
         return false;
-    log_to_serial("1\n");
+    //log_to_serial("1\n");
 
     if ((t->pgdir.pml4t[pml4t_index] & PTADDRMASK) == NULL)
         return false;
@@ -709,15 +709,15 @@ bool is_frame_mapped_thread(struct Thread* thread, uint64_t virtual_address)
     }
 
 
-    log_hexval("3\n", pdt_addr);
+   // log_hexval("3\n", pdt_addr);
     pt_addr = (pdt_addr[pdt_index] & PTADDRMASK) + KERNEL_HH_START;
-    log_hexval("3.5", pt_addr);
+   // log_hexval("3.5", pt_addr);
     if (pt_addr[pt_index] & PTADDRMASK != 0)
     {
-        log_to_serial("4\n");
+        //log_to_serial("4\n");
         return true;
     }
-    log_to_serial("5\n");
+    //log_to_serial("5\n");
     return false;
 }
 
@@ -777,7 +777,7 @@ void virtual_to_physical(uint64_t virtual_address, uint64_t* pml4t_addr, uint64_
     
     *frame_addr = pt[pt_index] & PTADDRMASK;
     *frame_offset = virtual_address & 0xFFF; // first 12 bits for 4kb pages
-    log_hexval("end", 0);
+   // log_hexval("end", 0);
     return;
 }
 

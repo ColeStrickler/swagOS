@@ -9,7 +9,8 @@ typedef struct iobuf {
   int flags;
   uint32_t dev;
   uint32_t blockno;
-  struct Sleeplock lock;
+  //struct Sleeplock lock;
+  struct Spinlock lock;
   uint32_t refcnt;
   struct iobuf *prev; // LRU cache list
   struct iobuf *next;

@@ -8,6 +8,7 @@
 #include <paging.h>
 #include <asm_routines.h>
 #include <syscalls.h>
+
 extern KernelSettings global_Settings;
 
 struct Thread *GetCurrentThread()
@@ -63,15 +64,15 @@ void CreatePageTables(struct Process *proc, struct Thread *thread)
     if (thread->pml4t_phys != KERNEL_PML4T_PHYS(&proc->pgdir.pml4t[0]))
         panic("CreatePageTables() --> bad pml4t");
 
-    log_hexval("pml4t phys", thread->pml4t_phys);
-    log_hexval("pml4t va", thread->pml4t_va);
+   // log_hexval("pml4t phys", thread->pml4t_phys);
+   // log_hexval("pml4t va", thread->pml4t_va);
     // Map top 4gb from kernel into the user address space, will avoid DMIO
     uva_copy_kernel(proc);
 
     //log_hexval("testing!!!", proc->pgdir.pdt[0xc3][0x1d7]);
 
     // load_page_table(thread->pml4t_phys);
-    log_to_serial("done create pt\n");
+    //log_to_serial("done create pt\n");
     // load_page_table(KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
 }
 
@@ -120,8 +121,8 @@ void load_page_table(uint64_t new_page_table)
 void test_pt(uint64_t new_page_table, uint64_t old_pt)
 {
     load_page_table(new_page_table);
-    log_to_serial("test pt");
-    log_hexval("testing", new_page_table);
+    // /log_to_serial("test pt");
+    // /log_hexval("testing", new_page_table);
     load_page_table(old_pt);
 }
 
@@ -165,35 +166,35 @@ Process *FindFreeProcess()
 
 void CreatePageTableFromCopy(Process* new_proc, Thread* new_thread, Process* old_proc)
 {
+
+    memset(&new_proc->pgdir, 0x00, sizeof(thread_pagetables_t));
     /*
         copy the whole thing over and then change physical addresses for all that need it
     */
     uva_copy_kernel(new_proc);
    // test_pt(new_thread->pml4t_phys, KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
-
+    log_hexval("old_proc", old_proc->thread_count);
     proc_used_page_entry* entry = (proc_used_page_entry*)old_proc->used_pages.first;
     while(entry != NULL && entry != &old_proc->used_pages)
     {
-        log_hexval("oa", entry->page_pa);
+        log_hexval("pa", entry->page_pa);
         log_hexval("va", entry->page_va);
         log_hexval("pd index", entry->pd_table_index);
         log_hexval("pdt index", entry->pdt_table_index);
         uint64_t new_frame = physical_frame_request_4kb();
         if (new_frame == UINT64_MAX)
-            log_to_serial("CreatePageTableFromCopy() --> physical_frame_request_4kb() returned bad frame\n");
+            panic("CreatePageTableFromCopy() --> physical_frame_request_4kb() returned bad frame\n");
         char buf[0x1000];
         if(!FetchStruct(entry->page_va, buf, 0x1000, KERNEL_PML4T_PHYS(&old_proc->pgdir.pml4t[0])))
             panic("fetch struct fail\n");
-        if (buf[0] == 0x0)
-             log_to_serial("buf NULL fail\n");
         map_4kb_page_user(entry->page_va, new_frame, new_thread, entry->pdt_table_index, entry->pd_table_index);
         if(!WriteStruct(entry->page_va, buf, 0x1000, KERNEL_PML4T_PHYS(&new_proc->pgdir.pml4t[0])))
-            log_to_serial("write struct fail\n");
+            panic("write struct fail\n");
 
         //test_pt(new_thread->pml4t_phys, KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
         entry = (proc_used_page_entry*)entry->entry.next;
     }
-    log_to_serial("done copy pt\n");
+    //log_to_serial("done copy pt\n");
 }
 
 
@@ -222,7 +223,7 @@ int ForkUserProcess(Thread *old_thread)
 
     memcpy(&new_thread->execution_context, &old_thread->execution_context, sizeof(cpu_context_t));
     memcpy(&new_proc->fd, &old_proc->fd, sizeof(new_proc->fd)); // copy over file descriptors
-    new_thread->id = 10;
+    new_thread->id = global_Settings.proc_table.pid_alloc++;
     new_thread->run_mode = old_thread->run_mode;
     new_thread->status = THREAD_STATE_READY;
     new_thread->owner_proc = new_proc;
@@ -232,7 +233,7 @@ int ForkUserProcess(Thread *old_thread)
    // log_hexval("new_thread->pml4t_phys", new_thread->pml4t_phys);
     new_thread->pml4t_va = &new_proc->pgdir.pml4t[0];
     new_proc->pid = global_Settings.proc_table.pid_alloc++;
-
+    new_proc->thread_count = 1;
     new_thread->execution_context.i_rip; 
     new_thread->execution_context.rax = 0; // child process returns 0 from fork
     if (!is_frame_mapped_thread(new_thread, new_thread->execution_context.i_rip))
@@ -247,7 +248,7 @@ void dummy1()
     return;
 }
 
-int ExecUserProcess(Thread* thread, char* filepath, struct exec_args* args)
+int ExecUserProcess(Thread* thread, char* filepath, struct exec_args* args, cpu_context_t* ctx)
 {
     Process* proc = thread->owner_proc;
     if (proc == NULL)
@@ -256,30 +257,31 @@ int ExecUserProcess(Thread* thread, char* filepath, struct exec_args* args)
     /* We do these disk loads before we grab the lock and disable interrupts */
     if (!ext2_file_exists(filepath))
     {
-        log_to_serial("Exec() --> file don't exist\n");
-        release_Spinlock(&global_Settings.proc_table.lock);
+        //log_to_serial("Exec() --> file don't exist\n");
+        //release_Spinlock(&global_Settings.proc_table.lock);
         return -1;
     }
-
+    log_to_serial("ExecUserProcess begin ext2_read_file()\n");
     unsigned char* elf = ext2_read_file(filepath);
     if (!elf)
     {
-        log_to_serial("Error reading file\n");
-        release_Spinlock(&global_Settings.proc_table.lock);
+       // log_to_serial("Error reading file\n");
+        //release_Spinlock(&global_Settings.proc_table.lock);
         return -1;
     }
 
     // Cleanup old process resources
-    log_to_serial("grabbing spinlock!\n");
+   // log_to_serial("grabbing spinlock!\n");
     acquire_Spinlock(&global_Settings.proc_table.lock);
-    dummy1();
-    log_to_serial("got spinlock!\n");
+    memset(ctx, 0x00, sizeof(cpu_context_t));
+   // log_to_serial("got spinlock!\n");
     ProcessFree(proc);
 
     thread->id = 1;
     thread->run_mode = USER_THREAD;
     proc->pid = global_Settings.proc_table.pid_alloc++;
     thread->owner_proc = proc;
+    proc->thread_count = 1;
     
 
     ThreadEntry *thread_entry = kalloc(sizeof(ThreadEntry));
@@ -293,10 +295,10 @@ int ExecUserProcess(Thread* thread, char* filepath, struct exec_args* args)
 
 
     
-    cpu_context_t* ctx = &thread->execution_context;
+    //cpu_context_t* ctx = &thread->execution_context;
     CreatePageTables(proc, thread);
     ctx->i_rsp = CreateUserProcessStack(thread);
-    ELF_load_segments(thread, elf);
+    ctx->i_rip = ELF_load_segments(thread, elf);
 
 
     ctx->i_rflags = 0x202;                            // IF | Reserved
@@ -310,7 +312,7 @@ int ExecUserProcess(Thread* thread, char* filepath, struct exec_args* args)
     // copy the arg array to the user process and set argc
     int argc = 0;
     // We go in reverse order so that the array is constituted properly
-    log_to_serial("traversing args!\n");
+   // log_to_serial("traversing args!\n");
     char** argv[MAX_ARG_COUNT];
     for (int i = MAX_ARG_COUNT-1; i >= 0; i--)
     {
@@ -332,11 +334,11 @@ int ExecUserProcess(Thread* thread, char* filepath, struct exec_args* args)
 
     ctx->rdi = argc; // argument count
     ctx->rsi = ctx->i_rsp; // start of array
+    log_hexval("setting rdi to", ctx->rdi);
+    //thread->execution_context = *ctx;
 
+    thread->status = THREAD_STATE_RUNNING;
 
-    thread->status = THREAD_STATE_READY;
-
-    test_pt(KERNEL_PML4T_PHYS(&proc->pgdir), KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
     kfree(elf);
     release_Spinlock(&global_Settings.proc_table.lock);
     
@@ -349,13 +351,13 @@ bool CreateUserProcess(uint8_t *elf)
 {
 
     acquire_Spinlock(&global_Settings.proc_table.lock);
-    log_hexval("CREATE USER PROC", elf);
+   // log_hexval("CREATE USER PROC", elf);
     Process *init_proc = FindFreeProcess();
     Thread *init_thread = FindFreeThread();
     if (init_thread == NULL || init_proc == NULL)
     {
         release_Spinlock(&global_Settings.proc_table.lock);
-        log_to_serial("CreateUserProcess() --> unable to find free proc or thread!\n");
+        //log_to_serial("CreateUserProcess() --> unable to find free proc or thread!\n");
         return false;
     }
     init_proc->thread_count = 1;
@@ -380,13 +382,13 @@ bool CreateUserProcess(uint8_t *elf)
     CreatePageTables(init_proc, init_thread);
     // init_thread->pml4t_phys = KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel);
     //  log_hexval("PT:", init_thread->pml4t_va);
-    log_hexval("mapped", is_frame_mapped_thread(init_thread, KERNEL_HH_START));
+    //log_hexval("mapped", is_frame_mapped_thread(init_thread, KERNEL_HH_START));
 
     struct cpu_context_t *ctx = &init_thread->execution_context;
     if (ctx == NULL)
         panic("CreateThread() --> failed to allocatged cpu_context_t for new task!\n");
 
-    ELF_load_segments(init_thread, elf);
+    ctx->i_rip = ELF_load_segments(init_thread, elf);
    // log_hexval("testing!!!", init_proc->pgdir.pdt[0xc3][0x1d7]);
     /*
         Need to set up the stack in such a way that we can pop off of it and run the proces
@@ -424,7 +426,7 @@ void CreateKernelThread(void (*entry)(void *))
         if (thread_table[i].status == THREAD_STATE_NOT_INITIALIZED || thread_table[i].status == THREAD_STATE_KILLED)
         {
 
-            log_hexval("Creating new thread at index", i);
+            //log_hexval("Creating new thread at index", i);
             struct Thread *init_thread = &thread_table[i];
 
             /*
@@ -444,7 +446,7 @@ void CreateKernelThread(void (*entry)(void *))
             if (stack_alloc == NULL)
                 panic("CreateThread() --> kalloc() failed!\n");
             stack_alloc += 0x10000; // point stack to top of allocation
-            log_hexval("STACK:", stack_alloc);
+           // log_hexval("STACK:", stack_alloc);
             /*
                 Need to set up the stack in such a way that we can pop off of it and run the process
 
@@ -491,19 +493,18 @@ void ThreadSleep(void *sleep_channel, struct Spinlock *spin_lock)
     // log_hexval("CLI", get_current_cpu()->cli_count);
     //  We currently have this set up to sleep if thread->status is PROCESS_STATE_SLEEPING
     //  If we want to add software debugging in the future we will need to edit this
-    DEBUG_PRINT("Sleeping", sleeping_cpu);
+   // DEBUG_PRINT("Sleeping", sleeping_cpu);
     if (thread->status == THREAD_STATE_SLEEPING) // woke up early
         __asm__ __volatile__("int3");
     else
     {
-        DEBUG_PRINT("SKIPPING SLEEP", thread->id);
         if (spin_lock != &global_Settings.proc_table.lock)
             acquire_Spinlock(spin_lock);
         thread->sleep_channel = NULL;
         return;
     }
 
-    DEBUG_PRINT("Woken up!", lapic_id());
+    //DEBUG_PRINT("Woken up!", lapic_id());
     thread->sleep_channel = NULL;
 
     if (spin_lock != &global_Settings.proc_table.lock)
@@ -526,19 +527,12 @@ void Wakeup(void *channel)
         Thread *t = &thread_table[i];
         if (t->status == THREAD_STATE_SLEEPING && t->sleep_channel == channel)
         {
-            DEBUG_PRINT("waking up", t->id);
             /*
                 We are getting here before the scheduler can set the execution context during sleep
 
             */
-
-            while (!t->can_wakeup)
-            {
-            };
-
-            t->status = THREAD_STATE_READY;
-
-            DEBUG_PRINT("waking up", t->id);
+            t->can_wakeup = true;
+            //t->status = THREAD_STATE_READY;
         }
     }
     release_Spinlock(&global_Settings.proc_table.lock);
@@ -586,16 +580,28 @@ void ProcessFreeThreads(Process* proc)
     proc->thread_count = 0;
 }
 
+
+void ProcFreeHeapAllocations(Process* proc)
+{
+    HeapAllocEntry* entry = (HeapAllocEntry*)proc->heap_allocations.first;
+
+    while(entry != NULL && entry != &proc->heap_allocations)
+    {
+        void* old_entry = entry;
+        kfree(entry);
+        entry = (HeapAllocEntry*)entry->entry.next;
+    }
+}
+
 /*
-    Frees all file descriptors, kills all threads, and frees all pages allocated to a process
+    Frees all file descriptors, kills all threads, heap allocation entries, and frees all pages allocated to a process
 */
 void ProcessFree(Process* proc)
 {
     ProcessFreeFileDescriptors(proc);
     ProcessFreeThreads(proc);
-    log_to_serial("threads freed\n");
     ProcFreeUserPages(proc);
-    log_to_serial("user pages freed\n");
+    ProcFreeHeapAllocations(proc);
     // need to add a heap free and a per process heap
 }
 
@@ -613,3 +619,43 @@ void ExitThread()
         ; // wait to be rescheduled
           // InvokeScheduler(NULL);
 }
+
+
+void SetErrNo(Thread* thread, enum ERROR err_no)
+{
+    thread->errno = err_no;
+}
+
+char* GetErrNo(Thread* thread)
+{
+    if (thread->errno >= MAX_ERROR)
+        return NULL;
+    return error_strings[thread->errno];
+}
+
+
+
+
+
+void FreeHeapAllocEntry(Process* proc, uint64_t address)
+{
+    HeapAllocEntry* entry = (HeapAllocEntry*)proc->heap_allocations.first;
+
+    while(entry != NULL && entry != &proc->heap_allocations)
+    {
+        if (entry->start >= address && entry->end <= address)
+        {
+            void* old_entry = entry;
+            remove_dll_entry(&entry->entry);
+            FreeUserHeapBits(proc, entry->bit_start, entry->bit_end);
+            kfree(entry);
+            break;
+        }
+        entry = (HeapAllocEntry*)entry->entry.next;
+    }
+}
+
+void FreeUserHeapBits(Process* proc, uint32_t start, uint32_t end)
+{
+    
+} 

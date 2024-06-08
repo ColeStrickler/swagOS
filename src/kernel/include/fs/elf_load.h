@@ -76,6 +76,6 @@ bool ELF_check_magic(void* elf);
 
 bool ELF_check_file_class(void* elf);
 
-bool ELF_load_segments(struct Thread *thread, unsigned char* elf);
+uint64_t ELF_load_segments(struct Thread *thread, unsigned char* elf);
 
 #endif

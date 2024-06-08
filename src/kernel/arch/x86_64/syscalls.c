@@ -87,9 +87,7 @@ bool FetchQword(void* addr, uint64_t* out, uint64_t user_pagetable)
     inc_cli();
     load_page_table(user_pagetable);
     disable_supervisor_mem_protections();
-    log_to_serial("FetchQword() fetching\n");
     out = *(uint64_t*)addr;
-    log_to_serial("FetchQword() done fetching\n");
     enable_supervisor_mem_protections();
     load_page_table(KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
     dec_cli();
@@ -132,7 +130,7 @@ bool FetchString(void* addr, void* out, uint32_t max_len, uint64_t pagetable)
     char* buf = out;
     for (uint32_t i = 0; i < max_len; i++)
     {
-        log_hexval("here", i);
+        //log_hexval("here", i);
         if (!str[i])
             break;
         buf[i] = str[i];
@@ -140,7 +138,7 @@ bool FetchString(void* addr, void* out, uint32_t max_len, uint64_t pagetable)
     enable_supervisor_mem_protections();
     load_page_table(KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
     dec_cli();
-    log_to_serial("done!\n");
+   // log_to_serial("done!\n");
     return true;
 }
 
@@ -186,7 +184,7 @@ void SYSHANDLER_sbrk(cpu_context_t* ctx)
     // rsi = number of bytes to allocate
 
     uint64_t num_pages = (ctx->rsi / PGSIZE) + 1;
-    Thread* t = GetCurrentThread();
+    Process* t = GetCurrentThread()->owner_proc;
     uint32_t curr_count = 0;
     uint32_t i_start = 0;
     uint32_t bit_start = 0;
@@ -222,11 +220,11 @@ void SYSHANDLER_sbrk(cpu_context_t* ctx)
         if (curr_count == num_pages)
             break;
     }
-
+    
     // did not find adequate space
     if (curr_count != num_pages)
     {
-        log_hexval("Could not find adequate number of pages. Needed", num_pages);
+       // log_hexval("Could not find adequate number of pages. Needed", num_pages);
         ctx->rax = UINT64_MAX;
         return;
     }
@@ -234,8 +232,11 @@ void SYSHANDLER_sbrk(cpu_context_t* ctx)
     // this will contain the pointer we return to the allocated space
     uint64_t alloc_ptr = USER_HEAP_START - ((PGSIZE * bit_start) + ((64*PGSIZE)*i_start));
     ctx->rax = alloc_ptr;
-    log_hexval("sbrk() returning address", alloc_ptr);
+    //log_hexval("sbrk() returning address", alloc_ptr);
+
+    HeapAllocEntry* entry = kalloc(sizeof(HeapAllocEntry));
     // we found adequate space, mark bits used and allocate pages
+    uint64_t end = 0;
     for (uint32_t i = i_start; i <= end_i; i++)
     {
         for (uint32_t bit = bit_start; bit <= end_bit; bit++)
@@ -248,14 +249,30 @@ void SYSHANDLER_sbrk(cpu_context_t* ctx)
                 return;
             }
             t->user_heap_bitmap[i] |= (1 << bit); // set bit in bitmap
-            log_hexval("mapping pt table index", (USER_HEAP_START - va)/HUGEPGSIZE);
+            //log_hexval("mapping pt table index", (USER_HEAP_START - va)/HUGEPGSIZE);
             map_4kb_page_user(va, pa, t, 3, 2 + (USER_HEAP_START - va)/HUGEPGSIZE); // map page to process page table
+            end = va + 0xFFF;
         }
     }
-    log_hexval("returning from SYSHANDLER_sbrk()", 0x0);
+    entry->bit_end = end_bit;
+    entry->bit_start = bit_start;
+    entry->i_start = i_start;
+    entry->i_end = end_i;
+    entry->start = alloc_ptr;
+    entry->end = end;
+
+    insert_dll_entry_head(&t->user_heap_bitmap, &entry->entry);
+
+
+  //  log_hexval("returning from SYSHANDLER_sbrk()", 0x0);
     return;
 }
 
+void SYSHANDLER_free(cpu_context_t* ctx, uint64_t user_pagetable)
+{
+    // rdi = syscall number
+    
+}
 
 
 void SYSHANDLER_tprintf(cpu_context_t* ctx, uint64_t user_pagetable)
@@ -265,8 +282,6 @@ void SYSHANDLER_tprintf(cpu_context_t* ctx, uint64_t user_pagetable)
     // rdx = string length
     // rcx = arg1 --> only used for printf1 while we debug
 
-    log_hexval("strlen", ctx->rdx);
-    log_hexval("str start addr", ctx->rsi);    
     if (ctx->rdx > PGSIZE) // do not allow arbitrary string length
     {
         ctx->rax = -1;
@@ -277,8 +292,8 @@ void SYSHANDLER_tprintf(cpu_context_t* ctx, uint64_t user_pagetable)
     memset(buf, 0x00, PGSIZE+1);
 
     FetchStruct(ctx->rsi, buf, ctx->rdx, user_pagetable);
-    log_to_serial("buf:\n");
-    log_to_serial(buf);
+   // log_to_serial("buf:\n");
+   // log_to_serial(buf);
     printf(buf, ctx->rcx);
     ctx->rax = 0; // no error
     return;
@@ -351,6 +366,7 @@ void SYSHANDLER_read(cpu_context_t* ctx, uint64_t user_pagetable)
 
     if (!fd->in_use)
     {
+        log_to_serial("fd not in use\n");
         ctx->rax = UINT64_MAX;
         return;
     }
@@ -412,7 +428,7 @@ void SYSHANDLER_fork(cpu_context_t* ctx, uint64_t user_pagetable)
         ctx->rax = UINT64_MAX; // failure
         return;
     }
-    log_hexval("child pid", child_pid);
+    //log_hexval("child pid", child_pid);
 
     ctx->rax = child_pid;
 
@@ -434,9 +450,9 @@ void SYSHANDLER_exec(cpu_context_t* ctx, uint64_t user_pagetable)
         return;
     }
 
-    log_to_serial("got path: ");
-    log_to_serial(program_path);
-    log_to_serial("\n");
+   // log_to_serial("got path: ");
+   // log_to_serial(program_path);
+   // log_to_serial("\n");
 
 
     exec_args execargs;
@@ -444,102 +460,137 @@ void SYSHANDLER_exec(cpu_context_t* ctx, uint64_t user_pagetable)
 
     
     apic_end_of_interrupt();
-    ExecUserProcess(current_thread, program_path, &execargs);
+    ExecUserProcess(current_thread, program_path, &execargs, ctx);
     return;
 }
 
 
 void SYSHANDLER_cacheflush(cpu_context_t* ctx, uint64_t user_pagetable)
 {
+    // rdi = syscall number
+    // rsi = address to flush from cache
+    flush(ctx->rsi);
+    return;
+}
 
+
+void SYSHANDLER_perror(cpu_context_t* ctx, uint64_t user_pagetable)
+{
+    // rdi = syscall number
+    // rsi = string argument
+    // rdx = string argument length
+
+
+    if (ctx->rdx < 0x1000)
+    {
+        char buf[0x1000];
+        memset(buf, 0x00, 0x1000);
+        FetchStruct(ctx->rsi, buf, ctx->rdx, user_pagetable);
+        printf(buf);
+    }
+    printf(GetErrNo(GetCurrentThread()));
+    return;
 }
 
 
 
-
-
-void syscall_handler(cpu_context_t* ctx)
+void syscall_handler(cpu_context_t* context)
 {
     load_page_table(KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
-    log_hexval("syscall_handler()", ctx->rdi);
+    log_hexval("\n\nsyscall_handler()\n\n", context->rdi);
+    cpu_context_t ctx = *context;
     bool do_eoi = true;
     Thread* t = GetCurrentThread();
     uint64_t user_pt = t->pml4t_phys;
-    t->execution_context = *ctx;
+    t->execution_context = *context;
     t->pml4t_phys = KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel);// do this to allow interrupts during syscall handling
     NoINT_Enable(); // no interrupts will be handled recursively
-    LogTrapFrame(ctx);
+   // LogTrapFrame(ctx);
 
 
-    switch(ctx->rdi)
+    switch(ctx.rdi)
     {
         case sys_exit:
         {
-            SYSHANDLER_exit(ctx);
+            SYSHANDLER_exit(&ctx);
             break;
         }
         case sys_sbrk:
         {
-            SYSHANDLER_sbrk(ctx);
+            SYSHANDLER_sbrk(&ctx);
             break;
         }
         case sys_tprintf:
         {
-            SYSHANDLER_tprintf(ctx, user_pt);
+            SYSHANDLER_tprintf(&ctx, user_pt);
             break;
         }
         case sys_open:
         {
-            SYSHANDLER_open(ctx, user_pt);
+            SYSHANDLER_open(&ctx, user_pt);
             do_eoi = false;
             break;
         }
         case sys_read:
         {
-            SYSHANDLER_read(ctx, user_pt);
+            SYSHANDLER_read(&ctx, user_pt);
             do_eoi = false;
             break;
         }
         case sys_fork:
         {
             log_hexval("fork from tid", GetCurrentThread()->id);
-            SYSHANDLER_fork(ctx, user_pt);
+            SYSHANDLER_fork(&ctx, user_pt);
             break;
         }
         case sys_exec:
         {
-            SYSHANDLER_exec(ctx, user_pt);
+            SYSHANDLER_exec(&ctx, user_pt);
             do_eoi = false;
             break;
         }
         case sys_cacheflush:
         {
-            SYSHANDLER_cacheflush(ctx, user_pt);
+            SYSHANDLER_cacheflush(&ctx, user_pt);
+            break;
+        }
+        case sys_free:
+        {
+            SYSHANDLER_free(&ctx, user_pt);
+            break;
+        }
+        case sys_perror:
+        {
+            SYSHANDLER_perror(&ctx, user_pt);
             break;
         }
         case sys_tchangecolor:
         {
-            terminal_set_color(ctx->rsi, ctx->rdx, ctx->rcx);
+            terminal_set_color(ctx.rsi, ctx.rdx, ctx.rcx);
             break;
         }
         case sys_debugvalue:
         {
-            log_hexval("SYSCALL DEBUG RSI", ctx->rsi);
-            log_hexval("SYSCALL DEBUG RDX", ctx->rdx);
-            log_hexval("SYSCALL DEBUG RCX", ctx->rcx);
-            log_hexval("SYSCALL DEBUG R8", ctx->r8);
-            log_hexval("SYSCALL DEBUG R9", ctx->r9);
+            log_hexval("SYSCALL DEBUG RSI", ctx.rsi);
+            log_hexval("SYSCALL DEBUG RDX", ctx.rdx);
+            log_hexval("SYSCALL DEBUG RCX", ctx.rcx);
+            log_hexval("SYSCALL DEBUG R8",  ctx.r8);
+            log_hexval("SYSCALL DEBUG R9",  ctx.r9);
             break;
         }
         default:
             break;;
     }
     
+    log_hexval("syscall done", ctx.rdi);
     t->pml4t_phys = user_pt;
     if (do_eoi)
         apic_end_of_interrupt(); // we have to do this before we switch page tables as apic isnt currently mapped in user mode processes
     load_page_table(user_pt);
-    memcpy(ctx, &t->execution_context, sizeof(cpu_context_t));
+    log_hexval("syscall done", ctx.rdi);
+    cli();
+    *context = ctx;
+    log_hexval("targeting rip", context->i_rip);
     return;
 }
 

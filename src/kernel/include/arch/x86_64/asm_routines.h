@@ -115,3 +115,9 @@ unsigned long get_cr2() {
     );
     return faulting_address;
 }
+
+#define flush(p) \
+    __asm__ __volatile__ ("clflush 0(%0)\n" \
+      : \
+      : "c" (p) \
+      : "rax")

@@ -14,6 +14,8 @@
 //#define sys_write     5 --> we do not yet have a write filesyststem implementation
 #define sys_fork        6
 #define sys_exec        7
+#define sys_free        8
+#define sys_perror      9
    
 #define sys_tchangecolor    0x1000
 #define sys_cacheflush      0x1001

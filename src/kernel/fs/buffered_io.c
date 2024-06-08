@@ -24,6 +24,7 @@
 #include <panic.h>
 extern KernelSettings global_Settings;
 
+
 bcache_t bcache;
 
 void
@@ -101,7 +102,6 @@ bread(uint32_t dev, uint32_t blockno)
   if((b->flags & B_VALID) == 0) {
     iderw(b);
   }
-
   return b;
 }
 
