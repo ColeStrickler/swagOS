@@ -75,7 +75,7 @@ bool FetchDword(void* addr, uint32_t* out)
     return true;
 }
 
-bool FetchQword(void* addr, uint64_t* out)
+bool FetchQword(void* addr, uint64_t* out, uint64_t user_pagetable)
 {
     Thread* calling_thread = GetCurrentThread();
     if (!is_frame_mapped_thread(calling_thread, addr) || !is_frame_mapped_thread(calling_thread, (uint64_t)addr + sizeof(uint64_t)-1)) // make sure that the address is mapped
@@ -85,7 +85,7 @@ bool FetchQword(void* addr, uint64_t* out)
 
     
     inc_cli();
-    load_page_table(calling_thread->pml4t_phys);
+    load_page_table(user_pagetable);
     disable_supervisor_mem_protections();
     log_to_serial("FetchQword() fetching\n");
     out = *(uint64_t*)addr;
@@ -438,55 +438,13 @@ void SYSHANDLER_exec(cpu_context_t* ctx, uint64_t user_pagetable)
     log_to_serial(program_path);
     log_to_serial("\n");
 
-    char** args[MAX_ARG_COUNT+1];
-    memset(args, 0x00, (MAX_ARG_COUNT+1)*sizeof(char*));
-    uint32_t arg_num = 1;
-    
-    // set first argument to the program path of the program to execute
-    char* path_arg = kalloc(MAX_PATH);
-    memset(path_arg, 0x00, MAX_PATH);
-    memcpy(path_arg, program_path, MAX_PATH);
 
-    for (uint32_t i = 0; i < MAX_ARG_COUNT && false; i++)
-    {
-        char buf[0x100];
-        memset(buf, 0x00, 0x100);
-
-        uint64_t arg_addr;
-        log_hexval("Getting addr", arg_addr);
-        if(!FetchQword(ctx->rdx + i*sizeof(char*), &arg_addr))
-        {
-            ctx->rax = UINT64_MAX;
-            return;
-        }
-        log_hexval("Got arg addr", arg_addr);
-        if (arg_addr == 0)
-            break;
-
-        if (!FetchString(arg_addr, buf, MAX_PATH, user_pagetable))
-        {
-            ctx->rax = UINT64_MAX;
-            return;
-        }
-
-        uint32_t len = strlen(buf);
-        if (!len)
-            break;
-
-        // copy string to argument array
-        char* arg = kalloc(len);
-        if (!arg)
-            panic("SYSHANDLER_exec() --> kalloc failed to allocate arg.\n");
-
-        memcpy(arg, buf, len);
-        arg[len] = 0x0; // null the arg
-        args[arg_num] = arg;
-        arg_num++;
-    }
+    exec_args execargs;
+    FetchStruct(ctx->rdx, &execargs, sizeof(exec_args), user_pagetable);
 
     
     apic_end_of_interrupt();
-    ExecUserProcess(current_thread, program_path, args);
+    ExecUserProcess(current_thread, program_path, &execargs);
     return;
 }
 

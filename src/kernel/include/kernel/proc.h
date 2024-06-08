@@ -8,12 +8,19 @@
 #include <sleeplock.h>
 #include <elf_load.h>
 
+
 #define MAX_NUM_THREADS 300
 #define IDLE_THREAD MAX_NUM_THREADS
 #define MAX_NUM_PROC    64
 #define USER_STACK_LOC 0xfffffc000
 #define USER_HEAP_START (0xffffffff00000000 - 0x1000)
 #define USER_HEAP_END (USER_HEAP_START - (1024*1024*1024))
+#define MAX_ARG_COUNT 16
+#define MAX_PATH 260
+#define MAX_FILE_DESC 16
+#define USER_STACK_SIZE (0x1000 * 5)
+
+
 
 typedef enum {
     THREAD_STATE_NOT_INITIALIZED,
@@ -69,7 +76,7 @@ typedef struct cpu_context_t
     uint64_t i_ss;          // handled automatically by CPU iret instruction
 }__attribute__((packed))cpu_context_t;
 
-
+#include <syscalls.h>
 typedef struct proc_used_page_entry
 {
     struct dll_Entry entry;
@@ -79,9 +86,7 @@ typedef struct proc_used_page_entry
     uint64_t pd_table_index
 }proc_used_page_entry;
 
-#define MAX_ARG_COUNT 16
-#define MAX_PATH 260
-#define MAX_FILE_DESC 16
+
 typedef struct file_descriptor
 {
     bool in_use;
@@ -89,7 +94,7 @@ typedef struct file_descriptor
 } file_descriptor;
 
 
-#define USER_STACK_SIZE (0x1000 * 5)
+
 
 
 
@@ -150,6 +155,8 @@ Thread *GetCurrentThread();
 void CreateIdleThread(void (*entry)(void *));
 
 void CreatePageTables(Process *proc, Thread *thread);
+
+int ExecUserProcess(Thread *thread, char *filepath, struct exec_args *args);
 
 bool CreateUserProcess(uint8_t *elf);
 

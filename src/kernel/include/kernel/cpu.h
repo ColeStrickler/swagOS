@@ -114,8 +114,6 @@ void load_page_table(uint64_t new_page_table);
 
 int ForkUserProcess(Thread *old_thread);
 
-int ExecUserProcess(Thread *thread, char *filepath, char **args);
-
 /*
     We access this structure in smp_boot.asm so if we need to edit this
     we need to also edit the offsets provided in that file

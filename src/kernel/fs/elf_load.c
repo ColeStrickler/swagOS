@@ -82,8 +82,8 @@ bool ELF_load_segments(struct Thread* thread, unsigned char* elf)
             // map the frame into the transfer space
             map_4kb_page_smp(VA_LOAD_TRANSFER, frame, PAGE_PRESENT|PAGE_WRITE);
             //log_to_serial("mapped\n");
-            log_hexval("elf frame", frame);
-            log_hexval("messed up addr", KERNEL_PML4T_PHYS(&thread->owner_proc->pgdir.pdt[0xc3][0x1d7]));
+            //log_hexval("elf frame", frame);
+            //log_hexval("messed up addr", KERNEL_PML4T_PHYS(&thread->owner_proc->pgdir.pdt[0xc3][0x1d7]));
 
             
 
@@ -95,20 +95,20 @@ bool ELF_load_segments(struct Thread* thread, unsigned char* elf)
                 log_hexval("check+offset", check_frame+check_offset);
                 panic("check_frame+check_offset!=frame");
             }
-            log_hexval("testing!!!", thread->owner_proc->pgdir.pdt[0xc3][0x1d7]);
+            //log_hexval("testing!!!", thread->owner_proc->pgdir.pdt[0xc3][0x1d7]);
             map_4kb_page_user(ph->vaddr+copy_offset, frame, thread, 1, 0);
             
-            log_to_serial("mapped to kernel pt\n");
+           // log_to_serial("mapped to kernel pt\n");
             // zero the frame to rid old data
-            log_hexval("VA_LOAD_TRANSFER", VA_LOAD_TRANSFER);
+           // log_hexval("VA_LOAD_TRANSFER", VA_LOAD_TRANSFER);
             memset(VA_LOAD_TRANSFER, 0x00, PGSIZE);
-            log_to_serial("zeroed\n");
+            //log_to_serial("zeroed\n");
             //log_to_serial("zeroed\n");
             // copy the relevant data to the frame
            
             if (copy_offset < to_copy)
                 memcpy(VA_LOAD_TRANSFER, elf + ph->offset, (copy_offset + PGSIZE < ph->fileSize ? PGSIZE : ph->fileSize-copy_offset)); // need to make sure this is copying correctly
-            uint64_t* t = (uint64_t*)VA_LOAD_TRANSFER;
+            //uint64_t* t = (uint64_t*)VA_LOAD_TRANSFER;
             //// map the frame into the thread's user space page table
             //log_hexval("testing!!!", );
             //map_4kb_page_smp(ph->vaddr+copy_offset, frame, PAGE_PRESENT|PAGE_WRITE|PAGE_USER);
@@ -119,7 +119,7 @@ bool ELF_load_segments(struct Thread* thread, unsigned char* elf)
             break;
         }
     }
-    log_hexval("byte 0", ((uint8_t*)VA_LOAD_TRANSFER)[0]);
+    //log_hexval("byte 0", ((uint8_t*)VA_LOAD_TRANSFER)[0]);
     
     log_hexval("HEADER ENTRY", header->entry);
     thread->execution_context.i_rip = header->entry;

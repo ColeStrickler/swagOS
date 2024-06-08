@@ -1,5 +1,4 @@
 #ifndef SYSCALL_H
-
 #define SYSCALL_H
 
 
@@ -17,7 +16,18 @@
 #define sys_debugvalue   0x1111
 
 
+typedef struct argstruct
+{
+    char arg[MAX_PATH];
+} argstruct;
+
+typedef struct exec_args
+{
+    argstruct args[MAX_ARG_COUNT];
+} exec_args;
+
 void syscall_handler(cpu_context_t *ctx);
+bool FetchQword(void *addr, uint64_t *out, uint64_t user_pagetable);
 bool FetchStruct(void *addr, void *out, uint32_t size, uint64_t pagetable);
 bool WriteStruct(void *addr, void *src, uint32_t size, uint64_t pagetable);
 

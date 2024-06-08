@@ -40,11 +40,10 @@ void main()
     else if (pid == 0)
     {
         printf0(child);
-        
     }
     else
     {
-        exec("/meme", 0);
+        exec("/meme", 2, "swag");
         printf1(parent, pid);
         
     }

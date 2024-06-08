@@ -4,6 +4,13 @@
 #include "string.h"
 #include <stdarg.h>
 
+#define MAX_PATH 260
+
+typedef struct argstruct
+{
+    char arg[MAX_PATH];
+} argstruct;
+
 
 void printf(const char* str, ...);
 void printf0(const char *fmt);

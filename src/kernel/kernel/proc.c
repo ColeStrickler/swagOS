@@ -247,7 +247,7 @@ void dummy1()
     return;
 }
 
-int ExecUserProcess(Thread* thread, char* filepath, char** args)
+int ExecUserProcess(Thread* thread, char* filepath, struct exec_args* args)
 {
     Process* proc = thread->owner_proc;
     if (proc == NULL)
@@ -309,25 +309,26 @@ int ExecUserProcess(Thread* thread, char* filepath, char** args)
 
     // copy the arg array to the user process and set argc
     int argc = 0;
-    char** argv[MAX_ARG_COUNT];
-
-    char tmp_buf[MAX_PATH+1];
     // We go in reverse order so that the array is constituted properly
     log_to_serial("traversing args!\n");
+    char** argv[MAX_ARG_COUNT];
     for (int i = MAX_ARG_COUNT-1; i >= 0; i--)
     {
-        if (args[i])
+        char* arg_chars = &args->args[i].arg;
+        uint32_t arg_len  = strlen(arg_chars);
+        if (arg_len)
         {
             argc++;
-            uint32_t arg_len = strlen(args[i]);
-            memset(tmp_buf, 0x00, MAX_PATH+1);
-            /* copy over to stack buffer so we can write to user space */
-            memcpy(tmp_buf, args[i], arg_len+1); 
             // we will store these arguments on the stack
             ctx->i_rsp -= (arg_len + 1);
-            WriteStruct(ctx->i_rsp, tmp_buf,  arg_len+1, KERNEL_PML4T_PHYS(&proc->pgdir));
+            argv[i] = ctx->i_rsp;
+            WriteStruct(ctx->i_rsp, arg_chars,  arg_len+1, KERNEL_PML4T_PHYS(&proc->pgdir));
         }
     }
+    // copy the actual array of pointers over
+    ctx->i_rsp -= sizeof(argv);
+    WriteStruct(ctx->i_rsp, &argv, sizeof(argv), KERNEL_PML4T_PHYS(&proc->pgdir));
+
 
     ctx->rdi = argc; // argument count
     ctx->rsi = ctx->i_rsp; // start of array
@@ -336,8 +337,7 @@ int ExecUserProcess(Thread* thread, char* filepath, char** args)
     thread->status = THREAD_STATE_READY;
 
     test_pt(KERNEL_PML4T_PHYS(&proc->pgdir), KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
-    log_to_serial("ExecUserProcess() done!\n");
-    log_hexval("rip", ctx->i_rip);
+    kfree(elf);
     release_Spinlock(&global_Settings.proc_table.lock);
     
     return 0;
@@ -411,7 +411,7 @@ bool CreateUserProcess(uint8_t *elf)
     ctx->rsi = 0x0;
     ctx->rbp = 0x0;
 
-
+    kfree(elf);
     release_Spinlock(&global_Settings.proc_table.lock);
 }
 
