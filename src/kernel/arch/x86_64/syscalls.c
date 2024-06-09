@@ -170,7 +170,7 @@ void SYSHANDLER_exit(cpu_context_t* ctx)
     
     Thread* t = GetCurrentThread();
     get_current_cpu()->current_thread = NULL;
-    //log_hexval("Killing", t->id);
+    log_hexval("Killing", t->id);
     // Free pages if last thread in a process
     //ThreadFreeUserPages(t); // free all user mode pages
     t->status = THREAD_STATE_KILLED;

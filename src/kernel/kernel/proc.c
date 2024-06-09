@@ -619,12 +619,13 @@ void ProcessFree(Process* proc)
 
 void ExitThread()
 {
-
+    acquire_Spinlock(&global_Settings.proc_table.lock);
     Thread *t = GetCurrentThread();
-    DEBUG_PRINT0("EXIT THREAD()", t->id);
+    get_current_cpu()->current_thread = NULL;
+    log_hexval("Killing thread", 0);
     t->status = THREAD_STATE_KILLED;
     t->id = -1;
-    get_current_cpu()->noINT = false;
+    release_Spinlock(&global_Settings.proc_table.lock);
     sti();
     while (1)
         ; // wait to be rescheduled

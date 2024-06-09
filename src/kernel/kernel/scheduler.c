@@ -15,6 +15,7 @@ extern KernelSettings global_Settings;
 */
 void HandleNoSchedule(Thread* old_thread)
 {
+   // log_to_serial("no schedule");
     apic_end_of_interrupt(); // move this back to idt?
     if (old_thread->run_mode == USER_THREAD)
         load_page_table(old_thread->pml4t_phys);
@@ -101,15 +102,15 @@ void InvokeScheduler(struct cpu_context_t* ctx)
     acquire_Spinlock(&global_Settings.proc_table.lock);
     //log_to_seria("Invoke Scheduler!\n");
     
-    log_hexval("InvokeScheduler() CPU", lapic_id());
+   // log_hexval("InvokeScheduler() CPU", lapic_id());
     //DEBUG_PRINT("KSTACK CTX", ctx);
     //if (old_thread)
-    //    DEBUG_PRINT("Old thread id", old_thread->id);
+    //    DEBUG_PRINT
     //else
     //    DEBUG_PRINT("Old thread null", 0x0);
     
     uint32_t old_thread_id  = (old_thread == NULL ? 0 : (old_thread->id == UINT32_MAX ? MAX_NUM_THREADS : old_thread->id));
-
+   // log_hexval("old thread id", old_thread_id);
     /*
         These two for loops are just round-robin
     */
@@ -137,7 +138,7 @@ void InvokeScheduler(struct cpu_context_t* ctx)
         DEBUG_PRINT("Doing Idle Thread on CPU", lapic_id());
         ScheduleIdleThread(old_thread, ctx);
     }
-    log_hexval("DONE SCHEDULING", lapic_id());
+    //log_hexval("DONE SCHEDULING", lapic_id());
     release_Spinlock(&global_Settings.proc_table.lock);
     
 
@@ -175,7 +176,7 @@ void schedule(struct CPU* cpu, struct Thread* thread, THREAD_STATE state)
     //    LogTrapFrame((trapframe64_t*)&thread->execution_context);
     //}
     ctx_switch_tss(cpu, thread);
-    log_hexval("DONE SCHEDULING", lapic_id());
+   // log_hexval("DONE SCHEDULING", lapic_id());
     release_Spinlock(&global_Settings.proc_table.lock);
     /*
         This CLI command has to be here otherwise a another timer could go off and we would save the wrong state
