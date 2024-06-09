@@ -172,14 +172,14 @@ iderw(struct iobuf *b)
 
 
 
-  release_Spinlock(&ide_request_queue.ide_lock);
+  //release_Spinlock(&ide_request_queue.ide_lock);
   // Wait for request to finish.
   while((b->flags & (B_VALID|B_DIRTY)) != B_VALID){
    // log_to_serial("iderw() going to sleep!\n");
-    //ThreadSleep(b, &ide_request_queue.ide_lock);
+    ThreadSleep(b, &ide_request_queue.ide_lock);
   }
   
 
- // release_Spinlock(&ide_request_queue.ide_lock);
+  release_Spinlock(&ide_request_queue.ide_lock);
   //DEBUG_PRINT("iderw() finished", 0);
 }

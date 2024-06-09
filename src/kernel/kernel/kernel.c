@@ -56,6 +56,7 @@ Spinlock print_lock;
 
 void DEBUG_PRINT(const char *str, uint64_t hex)
 {
+	return;
 	if (print_lock.owner_cpu == UINT32_MAX)
 	{
 		log_hexval(str, hex);
@@ -68,6 +69,7 @@ void DEBUG_PRINT(const char *str, uint64_t hex)
 
 void DEBUG_PRINT0(const char *str)
 {
+	return;
 	acquire_Spinlock(&print_lock);
 	log_to_serial(str);
 	release_Spinlock(&print_lock);
@@ -228,7 +230,7 @@ void smp_start()
 		else
 		{
 			alloc_per_cpu_gdt();
-			global_Settings.cpu[i].kstack = kalloc(0x10000) + 0x10000;
+			//gobal_Settings.cpu[i].kstack = kalloc(0x10000) + 0x10000;
 		}
 	}
 }
@@ -342,7 +344,7 @@ void kernel_main(uint64_t ptr_multiboot_info)
 	char *b = ext2_read_file("/test");
 	if (b != NULL)
 		CreateUserProcess(b);
-	log_to_serial("here2!\n");
+	//log_to_serial("here2!\n");
 
 	// char* user = 0x69000;
 	// unsigned char arr[] = {0xeb, 0xfe, 0x90, 0x90};

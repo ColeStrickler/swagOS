@@ -221,7 +221,7 @@ void set_tss(CPU *cpu, Thread* thread)
     uint64_t *tss_high = &cpu->gdt.tss_high;
     *tss_low = 0;
     *tss_high = 0;
-    log_hexval("tss addr", tss);
+   // log_hexval("tss addr", tss);
     // TSS_ENTRY_LOW:
     uint16_t limit_low = (uint16_t)sizeof(tss_t);              // 0:15 -> Limit (first 15 bits) should be 0xFFFF
     uint16_t tss_entry_base_1 = (((uint64_t)tss & 0xFFFF));    // 16:31 -> First 16 bits of kernel_tss address

@@ -38,12 +38,12 @@ void SaveThreadContext(struct Thread* old_thread, struct cpu_context_t* ctx)
 
     if (old_thread == NULL)
     {
-        DEBUG_PRINT("OLD THREAD NULL, RETURNING...", 0);
+        log_hexval("OLD THREAD NULL, RETURNING...", 0);
         return;
     }
     if (ctx == NULL)
     {
-        DEBUG_PRINT("CTX NULL, RETURNING...", 0);
+        log_hexval("CTX NULL, RETURNING...", 0);
         return;
     }
 
@@ -53,10 +53,10 @@ void SaveThreadContext(struct Thread* old_thread, struct cpu_context_t* ctx)
     */
     if (old_thread == idle_thread) 
     {
-        DEBUG_PRINT("old_thread == idle_thread, RETURNING...", 0);
+        log_hexval("old_thread == idle_thread, RETURNING...", 0);
         return;
     }
-    log_hexval("status", old_thread->status);
+    //log_hexval("status", old_thread->status);
     switch (old_thread->status)
     {
         case THREAD_STATE_KILLED:
@@ -67,20 +67,23 @@ void SaveThreadContext(struct Thread* old_thread, struct cpu_context_t* ctx)
         case THREAD_STATE_SLEEPING:
         {
             old_thread->execution_context = *ctx;
-            if (old_thread->can_wakeup) // this is set when wakeup() triggers
-                old_thread->status = THREAD_STATE_READY; // we are setting this too early, before whole ExecUserProcessIsDone()
+            old_thread->status = THREAD_STATE_WAKEUP_READY;
             break;
         }
         case THREAD_STATE_RUNNING:
         {
             old_thread->execution_context = *ctx;
             old_thread->status = THREAD_STATE_READY;
+            log_hexval("Setting to ready", old_thread->id);
+            //log_hexval("setting pid to ready0", old_thread->id);
             break;
         }
         default:
         {
-            DEBUG_PRINT("State", old_thread->status);
-            DEBUG_PRINT("Id", old_thread->id);
+            
+            log_hexval("CPU", lapic_id());
+            log_hexval("State", old_thread->status);
+            log_hexval("Id", old_thread->id);
             panic("InvokeScheduler() --> old_thread was in unexpected state.\n");
         }
     }
@@ -96,9 +99,9 @@ void InvokeScheduler(struct cpu_context_t* ctx)
     struct Thread* old_thread = current_cpu->current_thread;
     
     acquire_Spinlock(&global_Settings.proc_table.lock);
-    //log_to_serial("Invoke Scheduler!\n");
+    //log_to_seria("Invoke Scheduler!\n");
     
-    //DEBUG_PRINT("InvokeScheduler() CPU", lapic_id());
+    log_hexval("InvokeScheduler() CPU", lapic_id());
     //DEBUG_PRINT("KSTACK CTX", ctx);
     //if (old_thread)
     //    DEBUG_PRINT("Old thread id", old_thread->id);
@@ -110,40 +113,33 @@ void InvokeScheduler(struct cpu_context_t* ctx)
     /*
         These two for loops are just round-robin
     */
-    for (uint32_t i = old_thread_id+1; i < MAX_NUM_THREADS; i++)
+    for (uint32_t i = 0; i < MAX_NUM_THREADS; i++)
     {
-        if (thread_table[i].status == THREAD_STATE_SLEEPING && thread_table[i].can_wakeup)
-            thread_table[i].status = THREAD_STATE_READY;
+        if (i == old_thread_id)
+            continue;
 
+        if (thread_table[i].status == THREAD_STATE_WAKEUP_READY && thread_table[i].can_wakeup)
+        {   
+            log_hexval("Setting to ready", i);
+            thread_table[i].status = THREAD_STATE_READY;
+        }
         if (thread_table[i].status != THREAD_STATE_READY)
             continue;
         
+        log_hexval("doing thread", i);
         SaveThreadContext(old_thread, ctx);       
-        //DEBUG_PRINT("Old id0", old_thread_id);
-        DEBUG_PRINT("Doing process", thread_table[i].id);
         schedule(current_cpu, &thread_table[i], THREAD_STATE_RUNNING);
     }
 
-    for (uint32_t i = 0; i < old_thread_id; i++)
-    {
-        if (thread_table[i].status == THREAD_STATE_SLEEPING && thread_table[i].can_wakeup)
-            thread_table[i].status = THREAD_STATE_READY;
-        if (thread_table[i].status != THREAD_STATE_READY)
-            continue;
-        
-        SaveThreadContext(old_thread, ctx);
-        //DEBUG_PRINT("Old id1", old_thread_id);
-        DEBUG_PRINT("Doing process", thread_table[i].id);
-        schedule(current_cpu, &thread_table[i], THREAD_STATE_RUNNING);
-    }
 
     if (old_thread == NULL || old_thread->status == THREAD_STATE_KILLED) // If we already hold the Idle thread we can avoid this overhead
     {
         DEBUG_PRINT("Doing Idle Thread on CPU", lapic_id());
         ScheduleIdleThread(old_thread, ctx);
     }
+    log_hexval("DONE SCHEDULING", lapic_id());
     release_Spinlock(&global_Settings.proc_table.lock);
-   // DEBUG_PRINT("DONE SCHEDULING", lapic_id());
+    
 
     HandleNoSchedule(old_thread);
 }
@@ -159,15 +155,15 @@ void schedule(struct CPU* cpu, struct Thread* thread, THREAD_STATE state)
         return;
 
 
-    if (cpu->current_thread)
-        DEBUG_PRINT("Old thread rip", cpu->current_thread->execution_context.i_rip);
+    //if (cpu->current_thread)
+    //    DEBUG_PRINT("Old thread rip", cpu->current_thread->execution_context.i_rip);
 
     cpu->current_thread = thread;
     thread->status = state;
     //DEBUG_PRINT("Target Thread state", thread->status);
     //DEBUG_PRINT("CPU", cpu->id);
-    DEBUG_PRINT("Targeting RIP", thread->execution_context.i_rip);
-    DEBUG_PRINT("TARGETING RSP", thread->execution_context.i_rsp);
+    //DEBUG_PRINT("Targeting RIP", thread->execution_context.i_rip);
+    //DEBUG_PRINT("TARGETING RSP", thread->execution_context.i_rsp);
     //if (thread->id == 420)
     //{
     //    log_to_serial("Schedule()\n");
@@ -179,6 +175,7 @@ void schedule(struct CPU* cpu, struct Thread* thread, THREAD_STATE state)
     //    LogTrapFrame((trapframe64_t*)&thread->execution_context);
     //}
     ctx_switch_tss(cpu, thread);
+    log_hexval("DONE SCHEDULING", lapic_id());
     release_Spinlock(&global_Settings.proc_table.lock);
     /*
         This CLI command has to be here otherwise a another timer could go off and we would save the wrong state

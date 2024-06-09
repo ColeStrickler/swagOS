@@ -128,16 +128,18 @@ void test_pt(uint64_t new_page_table, uint64_t old_pt)
 
 /*
     Finds a free thread in the thread table if one exists, returns NULL on failure
+    This function also returns the proper id
 
     NOTE: does not lock the Process table lock, this needs to be done before calling this function
 */
-Thread *FindFreeThread()
+Thread *FindFreeThread(uint32_t* id)
 {
     struct Thread *thread_table = &global_Settings.proc_table.thread_table[0];
     for (uint32_t i = 0; i < MAX_NUM_THREADS; i++)
     {
         if (thread_table[i].status == THREAD_STATE_NOT_INITIALIZED || thread_table[i].status == THREAD_STATE_KILLED)
         {
+            *id = i;
             struct Thread *thread = &thread_table[i];
             return thread;
         }
@@ -173,14 +175,14 @@ void CreatePageTableFromCopy(Process* new_proc, Thread* new_thread, Process* old
     */
     uva_copy_kernel(new_proc);
    // test_pt(new_thread->pml4t_phys, KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
-    log_hexval("old_proc", old_proc->thread_count);
+    //log_hexval("old_proc", old_proc->thread_count);
     proc_used_page_entry* entry = (proc_used_page_entry*)old_proc->used_pages.first;
     while(entry != NULL && entry != &old_proc->used_pages)
     {
-        log_hexval("pa", entry->page_pa);
-        log_hexval("va", entry->page_va);
-        log_hexval("pd index", entry->pd_table_index);
-        log_hexval("pdt index", entry->pdt_table_index);
+        //log_hexval("pa", entry->page_pa);
+        //log_hexval("va", entry->page_va);
+        //log_hexval("pd index", entry->pd_table_index);
+        //log_hexval("pdt index", entry->pdt_table_index);
         uint64_t new_frame = physical_frame_request_4kb();
         if (new_frame == UINT64_MAX)
             panic("CreatePageTableFromCopy() --> physical_frame_request_4kb() returned bad frame\n");
@@ -198,12 +200,14 @@ void CreatePageTableFromCopy(Process* new_proc, Thread* new_thread, Process* old
 }
 
 
-int ForkUserProcess(Thread *old_thread)
+int ForkUserProcess(Thread *old_thread, cpu_context_t* ctx)
 {
     acquire_Spinlock(&global_Settings.proc_table.lock);
+    //log_to_serial("FORK()\n");
     Process *old_proc = old_thread->owner_proc;
+    uint32_t tid;
     Process *new_proc = FindFreeProcess();
-    Thread *new_thread = FindFreeThread();
+    Thread *new_thread = FindFreeThread(&tid);
     if (new_proc == NULL || new_thread == NULL || old_proc == NULL)
     {
         release_Spinlock(&global_Settings.proc_table.lock);
@@ -220,11 +224,13 @@ int ForkUserProcess(Thread *old_thread)
     insert_dll_entry_head(&new_proc->threads, &entry->entry);
 
     
-
-    memcpy(&new_thread->execution_context, &old_thread->execution_context, sizeof(cpu_context_t));
+    new_thread->execution_context = *ctx;
+    //memcpy(&new_thread->execution_context, &old_thread->execution_context, sizeof(cpu_context_t));
     memcpy(&new_proc->fd, &old_proc->fd, sizeof(new_proc->fd)); // copy over file descriptors
-    new_thread->id = global_Settings.proc_table.pid_alloc++;
+    new_thread->id = tid;
     new_thread->run_mode = old_thread->run_mode;
+    log_hexval("new_thread->id", new_thread->id);
+    log_hexval("old thread status", old_thread->status);
     new_thread->status = THREAD_STATE_READY;
     new_thread->owner_proc = new_proc;
     new_thread->can_wakeup = true;
@@ -250,10 +256,14 @@ void dummy1()
 
 int ExecUserProcess(Thread* thread, char* filepath, struct exec_args* args, cpu_context_t* ctx)
 {
+    //log_hexval("EXEC() tid", thread->id);
     Process* proc = thread->owner_proc;
     if (proc == NULL)
+    {
+        //log_to_serial("owner proc null\n");
         return -1;
-
+    }
+    
     /* We do these disk loads before we grab the lock and disable interrupts */
     if (!ext2_file_exists(filepath))
     {
@@ -261,11 +271,11 @@ int ExecUserProcess(Thread* thread, char* filepath, struct exec_args* args, cpu_
         //release_Spinlock(&global_Settings.proc_table.lock);
         return -1;
     }
-    log_to_serial("ExecUserProcess begin ext2_read_file()\n");
+    //log_to_serial("ExecUserProcess begin ext2_read_file()\n");
     unsigned char* elf = ext2_read_file(filepath);
     if (!elf)
     {
-       // log_to_serial("Error reading file\n");
+        log_to_serial("Error reading file\n");
         //release_Spinlock(&global_Settings.proc_table.lock);
         return -1;
     }
@@ -273,11 +283,12 @@ int ExecUserProcess(Thread* thread, char* filepath, struct exec_args* args, cpu_
     // Cleanup old process resources
    // log_to_serial("grabbing spinlock!\n");
     acquire_Spinlock(&global_Settings.proc_table.lock);
-    memset(ctx, 0x00, sizeof(cpu_context_t));
    // log_to_serial("got spinlock!\n");
+    memset(ctx, 0x00, sizeof(cpu_context_t));
+    //log_to_serial("EXEC() here\n");
     ProcessFree(proc);
 
-    thread->id = 1;
+    
     thread->run_mode = USER_THREAD;
     proc->pid = global_Settings.proc_table.pid_alloc++;
     thread->owner_proc = proc;
@@ -334,14 +345,14 @@ int ExecUserProcess(Thread* thread, char* filepath, struct exec_args* args, cpu_
 
     ctx->rdi = argc; // argument count
     ctx->rsi = ctx->i_rsp; // start of array
-    log_hexval("setting rdi to", ctx->rdi);
+    //log_hexval("setting rdi to", ctx->rdi);
     //thread->execution_context = *ctx;
 
     thread->status = THREAD_STATE_RUNNING;
 
     kfree(elf);
     release_Spinlock(&global_Settings.proc_table.lock);
-    
+    //log_to_serial("returning from exec()\n");
     return 0;
 }
 
@@ -352,8 +363,9 @@ bool CreateUserProcess(uint8_t *elf)
 
     acquire_Spinlock(&global_Settings.proc_table.lock);
    // log_hexval("CREATE USER PROC", elf);
+   uint32_t tid;
     Process *init_proc = FindFreeProcess();
-    Thread *init_thread = FindFreeThread();
+    Thread *init_thread = FindFreeThread(&tid);
     if (init_thread == NULL || init_proc == NULL)
     {
         release_Spinlock(&global_Settings.proc_table.lock);
@@ -372,7 +384,7 @@ bool CreateUserProcess(uint8_t *elf)
 
     // log_hexval("Creating new thread at index", i);
 
-    init_thread->id = 1;
+    init_thread->id = tid;
 
     // CreatePageTables(init_thread);
     init_thread->status = THREAD_STATE_READY; // --> may want to do this later
@@ -498,10 +510,7 @@ void ThreadSleep(void *sleep_channel, struct Spinlock *spin_lock)
         __asm__ __volatile__("int3");
     else
     {
-        if (spin_lock != &global_Settings.proc_table.lock)
-            acquire_Spinlock(spin_lock);
-        thread->sleep_channel = NULL;
-        return;
+        panic("did not hit sleep state\n");
     }
 
     //DEBUG_PRINT("Woken up!", lapic_id());
@@ -520,17 +529,19 @@ void ThreadSleep(void *sleep_channel, struct Spinlock *spin_lock)
 
 void Wakeup(void *channel)
 {
+    //log_to_serial("Wakeup()\n");
     struct Thread *thread_table = &global_Settings.proc_table.thread_table[0];
     acquire_Spinlock(&global_Settings.proc_table.lock);
     for (uint32_t i = 0; i < MAX_NUM_THREADS; i++)
     {
         Thread *t = &thread_table[i];
-        if (t->status == THREAD_STATE_SLEEPING && t->sleep_channel == channel)
+        if ((t->status == THREAD_STATE_SLEEPING || t->status == THREAD_STATE_WAKEUP_READY) && t->sleep_channel == channel)
         {
             /*
                 We are getting here before the scheduler can set the execution context during sleep
 
             */
+           log_hexval("Waking up", t->id);
             t->can_wakeup = true;
             //t->status = THREAD_STATE_READY;
         }

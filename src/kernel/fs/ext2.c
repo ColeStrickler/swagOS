@@ -413,10 +413,10 @@ unsigned char* ext2_read_file(char* filepath)
     
     if (ext2_find_file_inode(filepath, &file_inode) == UINT32_MAX)
     {
-        DEBUG_PRINT0("Could not find file inode!\n");
+        //DEBUG_PRINT0("Could not find file inode!\n");
         return NULL;
     }
-    DEBUG_PRINT("Got inode", GetCurrentThread()->id);
+  //  DEBUG_PRINT("Got inode", GetCurrentThread()->id);
     if ((file_inode.mode & 0xF000) != INODE_TYPE_FILE)
     {
         // not a file
@@ -428,7 +428,7 @@ unsigned char* ext2_read_file(char* filepath)
     
     if (ret_buf == NULL)
         panic("ext2_read_file() --> kalloc() failure!");
-    log_to_serial("allocated ret buf\n");
+    // /log_to_serial("allocated ret buf\n");
     uint64_t buf_offset = 0;
     for (uint16_t i = 0; i < 12; i++)
     {

@@ -33,22 +33,21 @@ void main()
 
     char* fmt = "wtf %d\n";
     char* error = "ERROR\n";
-    int fd = open("/test");
-    char buf[0x1000];
-    printf1(fmt, fd);
+    printf0("CHECK\n");
+    fork();
+    fork();
+    fork();
+    fork();
+
+    /*
+        We are getting threads in unexpected states
+    */
+
+    printf0(coc);
+    //exec("/meme", 1);
 
 
-    int pid = fork();
-    if (!pid)
-    {
-        printf0(child);
-        exec("/meme", 2, "swag");
-    }
-    else
-    {
-        //printf0(parent);
-        exec("/meme", 1);
-    }
+    
         
 
         //exec("/meme", 0);

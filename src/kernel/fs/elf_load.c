@@ -37,7 +37,7 @@ bool ELF_check_file_class(void* elf)
 */
 uint64_t ELF_load_segments(struct Thread* thread, unsigned char* elf)
 {
-    log_to_serial("ELF_load_segments()\n");
+    //log_to_serial("ELF_load_segments()\n");
     elf64_header_t* header = (elf64_header_t*)elf;
     
     if (!ELF_check_magic(header) || !ELF_check_file_class(header))
@@ -76,7 +76,7 @@ uint64_t ELF_load_segments(struct Thread* thread, unsigned char* elf)
         */
         for (uint64_t j = 0; j < ph->memSize; j += PGSIZE)
         {
-            log_hexval("Attempting ELF load segment", j);
+            //log_hexval("Attempting ELF load segment", j);
             uint64_t frame = physical_frame_request_4kb();
             if (frame == UINT64_MAX)
                 panic("ELF_load_segments() failed! could not get 4kb frame.\n");
@@ -93,7 +93,7 @@ uint64_t ELF_load_segments(struct Thread* thread, unsigned char* elf)
             virtual_to_physical(VA_LOAD_TRANSFER, global_Settings.pml4t_kernel, &check_frame, &check_offset);
             if (check_frame+check_offset != frame)
             {
-                log_hexval("check+offset", check_frame+check_offset);
+               // log_hexval("check+offset", check_frame+check_offset);
                 panic("check_frame+check_offset!=frame");
             }
             //log_hexval("testing!!!", thread->owner_proc->pgdir.pdt[0xc3][0x1d7]);
@@ -122,7 +122,7 @@ uint64_t ELF_load_segments(struct Thread* thread, unsigned char* elf)
     }
     //log_hexval("byte 0", ((uint8_t*)VA_LOAD_TRANSFER)[0]);
     
-    log_hexval("HEADER ENTRY", header->entry);
+   // log_hexval("HEADER ENTRY", header->entry);
     //thread->execution_context.i_rip = header->entry;
     
    // dec_cli();

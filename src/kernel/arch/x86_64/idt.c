@@ -241,7 +241,7 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
             {
                 log_hexval("Bad INT3 on thread id", GetCurrentThread()->id);
                 log_hexval("Bad INT3 stat", GetCurrentThread()->status);
-                break; 
+                panic("\n");
             }
             apic_end_of_interrupt();
             break;
@@ -249,18 +249,18 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
         case 13:
         {
             //printf("\nGeneral Protection fault interrupt.\nGeneral Protection fault on CPU: %d\nRIP: %u\n", lapic_id(), tf->i_rip);
-            DEBUG_PRINT("GP FAULT on CPU", lapic_id());
-            DEBUG_PRINT("RIP", tf->i_rip);
+            log_hexval("GP FAULT on CPU", lapic_id());
+            log_hexval("RIP", tf->i_rip);
             while(1)
                 panic("");
             break;
         }
         case 14:
         {
-            DEBUG_PRINT("PF CPU", lapic_id());
-            DEBUG_PRINT("Page Fault Interrupt", tf->i_rip);
-            DEBUG_PRINT("Stack", tf->i_rsp);
-            DEBUG_PRINT("Faulting address", get_cr2());
+            log_hexval("PF CPU", lapic_id());
+            log_hexval("Page Fault Interrupt", tf->i_rip);
+            log_hexval("Stack", tf->i_rsp);
+            log_hexval("Faulting address", get_cr2());
             while(1)
                 panic("");
         }

@@ -166,13 +166,18 @@ bool WriteStruct(void* addr, void* src, uint32_t size, uint64_t pagetable)
 
 void SYSHANDLER_exit(cpu_context_t* ctx)
 {
+    acquire_Spinlock(&global_Settings.proc_table.lock);
+    
     Thread* t = GetCurrentThread();
+    get_current_cpu()->current_thread = NULL;
+    //log_hexval("Killing", t->id);
     // Free pages if last thread in a process
     //ThreadFreeUserPages(t); // free all user mode pages
-    apic_end_of_interrupt();
     t->status = THREAD_STATE_KILLED;
     t->id = -1;
     get_current_cpu()->noINT = false;
+    release_Spinlock(&global_Settings.proc_table.lock);
+    apic_end_of_interrupt();
     sti();
     while(1);
 }
@@ -342,7 +347,7 @@ void SYSHANDLER_open(cpu_context_t* ctx, uint64_t user_pagetable)
         memset(t->fd[min_fd].path, 0x00, MAX_PATH);
         memcpy(t->fd[min_fd].path, req_path, strlen(req_path));
 
-        log_hexval("returning fd", min_fd);
+        //log_hexval("returning fd", min_fd);
         return;
     }
 
@@ -422,7 +427,7 @@ void SYSHANDLER_fork(cpu_context_t* ctx, uint64_t user_pagetable)
     // rdi = syscall number
 
     Thread* current_thread = GetCurrentThread();
-    int child_pid = ForkUserProcess(current_thread);
+    int child_pid = ForkUserProcess(current_thread, ctx);
     if (child_pid == -1)
     {
         ctx->rax = UINT64_MAX; // failure
@@ -460,6 +465,7 @@ void SYSHANDLER_exec(cpu_context_t* ctx, uint64_t user_pagetable)
 
     
     apic_end_of_interrupt();
+    
     ExecUserProcess(current_thread, program_path, &execargs, ctx);
     return;
 }
@@ -497,7 +503,7 @@ void SYSHANDLER_perror(cpu_context_t* ctx, uint64_t user_pagetable)
 void syscall_handler(cpu_context_t* context)
 {
     load_page_table(KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel));
-    log_hexval("\n\nsyscall_handler()\n\n", context->rdi);
+   // log_hexval("\n\nsyscall_handler()\n\n", context->rdi);
     cpu_context_t ctx = *context;
     bool do_eoi = true;
     Thread* t = GetCurrentThread();
@@ -539,7 +545,7 @@ void syscall_handler(cpu_context_t* context)
         }
         case sys_fork:
         {
-            log_hexval("fork from tid", GetCurrentThread()->id);
+            //log_hexval("fork from tid", GetCurrentThread()->id);
             SYSHANDLER_fork(&ctx, user_pt);
             break;
         }
@@ -582,15 +588,15 @@ void syscall_handler(cpu_context_t* context)
             break;;
     }
     
-    log_hexval("syscall done", ctx.rdi);
+   // log_hexval("syscall done", ctx.rdi);
     t->pml4t_phys = user_pt;
     if (do_eoi)
         apic_end_of_interrupt(); // we have to do this before we switch page tables as apic isnt currently mapped in user mode processes
     load_page_table(user_pt);
-    log_hexval("syscall done", ctx.rdi);
+    //log_hexval("syscall done", ctx.rdi);
     cli();
     *context = ctx;
-    log_hexval("targeting rip", context->i_rip);
+   // log_hexval("targeting rip", context->i_rip);
     return;
 }
 
