@@ -35,7 +35,6 @@ typedef struct KernelSettings
     uint64_t original_GDT;
     uint64_t original_GDT_size;
     struct GlobalProcessTable proc_table;
-
     uint32_t ticksIn10ms;
     struct x8664_Settings settings_x8664;
     struct KeyboardDriverSettings KeyboardDriver;

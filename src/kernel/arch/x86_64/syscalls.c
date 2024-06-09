@@ -5,7 +5,7 @@
 #include <serial.h>
 #include <asm_routines.h>
 #include <kernel.h>
-
+#include <ps2_keyboard.h>
 
 
 
@@ -169,8 +169,20 @@ void SYSHANDLER_exit(cpu_context_t* ctx)
     acquire_Spinlock(&global_Settings.proc_table.lock);
     
     Thread* t = GetCurrentThread();
+    Process* p = t->owner_proc;
+    if (p)
+    {
+        p->thread_count--;
+        if (p->thread_count == 0)
+        {
+            ProcessFree(p);
+            p->state = PROCESS_STATE_EXITED;
+            NoLockWakeup(p);
+        }
+    }
+
     get_current_cpu()->current_thread = NULL;
-    log_hexval("Killing", t->id);
+   // log_hexval("Killing", t->id);
     // Free pages if last thread in a process
     //ThreadFreeUserPages(t); // free all user mode pages
     t->status = THREAD_STATE_KILLED;
@@ -257,9 +269,9 @@ void SYSHANDLER_sbrk(cpu_context_t* ctx)
                 return;
             }
             t->user_heap_bitmap[i] |= (1 << bit); // set bit in bitmap
-            log_hexval("mapping sbrk", va);
+           // log_hexval("mapping sbrk", va);
             map_4kb_page_user(va, pa, thread, 3, 2 + (USER_HEAP_START - va)/HUGEPGSIZE); // map page to process page table
-            log_hexval("done mapping sbrk", va);
+           // log_hexval("done mapping sbrk", va);
             end = va + 0xFFF;
         }
     }
@@ -286,7 +298,7 @@ void SYSHANDLER_free(cpu_context_t* ctx, uint64_t user_pagetable)
 
     Process* proc = GetCurrentThread()->owner_proc;
     FreeHeapAllocEntry(proc, ctx->rsi);
-    log_hexval("heap free done", ctx->rsi);
+   // log_hexval("heap free done", ctx->rsi);
     return;
 }
 
@@ -383,7 +395,7 @@ void SYSHANDLER_read(cpu_context_t* ctx, uint64_t user_pagetable)
 
     if (!fd->in_use)
     {
-        log_to_serial("fd not in use\n");
+        //log_to_serial("fd not in use\n");
         ctx->rax = UINT64_MAX;
         return;
     }
@@ -454,7 +466,7 @@ void SYSHANDLER_fork(cpu_context_t* ctx, uint64_t user_pagetable)
     return;
 }
 
-void SYSHANDLER_exec(cpu_context_t* ctx, uint64_t user_pagetable)
+int SYSHANDLER_exec(cpu_context_t* ctx, uint64_t user_pagetable)
 {
     // rdi = syscall number
     // rsi = path of program to execute
@@ -480,7 +492,7 @@ void SYSHANDLER_exec(cpu_context_t* ctx, uint64_t user_pagetable)
     
     apic_end_of_interrupt();
     
-    ExecUserProcess(current_thread, program_path, &execargs, ctx);
+    ctx->rax = ExecUserProcess(current_thread, program_path, &execargs, ctx);
     return;
 }
 
@@ -503,6 +515,48 @@ void SYSHANDLER_perror(cpu_context_t* ctx, uint64_t user_pagetable)
     }
     printf(GetErrNo(GetCurrentThread()));
     
+    return;
+}
+
+
+void SYSHANDLER_getchar(cpu_context_t* ctx, uint64_t user_pagetable)
+{
+    // rdi = syscall number
+
+    apic_end_of_interrupt();
+    sti();
+    char c = 0x0;
+    while(!c)
+    {
+        c = retrieve_character_buf();
+    }
+
+    ctx->rax = c;
+    return;
+}
+
+
+void SYSHANDLER_waitpid(cpu_context_t* ctx, uint64_t user_pagetable)
+{
+    // rdi = syscall number
+    // rsi = pid to wait on
+    int pid = (int)ctx->rsi;
+    if (pid >= 64 || pid < 0) // only 64 processes 
+    {
+        apic_end_of_interrupt();
+        return;
+    }
+
+    apic_end_of_interrupt();
+    sti();
+    Process* p = &global_Settings.proc_table.proc_table[pid];
+    acquire_Spinlock(&p->pid_wait_spinlock);
+    while(p->state != PROCESS_STATE_EXITED)
+    {
+        ThreadSleep(p, &p->pid_wait_spinlock);
+    }
+    release_Spinlock(&p->pid_wait_spinlock);
+    log_to_serial("done waitpid()\n");
     return;
 }
 
@@ -571,6 +625,18 @@ void syscall_handler(cpu_context_t* context)
         case sys_perror:
         {
             SYSHANDLER_perror(&ctx, user_pt);
+            break;
+        }
+        case sys_getchar:
+        {
+            SYSHANDLER_getchar(&ctx, user_pt);
+            do_eoi = false;
+            break;
+        }
+        case sys_waitpid:
+        {
+            SYSHANDLER_waitpid(&ctx, user_pt);
+            do_eoi = false;
             break;
         }
         case sys_tchangecolor:

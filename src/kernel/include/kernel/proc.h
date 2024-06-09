@@ -140,11 +140,22 @@ typedef struct HeapAllocEntry
     uint32_t i_end;
 } HeapAllocEntry;
 
+enum PROCESS_STATE
+{
+    PROCESS_STATE_FREE,
+    PROCESS_STATE_EXITED,
+    PROCESS_STATE_INUSE
+};
+
+
 typedef struct Process
 {
     struct dll_Head threads;
     uint32_t thread_count;
     uint32_t pid;
+    uint32_t ppid;
+    Spinlock pid_wait_spinlock;
+    enum PROCESS_STATE state;
     thread_pagetables_t pgdir;
     struct dll_Head used_pages;
     struct dll_Head heap_allocations;
@@ -178,9 +189,13 @@ void ThreadSleep(void* sleep_channel, Spinlock *spin_lock);
 
 void Wakeup(void *channel);
 
+void NoLockWakeup(void *channel);
+
 void ThreadFreeUserPages(Thread* t);
 
 void ExitThread();
+
+void ProcessFree(Process *proc);
 
 void SetErrNo(Thread *thread, enum ERROR err_no);
 

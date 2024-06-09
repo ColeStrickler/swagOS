@@ -13,6 +13,15 @@ void printf1(const char* fmt, int arg)
     do_syscall3(sys_tprintf, fmt, strlen(fmt), arg);
 }
 
+void printchar(char c)
+{
+    char buf[0x2];
+    buf[1] = 0x0;
+    buf[0] = c;
+    printf0(buf);
+}
+
+
 
 void FontChangeColor(uint8_t r, uint8_t g, uint8_t b)
 {
@@ -41,11 +50,9 @@ int fork()
     return (int)do_syscall0(sys_fork);
 }
 
-void exec(const char* filepath, int argc, ...)
+int exec(const char* filepath, int argc, argstruct* args)
 {
     argstruct arg_array[16];
-    va_list args;         // Declare a variable to hold the argument list
-    va_start(args, argc); 
 
     /*
         Zero argstruct
@@ -60,13 +67,12 @@ void exec(const char* filepath, int argc, ...)
     uint32_t len = 0;
     for (int i = 1; i < argc; i++)
     {
-        char* arg = va_arg(args, char*);
+        char* arg = args[i-1].arg;
         len = strlen(arg);
         memcpy(arg_array[i].arg, arg, len);
     }
 
-    do_syscall2(sys_exec, filepath, &arg_array[0]);
-    return;
+    return (int)do_syscall2(sys_exec, filepath, &arg_array[0]);
 }
 
 /*
@@ -87,6 +93,22 @@ void free(void* addr)
 {
     do_syscall1(sys_free, addr);
 }
+
+char getchar()
+{
+    char c = 0x0;
+    while(!c)
+    {
+        c = do_syscall0(sys_getchar);
+    }
+    return c;
+}
+
+void waitpid(int pid)
+{
+    do_syscall1(sys_waitpid, pid);
+}
+
 
 void dbg_val(uint64_t val)
 {

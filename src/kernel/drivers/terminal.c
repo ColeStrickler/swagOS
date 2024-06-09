@@ -69,7 +69,7 @@ void terminal_scroll_down()
     //log_to_serial("here!\n");
     for (int i = 0; i < row_size_in_chars; i++)
         driver->terminal_buf[driver->terminal_buf_size - i - 1] = ' ';
-    driver->buffer_write_location = driver->terminal_buf_size -row_size_in_chars- 1;
+    driver->buffer_write_location = driver->terminal_buf_size -row_size_in_chars;
 }
 
 
@@ -137,7 +137,16 @@ void terminal_write_char(char c, uint32_t color)
         }
         return;
     }
-    
+    else if (c == 0x8) // backspace
+    {
+        if (driver->buffer_write_location == 0)
+            return;
+        driver->buffer_write_location--;
+        uint32_t x = terminal_buf_location_to_xpixel();
+        uint32_t y = terminal_buf_location_to_ypixel();
+        draw_character(x, y, color, char_code_to_fontcode(' '));
+        return;
+    }
         
     if (driver->buffer_write_location >= driver->terminal_buf_size)
     {

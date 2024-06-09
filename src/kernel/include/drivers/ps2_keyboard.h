@@ -9,9 +9,9 @@ typedef struct KeyboardDriverSettings
     bool shift_pressed;
 }KeyboardDriverSettings;
 
+char retrieve_character_buf();
 
 void keyboard_driver_init();
-
 
 static char qwertz[128] = {
     0,  '`', '1', '2', '3', '4', '5', '6', '7', '8', /* 9 */

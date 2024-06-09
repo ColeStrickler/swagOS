@@ -16,7 +16,8 @@
 #define sys_exec        7
 #define sys_free        8
 #define sys_perror      9
-   
+#define sys_getchar     10
+#define sys_waitpid     11
 #define sys_tchangecolor    0x1000
 #define sys_debugvalue   0x1111
 

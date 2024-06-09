@@ -31,13 +31,6 @@ void main()
 
 
 
-    char* coc = malloc(0x100);
-    open("/memeswwag");
-    perror("");
-
-
-    free(coc);
-
     char* fmt = "wtf %d\n";
     char* error = "ERROR\n";
     printf0("CHECK\n");
@@ -45,8 +38,7 @@ void main()
     fork();
     fork();
     fork();
-    fork();
-    fork();
+    
 
     /*
         We are getting threads in unexpected states

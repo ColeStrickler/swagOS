@@ -341,7 +341,7 @@ void kernel_main(uint64_t ptr_multiboot_info)
 
 	//for (uint32_t i = 0; i < UINT32_MAX;i++){};
 	log_to_serial("here!\n");
-	char *b = ext2_read_file("/test");
+	char *b = ext2_read_file("/shell");
 	if (b != NULL)
 		CreateUserProcess(b);
 	//log_to_serial("here2!\n");

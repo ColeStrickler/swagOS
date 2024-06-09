@@ -37,7 +37,7 @@ void acquire_Spinlock(Spinlock* lock)
     inc_cli();
     if (spinlock_check_held(lock))
     {
-        DEBUG_PRINT(lock->name, 0x0);
+        log_hexval(lock->name, lock);
         panic("acquire_Spinlock() --> encountered deadlock situation.");
     }
  

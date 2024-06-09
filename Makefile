@@ -112,7 +112,7 @@ build-disk : test clean myos.iso $(USER_PROG)
 	
 # 
 qemu: build-disk
-	sudo qemu-system-x86_64 -enable-kvm -cpu host -D out.txt -serial file:out.log -m 8G -smp 2 -drive format=raw,file=./build/disk.img
+	sudo qemu-system-x86_64 -enable-kvm -cpu host -D out.txt -serial file:out.log -m 8G -smp 1 -drive format=raw,file=./build/disk.img
 # -d int -no-reboot
 debug: build-disk
 	qemu-system-x86_64 -enable-kvm -cpu host -s -S -serial file:out.log -m 8G -smp 1 -drive format=raw,file=./build/disk.img | grep exception

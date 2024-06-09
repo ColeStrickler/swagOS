@@ -526,6 +526,8 @@ void map_4kb_page_smp(uint64_t virtual_address, uint64_t physical_address, uint3
 void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thread* t, uint64_t pdt_table_index, uint64_t pd_table_index)
 {
 
+    log_hexval("mapping va", virtual_address);
+    log_hexval("to pa", physical_address);
     uint64_t pml4t_index = (virtual_address >> 39) & 0x1FF; 
     uint64_t pdpt_index = (virtual_address >> 30) & 0x1FF; 
     uint64_t pdt_index = (virtual_address >> 21) & 0x1FF; 
@@ -534,7 +536,7 @@ void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thre
     Process* thread = t->owner_proc;
     if (thread == NULL)
     {
-        log_hexval("Proc", thread);
+       // log_hexval("Proc", thread);
         panic("owner proc null");
         return;
     }
@@ -566,7 +568,6 @@ void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thre
     struct proc_used_page_entry* page_entry = kalloc(sizeof(struct proc_used_page_entry));
     page_entry->page_pa = physical_address;
     page_entry->page_va = PGROUNDDOWN(virtual_address);
-    log_hexval("mapping va", page_entry->page_va);
     page_entry->pdt_table_index = pdt_table_index;
     page_entry->pd_table_index = pd_table_index;
     if (page_entry == NULL)

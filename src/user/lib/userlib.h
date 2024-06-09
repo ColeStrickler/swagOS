@@ -15,6 +15,7 @@ typedef struct argstruct
 void printf(const char* str, ...);
 void printf0(const char *fmt);
 void printf1(const char *fmt, int arg);
+void printchar(char c);
 void FontChangeColor(uint8_t r, uint8_t g, uint8_t b);
 
 void* malloc(uint32_t size);
@@ -25,7 +26,7 @@ int open(const char *filepath);
 
 int fork();
 
-void exec(const char *filepath, int argc, ...);
+int exec(const char *filepath, int argc, argstruct *args);
 
 int read(int fd, void *out, uint32_t size, uint32_t read_offset);
 
@@ -34,6 +35,10 @@ int fork();
 void perror(char* error);
 
 void free(void* addr);
+
+char getchar();
+
+void waitpid(int pid);
 
 void dbg_val(uint64_t val);
 

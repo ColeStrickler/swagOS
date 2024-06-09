@@ -6,7 +6,32 @@
 #include <kernel.h>
 #include <terminal.h>
 
+
+char character_buf;
+Spinlock char_buf_spinlock;
+
+
 extern KernelSettings global_Settings;
+
+
+void add_char_to_buf(char c)
+{
+    character_buf = c;
+}
+
+
+char retrieve_character_buf()
+{
+    acquire_Spinlock(&char_buf_spinlock);
+    while (!character_buf)
+        ThreadSleep(&character_buf, &char_buf_spinlock);
+    release_Spinlock(&char_buf_spinlock);
+    char ret = character_buf;
+    character_buf = 0x0;
+    return ret;
+}
+
+
 
 static enum pressed_codes
 {
@@ -198,6 +223,7 @@ static enum released_codes
 
 void keyboard_driver_init()
 {
+    init_Spinlock(&char_buf_spinlock, "char_buf");
 	unsigned char key = 0;
     // let's clear any junk currently in the keyboard port
     while(((key = inb(0x64)) & 1) == 1){
@@ -214,6 +240,8 @@ char shift_key_to_ascii(uint8_t key){
 
 bool is_ascii(char c)
 {
+    if (c == '\n' || c == 0x8) // backspace or newline
+        return true;
     if (c >= 0x20 && c <= 0x7e)
         return true;
     return false;
@@ -249,7 +277,8 @@ bool scancode_to_char(uint8_t scancode, char* outchar)
         {
             case PRESSED_ENTER:
             {
-                log_to_serial("[ENTER]");
+                *outchar = '\n';
+                break;
             }
             case PRESSED_LEFT_SHIFT:
             {
@@ -276,20 +305,6 @@ bool scancode_to_char(uint8_t scancode, char* outchar)
 }
 
 
-void view_idle_cpu()
-{
-    printf("View idle cpu: ");
-    for (int i = 0; i < global_Settings.cpu_count; i++)
-    {
-        if (global_Settings.cpu[i].current_thread != NULL)
-        {
-            CPU* cpu = &global_Settings.cpu[i];
-            printf("CPU: %d, NCLI: %d, TID: %d\n", cpu->id, cpu->cli_count, cpu->current_thread->id);
-        }
-    }
-}
-
-
 void keyboard_irq_handler()
 {
     uint8_t scancode = inb(0x60);
@@ -297,12 +312,8 @@ void keyboard_irq_handler()
 
     if(scancode_to_char(scancode, &c) && is_ascii(c))
     {
-        if (c == 'i')
-        {
-            view_idle_cpu();
-            return;
-        }
+        add_char_to_buf(c);
+        Wakeup(&character_buf);
     }
-        terminal_write_char(c, RGB_COLOR(0x00, 0xdd, 0x44));
 }
 

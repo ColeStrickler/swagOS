@@ -184,7 +184,7 @@ void schedule(struct CPU* cpu, struct Thread* thread, THREAD_STATE state)
 
     //load_page_table(thread->pml4t_phys);
     cli();
-    
+    dummy();
     apic_end_of_interrupt(); // move this back to idt?
     //log_to_serial("test!\n");
 

@@ -24,6 +24,7 @@ uint64_t get_pixel_index(int x, int y)
 
 void draw_character(int x, int y, uint32_t color, enum FONT_BITMAP_KEY key)
 {
+    uint32_t TERMINAL_COLOR = 0x0;
     if (key >= 97)
         return;
     for (int i = x; i < x+8; i++)
@@ -32,6 +33,8 @@ void draw_character(int x, int y, uint32_t color, enum FONT_BITMAP_KEY key)
         {
             if ((BITMAP_GLOBAL[key][j-y] >> (8-(i-x))) & 1)
                 set_pixel(i, j, color);
+            else
+                set_pixel(i, j, TERMINAL_COLOR);
         }
     }
 }
