@@ -533,7 +533,11 @@ void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thre
 
     Process* thread = t->owner_proc;
     if (thread == NULL)
+    {
+        log_hexval("Proc", thread);
+        panic("owner proc null");
         return;
+    }
 
     uint64_t flags = PAGE_USER | PAGE_WRITE | PAGE_PRESENT;
 
@@ -542,9 +546,6 @@ void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thre
 	uint64_t pdpt_addr = ((uint64_t*)((uint64_t)&thread->pgdir.pdpt & ~KERNEL_HH_START));
 	uint64_t pdt_addr = (uint64_t*)((uint64_t)&thread->pgdir.pdt[pdt_table_index] & ~KERNEL_HH_START);
     uint64_t pt_addr = ((uint64_t*)((uint64_t)&thread->pgdir.pd[pd_table_index] & ~KERNEL_HH_START));
-
-
-    
 
 
     thread->pgdir.pml4t[pml4t_index] = ((uint64_t)pdpt_addr) | flags;
@@ -565,6 +566,7 @@ void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thre
     struct proc_used_page_entry* page_entry = kalloc(sizeof(struct proc_used_page_entry));
     page_entry->page_pa = physical_address;
     page_entry->page_va = PGROUNDDOWN(virtual_address);
+    log_hexval("mapping va", page_entry->page_va);
     page_entry->pdt_table_index = pdt_table_index;
     page_entry->pd_table_index = pd_table_index;
     if (page_entry == NULL)
@@ -803,6 +805,15 @@ void unmap_4kb_page_kernel(uint64_t virtual_address)
     uint64_t pdt_index = (virtual_address >> 21) & 0x1FF; 
     uint64_t pt_index = (virtual_address >> 12) & 0x1FF;
     global_Settings.pt_kernel[pdt_index][pt_index] = 0;
+}
+
+void unmap_4kb_page_process(uint64_t virtual_address, Process* proc)
+{
+    uint64_t pml4t_index = (virtual_address >> 39) & 0x1FF; 
+    uint64_t pdpt_index = (virtual_address >> 30) & 0x1FF; 
+    uint64_t pdt_index = (virtual_address >> 21) & 0x1FF; 
+    uint64_t pt_index = (virtual_address >> 12) & 0x1FF;
+    proc->pgdir.pd[pdt_index][pt_index] = 0;
 }
 
 

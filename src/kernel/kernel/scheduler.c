@@ -44,7 +44,7 @@ void SaveThreadContext(struct Thread* old_thread, struct cpu_context_t* ctx)
     }
     if (ctx == NULL)
     {
-        log_hexval("CTX NULL, RETURNING...", 0);
+        //log_hexval("CTX NULL, RETURNING...", 0);
         return;
     }
 
@@ -54,7 +54,7 @@ void SaveThreadContext(struct Thread* old_thread, struct cpu_context_t* ctx)
     */
     if (old_thread == idle_thread) 
     {
-        log_hexval("old_thread == idle_thread, RETURNING...", 0);
+        //log_hexval("old_thread == idle_thread, RETURNING...", 0);
         return;
     }
     //log_hexval("status", old_thread->status);
@@ -75,7 +75,7 @@ void SaveThreadContext(struct Thread* old_thread, struct cpu_context_t* ctx)
         {
             old_thread->execution_context = *ctx;
             old_thread->status = THREAD_STATE_READY;
-            log_hexval("Setting to ready", old_thread->id);
+            //log_hexval("Setting to ready", old_thread->id);
             //log_hexval("setting pid to ready0", old_thread->id);
             break;
         }
@@ -121,13 +121,13 @@ void InvokeScheduler(struct cpu_context_t* ctx)
 
         if (thread_table[i].status == THREAD_STATE_WAKEUP_READY && thread_table[i].can_wakeup)
         {   
-            log_hexval("Setting to ready", i);
+            //log_hexval("Setting to ready", i);
             thread_table[i].status = THREAD_STATE_READY;
         }
         if (thread_table[i].status != THREAD_STATE_READY)
             continue;
         
-        log_hexval("doing thread", i);
+     //   log_hexval("doing thread", i);
         SaveThreadContext(old_thread, ctx);       
         schedule(current_cpu, &thread_table[i], THREAD_STATE_RUNNING);
     }
@@ -135,7 +135,7 @@ void InvokeScheduler(struct cpu_context_t* ctx)
 
     if (old_thread == NULL || old_thread->status == THREAD_STATE_KILLED) // If we already hold the Idle thread we can avoid this overhead
     {
-        DEBUG_PRINT("Doing Idle Thread on CPU", lapic_id());
+       // DEBUG_PRINT("Doing Idle Thread on CPU", lapic_id());
         ScheduleIdleThread(old_thread, ctx);
     }
     //log_hexval("DONE SCHEDULING", lapic_id());

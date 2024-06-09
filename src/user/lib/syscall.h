@@ -18,7 +18,6 @@
 #define sys_perror      9
    
 #define sys_tchangecolor    0x1000
-#define sys_cacheflush      0x1001
 #define sys_debugvalue   0x1111
 
 

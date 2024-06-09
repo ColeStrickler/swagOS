@@ -186,5 +186,7 @@ void SetErrNo(Thread *thread, enum ERROR err_no);
 
 char *GetErrNo(Thread *thread);
 
+void FreeHeapAllocEntry(Process *proc, uint64_t address);
+
 #endif
 

@@ -31,6 +31,9 @@ int read(int fd, void *out, uint32_t size, uint32_t read_offset);
 
 int fork();
 
+void perror(char* error);
+
+void free(void* addr);
 
 void dbg_val(uint64_t val);
 

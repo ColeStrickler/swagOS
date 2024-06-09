@@ -78,6 +78,15 @@ int read(int fd, void* out, uint32_t size, uint32_t read_offset)
 }
 
 
+void perror(char* error)
+{
+    do_syscall2(sys_perror, error, strlen(error));
+}
+
+void free(void* addr)
+{
+    do_syscall1(sys_free, addr);
+}
 
 void dbg_val(uint64_t val)
 {

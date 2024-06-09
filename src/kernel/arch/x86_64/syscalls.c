@@ -188,8 +188,11 @@ void SYSHANDLER_sbrk(cpu_context_t* ctx)
     // rdi = syscall number
     // rsi = number of bytes to allocate
 
+    // may need to synchronize this ?
+
     uint64_t num_pages = (ctx->rsi / PGSIZE) + 1;
-    Process* t = GetCurrentThread()->owner_proc;
+    Thread* thread = GetCurrentThread();
+    Process* t = thread->owner_proc;
     uint32_t curr_count = 0;
     uint32_t i_start = 0;
     uint32_t bit_start = 0;
@@ -254,8 +257,9 @@ void SYSHANDLER_sbrk(cpu_context_t* ctx)
                 return;
             }
             t->user_heap_bitmap[i] |= (1 << bit); // set bit in bitmap
-            //log_hexval("mapping pt table index", (USER_HEAP_START - va)/HUGEPGSIZE);
-            map_4kb_page_user(va, pa, t, 3, 2 + (USER_HEAP_START - va)/HUGEPGSIZE); // map page to process page table
+            log_hexval("mapping sbrk", va);
+            map_4kb_page_user(va, pa, thread, 3, 2 + (USER_HEAP_START - va)/HUGEPGSIZE); // map page to process page table
+            log_hexval("done mapping sbrk", va);
             end = va + 0xFFF;
         }
     }
@@ -266,9 +270,9 @@ void SYSHANDLER_sbrk(cpu_context_t* ctx)
     entry->start = alloc_ptr;
     entry->end = end;
 
-    insert_dll_entry_head(&t->user_heap_bitmap, &entry->entry);
+    insert_dll_entry_head(&t->heap_allocations, &entry->entry);
 
-
+   
   //  log_hexval("returning from SYSHANDLER_sbrk()", 0x0);
     return;
 }
@@ -276,7 +280,14 @@ void SYSHANDLER_sbrk(cpu_context_t* ctx)
 void SYSHANDLER_free(cpu_context_t* ctx, uint64_t user_pagetable)
 {
     // rdi = syscall number
-    
+    // rsi = address to free
+
+    // may need to synchronize this ?
+
+    Process* proc = GetCurrentThread()->owner_proc;
+    FreeHeapAllocEntry(proc, ctx->rsi);
+    log_hexval("heap free done", ctx->rsi);
+    return;
 }
 
 
@@ -351,6 +362,7 @@ void SYSHANDLER_open(cpu_context_t* ctx, uint64_t user_pagetable)
         return;
     }
 
+    SetErrNo(GetCurrentThread(), FILE_NOT_FOUND);
     ctx->rax = UINT64_MAX;
     return;
 }
@@ -381,6 +393,7 @@ void SYSHANDLER_read(cpu_context_t* ctx, uint64_t user_pagetable)
     uint64_t file_size = PathToFileSize(fd->path);
     if (file_size == UINT64_MAX || ctx->r8 + ctx->rcx >= file_size)
     {
+        SetErrNo(GetCurrentThread(), FILE_READ_ERROR);
         ctx->rax = UINT64_MAX;
         return;
     }
@@ -392,6 +405,7 @@ void SYSHANDLER_read(cpu_context_t* ctx, uint64_t user_pagetable)
     unsigned char* buf = ext2_read_file(fd->path);
     if (buf == NULL)
     {
+        SetErrNo(GetCurrentThread(), FILE_READ_ERROR);
         ctx->rax = UINT64_MAX;
         return;
     }
@@ -471,13 +485,6 @@ void SYSHANDLER_exec(cpu_context_t* ctx, uint64_t user_pagetable)
 }
 
 
-void SYSHANDLER_cacheflush(cpu_context_t* ctx, uint64_t user_pagetable)
-{
-    // rdi = syscall number
-    // rsi = address to flush from cache
-    flush(ctx->rsi);
-    return;
-}
 
 
 void SYSHANDLER_perror(cpu_context_t* ctx, uint64_t user_pagetable)
@@ -487,7 +494,7 @@ void SYSHANDLER_perror(cpu_context_t* ctx, uint64_t user_pagetable)
     // rdx = string argument length
 
 
-    if (ctx->rdx < 0x1000)
+    if (ctx->rdx > 0 && ctx->rdx < 0x1000)
     {
         char buf[0x1000];
         memset(buf, 0x00, 0x1000);
@@ -495,6 +502,7 @@ void SYSHANDLER_perror(cpu_context_t* ctx, uint64_t user_pagetable)
         printf(buf);
     }
     printf(GetErrNo(GetCurrentThread()));
+    
     return;
 }
 
@@ -553,11 +561,6 @@ void syscall_handler(cpu_context_t* context)
         {
             SYSHANDLER_exec(&ctx, user_pt);
             do_eoi = false;
-            break;
-        }
-        case sys_cacheflush:
-        {
-            SYSHANDLER_cacheflush(&ctx, user_pt);
             break;
         }
         case sys_free:

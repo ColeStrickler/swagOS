@@ -29,11 +29,20 @@ void main()
     char* parent = "Spawned child process with pid %d\n";
     char* test3 = "will print from malloc 3\n";
 
-    char* coc = "Child of child\n";
+
+
+    char* coc = malloc(0x100);
+    open("/memeswwag");
+    perror("");
+
+
+    free(coc);
 
     char* fmt = "wtf %d\n";
     char* error = "ERROR\n";
     printf0("CHECK\n");
+    fork();
+    fork();
     fork();
     fork();
     fork();
@@ -43,7 +52,7 @@ void main()
         We are getting threads in unexpected states
     */
 
-    printf0(coc);
+    printf0(child);
     //exec("/meme", 1);
 
 

@@ -100,6 +100,8 @@ void map_4kb_page_kernel(uint64_t virtual_address, uint64_t physical_address, PA
 
 void unmap_4kb_page_kernel(uint64_t virtual_address);
 
+void unmap_4kb_page_process(uint64_t virtual_address, Process * proc);
+
 bool uva_copy_kernel(Process *proc);
 
 

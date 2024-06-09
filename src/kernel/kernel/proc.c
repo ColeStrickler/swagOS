@@ -655,19 +655,56 @@ void FreeHeapAllocEntry(Process* proc, uint64_t address)
 
     while(entry != NULL && entry != &proc->heap_allocations)
     {
-        if (entry->start >= address && entry->end <= address)
+        if (address >= entry->start && address <= entry->end)
         {
             void* old_entry = entry;
             remove_dll_entry(&entry->entry);
-            FreeUserHeapBits(proc, entry->bit_start, entry->bit_end);
+            log_hexval("freeing addr", address);
+            log_hexval("entry->start", entry->start);
+            log_hexval("entry->end", entry->end);
+            FreeUserHeapBits(proc, entry);
             kfree(entry);
             break;
-        }
+        }      
         entry = (HeapAllocEntry*)entry->entry.next;
     }
 }
 
-void FreeUserHeapBits(Process* proc, uint32_t start, uint32_t end)
+void FreeUserHeapBits(Process* proc, HeapAllocEntry* entry)
 {
+    uint32_t bit_start = entry->bit_start;
+    uint32_t bit_end = entry->bit_end;
+    uint32_t i_start = entry->i_start;
+    uint32_t i_end = entry->i_end;
+    uint64_t addr_start = entry->start;
+    uint64_t addr_end = entry->end;
+
+
+    /*
+        Free the pages allocated in the given address range
+    */
+    proc_used_page_entry *up_entry = (proc_used_page_entry *)proc->used_pages.first;
+    while (up_entry != NULL && up_entry != &proc->used_pages)
+    {
+        proc_used_page_entry *old_entry = up_entry;
+        up_entry = (proc_used_page_entry *)up_entry->entry.next;
+        if (old_entry->page_va >= addr_start && old_entry->page_va <= addr_end)
+        {
+            try_free_chunked_frame(up_entry->page_pa);   
+            log_hexval("removing page", old_entry->page_va);
+            //unmap_4kb_page_process(up_entry->page_va, proc, 3, 2 + (USER_HEAP_START - va)/HUGEPGSIZE) --> we will just leave these as undefined after free for now
+            remove_dll_entry(&old_entry->entry);
+            kfree(old_entry);
+        }
+        log_hexval("va", old_entry->page_va);
+    }
     
+
+    for (uint32_t i = i_start; i <= i_end; i++)
+    {
+        for (uint32_t bit = bit_start; bit <= bit_end; bit++)
+        {
+            proc->user_heap_bitmap[i] &= ~(1 << bit); // unset bit in bitmap
+        }
+    }
 } 
