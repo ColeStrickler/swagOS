@@ -65,7 +65,7 @@ int split_line(argstruct* args_out, char** file_out, char* line)
     strsplit(line, '\n');
     argc = strsplit(line, ' ');
     *file_out = line;
-    
+
     line += strlen(file_out)+1;
     for (int i = 1; i < argc; i++)
     {
@@ -119,7 +119,6 @@ void loop(void)
         {
             char* exec_file;
             argc = split_line(&args[0], &exec_file, line_buf);
-            printf0(exec_file);
             if (argc == -1)
                 continue;
             int pid = fork();
