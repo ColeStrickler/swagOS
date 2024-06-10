@@ -116,8 +116,16 @@ void terminal_print_buffer(uint32_t color)
     }
 }
 
+void whiteout_cur_loc()
+{
+    uint32_t x = terminal_buf_location_to_xpixel();
+    uint32_t y = terminal_buf_location_to_ypixel();
+    draw_character(x, y, TERMINAL_COLOR, char_code_to_fontcode(' ')); // this isnt grabbing the correct, color, but should work cause of whiteout
+}
+
 void handle_endline()
 {
+    whiteout_cur_loc();
     TerminalState* driver = &global_Settings.TerminalDriver;
     uint32_t row_size_in_chars = (driver->max_x) / (16);
     driver->buffer_write_location += row_size_in_chars - (driver->buffer_write_location % row_size_in_chars);
@@ -134,6 +142,7 @@ void terminal_write_char(char c, uint32_t color)
         {
             terminal_scroll_down();
             terminal_print_buffer(color);
+            draw_cursor_loc();
         }
         return;
     }
@@ -141,10 +150,10 @@ void terminal_write_char(char c, uint32_t color)
     {
         if (driver->buffer_write_location == 0)
             return;
+        // white out previous cursor location
+        whiteout_cur_loc();
         driver->buffer_write_location--;
-        uint32_t x = terminal_buf_location_to_xpixel();
-        uint32_t y = terminal_buf_location_to_ypixel();
-        draw_character(x, y, color, char_code_to_fontcode(' '));
+        draw_cursor_loc();
         return;
     }
         
@@ -154,6 +163,7 @@ void terminal_write_char(char c, uint32_t color)
         driver->terminal_buf[driver->buffer_write_location] = c;
         driver->buffer_write_location++;
         terminal_print_buffer(color);
+        draw_cursor_loc();
     }
     else
     {
@@ -162,6 +172,7 @@ void terminal_write_char(char c, uint32_t color)
         draw_character(x, y, color, char_code_to_fontcode(c));
         driver->terminal_buf[driver->buffer_write_location] = c;
         driver->buffer_write_location++;
+        draw_cursor_loc();
     }
     
 }

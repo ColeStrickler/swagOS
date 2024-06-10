@@ -6,11 +6,12 @@
 
 #include <panic.h>
 #include <font.h>
+#include "video.h"
 
 
 extern KernelSettings global_Settings;
 
-
+uint32_t TERMINAL_COLOR = 0x0;
 
 
 uint64_t get_pixel_index(int x, int y)
@@ -24,7 +25,6 @@ uint64_t get_pixel_index(int x, int y)
 
 void draw_character(int x, int y, uint32_t color, enum FONT_BITMAP_KEY key)
 {
-    uint32_t TERMINAL_COLOR = 0x0;
     if (key >= 97)
         return;
     for (int i = x; i < x+8; i++)
@@ -39,7 +39,18 @@ void draw_character(int x, int y, uint32_t color, enum FONT_BITMAP_KEY key)
     }
 }
 
-
+void draw_cursor_loc()
+{
+    int x = terminal_buf_location_to_xpixel();
+    int y = terminal_buf_location_to_ypixel();
+    for (int i = x; i < x+8; i++)
+    {
+        for (int j = y; j < y+16; j++)
+        {
+            set_pixel(i, j, ~TERMINAL_COLOR);
+        }
+    }
+}
 
 
 void set_pixel(int x,int y, int color) {

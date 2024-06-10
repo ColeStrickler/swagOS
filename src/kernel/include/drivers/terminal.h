@@ -21,6 +21,10 @@ void terminal_set_color(uint8_t r, uint8_t g, uint8_t b);
 
 void init_terminal();
 
+uint32_t terminal_buf_location_to_ypixel();
+
+uint32_t terminal_buf_location_to_xpixel();
+
 void terminal_write_char(char c, uint32_t color);
 void terminal_print_string(char *fmt, uint32_t color);
 void printf(const char *fmt, ...);
