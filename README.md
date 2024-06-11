@@ -2,13 +2,9 @@ This is my first attempt at writing an operating system from scratch.
 
 Current Features:
 - Partial Ext2 File system implementation
-- Working ELF file loader
-- System calls
-- Keyboard and terminal drivers
 - SMP and multitasking
 - User mode shell
 - Some basic user mode utilities(ls, cat, etc.)
-
 
 Planned Features:
 - TCP/IP stack
