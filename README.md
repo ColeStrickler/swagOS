@@ -6,11 +6,12 @@ Current Features:
 - System calls
 - Keyboard and terminal drivers
 - SMP and multitasking
+- User mode shell
+- Some basic user mode utilities(ls, cat, etc.)
 
 
 Planned Features:
 - TCP/IP stack
-- Full user mode shell
 - Finish Ext2 implementation
 - a GUI
 - toy compiler/interpreter for custom shell scripting language
