@@ -54,6 +54,7 @@ sudo mount /dev/loop31 /mnt
 
 # Add a file to the disk
 sudo cp ./build/user/prog/* /mnt/
+sudo cp ./src/user/files/* /mnt/
 
 
 # Mount ISO and copy its contents

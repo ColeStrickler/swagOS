@@ -148,6 +148,7 @@ uint32_t ext2_find_file_inode(char *path, ext2_inode_t *inode_out);
 void ext2_get_bgd(uint32_t descriptor_index, ext2_block_group_desc *out);
 
 bool ext2_extended_fields_available(ext2_superblock *superblock);
+uint64_t ext2_get_file_size(ext2_inode_t *inode);
 uint64_t PathToFileSize(char *filepath);
 #endif
 

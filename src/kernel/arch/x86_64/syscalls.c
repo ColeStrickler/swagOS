@@ -6,7 +6,7 @@
 #include <asm_routines.h>
 #include <kernel.h>
 #include <ps2_keyboard.h>
-
+#include <vfs.h>
 
 
 
@@ -561,6 +561,63 @@ void SYSHANDLER_waitpid(cpu_context_t* ctx, uint64_t user_pagetable)
 }
 
 
+void SYSHANDLER_fstat(cpu_context_t* ctx, uint64_t user_pagetable)
+{
+    // rdi = syscall number
+    // rsi = file descriptor
+    // rdx = struct stat*
+
+
+
+    /*
+        Check to make sure this is a valid fd
+    */
+    stat statbuf;
+    Process* p = GetCurrentThread()->owner_proc;
+    file_descriptor* fd = &p->fd[ctx->rsi];
+    if (!fd->in_use)
+    {
+        ctx->rax = UINT64_MAX;
+        return;
+    }
+
+    // we must re-enable interrupts to handle disk, otherwise we will never receive the interrupt
+    apic_end_of_interrupt();
+    if (!ext2_file_exists(fd->path))
+    {
+        // set perror properly
+        ctx->rax = UINT64_MAX;
+        return;
+    }
+
+    int err = fill_statbuf(&statbuf, fd->path);
+    if (err == -1)
+    {
+        // perror set in fill_statbuf
+        ctx->rax = UINT64_MAX;
+        return;
+    }
+    if (WriteStruct(ctx->rdx, &statbuf, sizeof(stat), user_pagetable))
+        ctx->rax = 0;
+    else
+    {
+        // set perror properly
+        ctx->rax = UINT64_MAX;
+    }
+}
+
+void SYSHANDLER_close(cpu_context_t* ctx, uint64_t user_pagetable)
+{
+    // rdi = syscall number
+    // rsi = file descriptor
+
+    Process* p = GetCurrentThread()->owner_proc;
+    int fd = ctx->rsi;
+    memset(&p->fd[fd], 0x00, sizeof(file_descriptor));
+    ctx->rax = 0;
+    return;
+}
+
 
 void syscall_handler(cpu_context_t* context)
 {
@@ -642,6 +699,17 @@ void syscall_handler(cpu_context_t* context)
         case sys_tchangecolor:
         {
             terminal_set_color(ctx.rsi, ctx.rdx, ctx.rcx);
+            break;
+        }
+        case sys_fstat:
+        {
+            SYSHANDLER_fstat(&ctx, user_pt);
+            do_eoi = false;
+            break;
+        }
+        case sys_close:
+        {
+            SYSHANDLER_close(&ctx, user_pt);
             break;
         }
         case sys_debugvalue:

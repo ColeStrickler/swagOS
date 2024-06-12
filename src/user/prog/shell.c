@@ -66,7 +66,7 @@ int split_line(argstruct* args_out, char** file_out, char* line)
     argc = strsplit(line, ' ');
     *file_out = line;
 
-    line += strlen(file_out)+1;
+    line += strlen(file_out);
     for (int i = 1; i < argc; i++)
     {
         uint32_t len = strlen(line);
@@ -77,6 +77,7 @@ int split_line(argstruct* args_out, char** file_out, char* line)
             return -1;
         }
         memcpy(&args_out[index].arg[0], line, len);
+        line += len;
         index++;
     }
 

@@ -540,6 +540,7 @@ void ThreadSleep(void *sleep_channel, struct Spinlock *spin_lock)
         __asm__ __volatile__("int3");
     else // woke up early
     {
+        log_hexval("state", thread->status);
         panic("did not hit sleep state\n");
     }
 

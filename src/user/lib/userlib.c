@@ -1,8 +1,6 @@
 #include "userlib.h"
 
 
-
-
 void printf0(const char* fmt)
 {
     do_syscall2(sys_tprintf, fmt, strlen(fmt));
@@ -104,9 +102,20 @@ char getchar()
     return c;
 }
 
+
 void waitpid(int pid)
 {
     do_syscall1(sys_waitpid, pid);
+}
+
+int fstat(int fd, struct stat* statbuf)
+{
+    return (int)do_syscall2(sys_fstat, fd, statbuf);
+}
+
+void close(int fd)
+{
+    do_syscall1(sys_close, fd);
 }
 
 
