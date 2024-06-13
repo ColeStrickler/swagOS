@@ -362,7 +362,7 @@ void SYSHANDLER_open(cpu_context_t* ctx, uint64_t user_pagetable)
 
     // we must re-enable interrupts to handle disk, otherwise we will never receive the interrupt
     apic_end_of_interrupt();
-    if (ext2_file_exists(req_path))
+    if (ext2_file_exists(req_path) || ext2_dir_exists(req_path))
     {
         t->fd[min_fd].in_use = true;
         ctx->rax = min_fd;
@@ -395,7 +395,7 @@ void SYSHANDLER_read(cpu_context_t* ctx, uint64_t user_pagetable)
 
     if (!fd->in_use)
     {
-        //log_to_serial("fd not in use\n");
+        log_to_serial("fd not in use\n");
         ctx->rax = UINT64_MAX;
         return;
     }
@@ -403,12 +403,17 @@ void SYSHANDLER_read(cpu_context_t* ctx, uint64_t user_pagetable)
     // we must re-enable interrupts to handle disk, otherwise we will never receive the interrupt
     apic_end_of_interrupt();
     uint64_t file_size = PathToFileSize(fd->path);
-    if (file_size == UINT64_MAX || ctx->r8 + ctx->rcx >= file_size)
+    if (file_size == UINT64_MAX)
     {
+        log_hexval("error reading file size", file_size);
         SetErrNo(GetCurrentThread(), FILE_READ_ERROR);
         ctx->rax = UINT64_MAX;
         return;
     }
+
+    if (ctx->r8 + ctx->rcx > file_size)
+        ctx->rcx = file_size - ctx->r8; // do not read beyond EOF
+
 
     /*
         We can make this faster by adding ext2 functionality to read only from certain offsets
@@ -417,6 +422,7 @@ void SYSHANDLER_read(cpu_context_t* ctx, uint64_t user_pagetable)
     unsigned char* buf = ext2_read_file(fd->path);
     if (buf == NULL)
     {
+        log_to_serial("error reading file\n");
         SetErrNo(GetCurrentThread(), FILE_READ_ERROR);
         ctx->rax = UINT64_MAX;
         return;
@@ -547,8 +553,7 @@ void SYSHANDLER_waitpid(cpu_context_t* ctx, uint64_t user_pagetable)
         return;
     }
 
-    apic_end_of_interrupt();
-    sti();
+
     Process* p = &global_Settings.proc_table.proc_table[pid];
     acquire_Spinlock(&p->pid_wait_spinlock);
     while(p->state != PROCESS_STATE_EXITED)
@@ -583,7 +588,7 @@ void SYSHANDLER_fstat(cpu_context_t* ctx, uint64_t user_pagetable)
 
     // we must re-enable interrupts to handle disk, otherwise we will never receive the interrupt
     apic_end_of_interrupt();
-    if (!ext2_file_exists(fd->path))
+    if (!ext2_file_exists(fd->path) && !ext2_dir_exists(fd->path))
     {
         // set perror properly
         ctx->rax = UINT64_MAX;
@@ -615,6 +620,13 @@ void SYSHANDLER_close(cpu_context_t* ctx, uint64_t user_pagetable)
     int fd = ctx->rsi;
     memset(&p->fd[fd], 0x00, sizeof(file_descriptor));
     ctx->rax = 0;
+    return;
+}
+
+
+void SYSHANDLER_clear(cpu_context_t* ctx, uint64_t user_pagetable)
+{
+    terminal_reset();
     return;
 }
 
@@ -710,6 +722,11 @@ void syscall_handler(cpu_context_t* context)
         case sys_close:
         {
             SYSHANDLER_close(&ctx, user_pt);
+            break;
+        }
+        case sys_clear:
+        {
+            SYSHANDLER_clear(&ctx, user_pt);
             break;
         }
         case sys_debugvalue:

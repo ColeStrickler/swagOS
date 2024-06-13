@@ -123,6 +123,8 @@ typedef struct {
 
 
 
+
+
 typedef struct EXT2_DRIVER {
     Spinlock lock;
     uint32_t total_inodes;
@@ -141,7 +143,11 @@ typedef struct EXT2_DRIVER {
 
 bool ext2_file_exists(char *filepath);
 
+bool ext2_dir_exists(char *filepath);
+
 unsigned char *ext2_read_file(char *filepath);
+
+char *ext2_read_dir(char *dir);
 
 void ext2_driver_init();
 uint32_t ext2_find_file_inode(char *path, ext2_inode_t *inode_out);

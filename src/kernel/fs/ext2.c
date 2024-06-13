@@ -72,8 +72,12 @@ uint64_t ext2_get_file_size(ext2_inode_t* inode)
     if ((inode->mode & 0xF000) != INODE_TYPE_FILE)
     {
         // not a file
-        return UINT64_MAX;
+        log_to_serial("not a file\n");
+        return 0x1000; 
     }
+    
+
+
     return ((ext2_driver.extended_fields_available ? (inode->sizeHigh << 32) : 0) | inode->size);
 }
 
@@ -86,6 +90,11 @@ uint64_t PathToFileSize(char* filepath)
         ext2_find_file_inode(filepath, &inode);
         return ext2_get_file_size(&inode);
     }
+    else if (ext2_dir_exists(filepath))
+    {
+        return 0x1000*12;
+    }
+
     return UINT64_MAX;
 }
 
@@ -192,6 +201,13 @@ uint32_t ext2_read_from_root_directory(char* filename)
 */
 uint32_t ext2_find_file_inode(char* path, ext2_inode_t* inode_out)
 {
+    if (!strcmp(path, "/"))
+    {
+        *inode_out = ext2_driver.root_inode;
+        return 2;
+    }
+
+
     uint32_t len = strlen(path);
     //DEBUG_PRINT("length", len);
     char* filename = kalloc(len + 1);
@@ -398,6 +414,26 @@ bool ext2_file_exists(char* filepath)
     return true;
 }
 
+bool ext2_dir_exists(char* filepath)
+{
+    if (!strcmp("/", filepath)) // root directory will return false otherwise
+        return true;
+    ext2_inode_t file_inode;
+
+    if (ext2_find_file_inode(filepath, &file_inode) == UINT32_MAX)
+    {
+        DEBUG_PRINT0("Could not find file inode!\n");
+        return false;
+    }
+   // log_to_serial("found node!\n");
+    if ((file_inode.mode & 0xF000) != INODE_TYPE_DIRECTORY)
+    {
+        // not a file
+        DEBUG_PRINT0("ext2_read_file() --> inode not INODE_TYPE_FILE");
+        return false;
+    }
+    return true;
+}
 
 
 /*
@@ -417,18 +453,20 @@ unsigned char* ext2_read_file(char* filepath)
         return NULL;
     }
   //  DEBUG_PRINT("Got inode", GetCurrentThread()->id);
-    if ((file_inode.mode & 0xF000) != INODE_TYPE_FILE)
+    if ((file_inode.mode & 0xF000) != INODE_TYPE_FILE && (file_inode.mode & 0xF000) != INODE_TYPE_DIRECTORY)
     {
-        // not a file
-        DEBUG_PRINT0("ext2_read_file() --> inode not INODE_TYPE_FILE");
-        return NULL;
+
+        if (false )
+            return NULL;
+
+        return ext2_read_dir(filepath);
     }
 
     unsigned char* ret_buf = kalloc(ext2_get_file_size(&file_inode));
     
     if (ret_buf == NULL)
         panic("ext2_read_file() --> kalloc() failure!");
-    // /log_to_serial("allocated ret buf\n");
+    log_to_serial("allocated ret buf\n");
     uint64_t buf_offset = 0;
     for (uint16_t i = 0; i < 12; i++)
     {
@@ -471,12 +509,49 @@ unsigned char* ext2_read_file(char* filepath)
 
 
 
+/*
+    Must be kfree()'d after use
+*/
+char* ext2_read_dir(char* dir)
+{
+    if (!ext2_dir_exists(dir))
+        return NULL;
+
+    ext2_inode_t inode;
+
+    ext2_find_file_inode(dir, &inode);
+
+
+    int count = 0;
+    for (int i = 0; i < 12; i++)
+    {
+        uint32_t block = inode.blocks[i];
+        if (block == 0)
+            break;
+        count++;
+    }
+    char* block_buf = kalloc(count*ext2_driver.block_size);
+    if (block_buf == NULL)
+        return NULL;
+
+    for (int i = 0; i < 12; i++)
+    {
+        uint32_t block = inode.blocks[i];
+        if (block == 0)
+            break;
+        ext2_read_block(block_buf, block);
+        block_buf += ext2_driver.block_size;
+    }
+
+    return block_buf;
+}
+
 
 
 void ext2_driver_init()
 {
-    init_Spinlock(&disk_lock, "disk_lock");
-    log_to_serial("init disk lock success\n");
+   // init_Spinlock(&disk_lock, "disk_lock");
+   // log_to_serial("init disk lock success\n");
 
     iobuf* buf = bread(0, SUPERBLOCK_SECTOR);
     iobuf* buf2 = bread(0, SUPERBLOCK_SECTOR+1);

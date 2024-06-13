@@ -92,6 +92,13 @@ uint32_t terminal_buf_location_to_xpixel()
     return x;
 }
 
+void terminal_reset()
+{
+    TerminalState* driver = &global_Settings.TerminalDriver;
+    clear_screen(0, 0, 0);
+    driver->buffer_write_location = 0;
+}
+
 
 void terminal_print_buffer(uint32_t color)
 {
@@ -109,7 +116,7 @@ void terminal_print_buffer(uint32_t color)
         uint32_t y = terminal_buf_location_to_ypixel();
         //log_hexval("terminal_print_buffer x", x);
         //log_hexval("terminal_print_buffer y", y);
-        log_char_to_serial(driver->terminal_buf[driver->buffer_write_location]);
+       // log_char_to_serial(driver->terminal_buf[driver->buffer_write_location]);
         uint8_t fontcode = char_code_to_fontcode(driver->terminal_buf[driver->buffer_write_location]);
        // log_hexval("terminal_print_buffer fontcode", fontcode);
         draw_character(x, y, color, fontcode);

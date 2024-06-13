@@ -33,11 +33,13 @@ void main()
 
     char* fmt = "wtf %d\n";
     char* error = "ERROR\n";
-    printf0("CHECK\n");
+   // printf0("CHECK\n");
     fork();
     fork();
     fork();
     fork();
+
+
     
 
     /*

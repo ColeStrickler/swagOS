@@ -526,8 +526,8 @@ void map_4kb_page_smp(uint64_t virtual_address, uint64_t physical_address, uint3
 void map_4kb_page_user(uint64_t virtual_address, uint64_t physical_address, Thread* t, uint64_t pdt_table_index, uint64_t pd_table_index)
 {
 
-    log_hexval("mapping va", virtual_address);
-    log_hexval("to pa", physical_address);
+   // log_hexval("mapping va", virtual_address);
+   // log_hexval("to pa", physical_address);
     uint64_t pml4t_index = (virtual_address >> 39) & 0x1FF; 
     uint64_t pdpt_index = (virtual_address >> 30) & 0x1FF; 
     uint64_t pdt_index = (virtual_address >> 21) & 0x1FF; 

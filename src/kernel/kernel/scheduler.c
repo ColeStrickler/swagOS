@@ -39,7 +39,7 @@ void SaveThreadContext(struct Thread* old_thread, struct cpu_context_t* ctx)
 
     if (old_thread == NULL)
     {
-        log_hexval("OLD THREAD NULL, RETURNING...", 0);
+        //log_hexval("OLD THREAD NULL, RETURNING...", 0);
         return;
     }
     if (ctx == NULL)
@@ -67,8 +67,10 @@ void SaveThreadContext(struct Thread* old_thread, struct cpu_context_t* ctx)
         }
         case THREAD_STATE_SLEEPING:
         {
-            old_thread->execution_context = *ctx;
+            //if (old_thread->sleep_interrupt) 
             old_thread->status = THREAD_STATE_WAKEUP_READY;
+            old_thread->execution_context = *ctx;
+            //log_hexval("setting tid to wake up ready savethreadcontext()", old_thread->id);
             break;
         }
         case THREAD_STATE_RUNNING:
@@ -109,33 +111,70 @@ void InvokeScheduler(struct cpu_context_t* ctx)
     //else
     //    DEBUG_PRINT("Old thread null", 0x0);
     
-    uint32_t old_thread_id  = (old_thread == NULL ? 0 : (old_thread->id == UINT32_MAX ? MAX_NUM_THREADS : old_thread->id));
+    uint32_t old_thread_id  = (old_thread == NULL ? UINT32_MAX : (old_thread->id == UINT32_MAX ? MAX_NUM_THREADS : old_thread->id));
+    if (old_thread_id == UINT32_MAX)
+    {
+        for (uint32_t i = 0; i < MAX_NUM_THREADS; i++)
+        {
+            if (thread_table[i].status == THREAD_STATE_WAKEUP_READY && thread_table[i].can_wakeup)
+            {   
+                //log_hexval("Setting to ready0", i);
+                //log_hexval("Setting to ready0 id", thread_table[i].id);
+                //log_hexval("old state", thread_table[i].status);
+                thread_table[i].status = THREAD_STATE_READY;
+            }
+            if (thread_table[i].status != THREAD_STATE_READY)
+                continue;
+            
+        //   log_hexval("doing thread", i);
+            SaveThreadContext(old_thread, ctx);       
+            schedule(current_cpu, &thread_table[i], THREAD_STATE_RUNNING);
+        }
+        goto schedule_idle;
+    }
    // log_hexval("old thread id", old_thread_id);
     /*
         These two for loops are just round-robin
     */
-    for (uint32_t i = 0; i < MAX_NUM_THREADS; i++)
+    for (uint32_t i = old_thread_id+1; i < MAX_NUM_THREADS; i++)
     {
-        if (i == old_thread_id)
-            continue;
-
         if (thread_table[i].status == THREAD_STATE_WAKEUP_READY && thread_table[i].can_wakeup)
         {   
-            //log_hexval("Setting to ready", i);
+            //log_hexval("Setting to ready1", i);
+            //log_hexval("Setting to ready0 id", thread_table[i].id);
+            // log_hexval("old state", thread_table[i].status);
             thread_table[i].status = THREAD_STATE_READY;
         }
         if (thread_table[i].status != THREAD_STATE_READY)
             continue;
         
-     //   log_hexval("doing thread", i);
+       // log_hexval("doing thread", i);
         SaveThreadContext(old_thread, ctx);       
         schedule(current_cpu, &thread_table[i], THREAD_STATE_RUNNING);
     }
 
+    for (uint32_t i = 0; i < old_thread_id; i++)
+    {
+        if (thread_table[i].status == THREAD_STATE_WAKEUP_READY && thread_table[i].can_wakeup)
+        {   
+            //log_hexval("Setting to ready2", i);
+            //log_hexval("Setting to ready0 id", thread_table[i].id);
+            //log_hexval("old state", thread_table[i].status);
+            thread_table[i].status = THREAD_STATE_READY;
+        }
+        if (thread_table[i].status != THREAD_STATE_READY)
+            continue;
+        
+        //log_hexval("doing thread", i);
+        SaveThreadContext(old_thread, ctx);       
+        schedule(current_cpu, &thread_table[i], THREAD_STATE_RUNNING);
+    }
+    
 
+schedule_idle:
     if (old_thread == NULL || old_thread->status == THREAD_STATE_KILLED) // If we already hold the Idle thread we can avoid this overhead
     {
-       // DEBUG_PRINT("Doing Idle Thread on CPU", lapic_id());
+       //log_hexval("Doing Idle Thread on CPU", lapic_id());
         ScheduleIdleThread(old_thread, ctx);
     }
     //log_hexval("DONE SCHEDULING", lapic_id());

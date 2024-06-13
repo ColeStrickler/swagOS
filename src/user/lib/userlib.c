@@ -118,6 +118,16 @@ void close(int fd)
     do_syscall1(sys_close, fd);
 }
 
+int getdirentry(int entry_no, dir_entry* out_dir)
+{
+    return (int)do_syscall2(sys_getdirentry, entry_no, out_dir);
+}
+
+
+void clear()
+{
+    do_syscall0(sys_clear);
+}
 
 void dbg_val(uint64_t val)
 {

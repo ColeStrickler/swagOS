@@ -39,9 +39,16 @@ typedef struct stat {
     time_t    st_mtime;   /* Time of last modification */
     time_t    st_ctime;   /* Time of last status change */
 } stat;
-
-
-
+#define INODE_TYPE_DIRECTORY 0x4000
+#define INODE_TYPE_FILE 0x8000
+typedef struct {
+        uint32_t inode;        // Inode number
+        uint16_t size; // Displacement to next directory entry/record (must be 4 byte aligned)
+        uint8_t namelength;    // Length of the filename (must not be  larger than (recordLength - 8))
+        uint8_t reserved;      // Revision 1 only, indicates file type
+        char name[];
+} __attribute__((packed)) ext2_dir_entry;
+typedef ext2_dir_entry dir_entry;
 
 void printf(const char* str, ...);
 void printf0(const char *fmt);
@@ -74,6 +81,10 @@ void waitpid(int pid);
 int fstat(int fd, struct stat* statbuf);
 
 void close(int fd);
+
+int getdirentry(int entry_no, dir_entry *out_dir);
+
+void clear();
 
 void dbg_val(uint64_t val);
 

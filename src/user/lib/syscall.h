@@ -20,6 +20,8 @@
 #define sys_waitpid     11
 #define sys_fstat       12
 #define sys_close       13
+#define sys_getdirentry 14
+#define sys_clear       15
 #define sys_tchangecolor    0x1000
 #define sys_debugvalue   0x1111
 

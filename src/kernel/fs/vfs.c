@@ -24,7 +24,7 @@ int fill_statbuf(struct stat* statbuf, char* filepath)
 
     statbuf->st_dev = 0;
     statbuf->st_ino = inode_num;
-    statbuf->st_mode = 0; // not yet implemented
+    statbuf->st_mode = inode.mode; // not yet implemented
     statbuf->st_nlink = 0; // not yet implemented
     statbuf->st_uid = 0; // 
     statbuf->st_gid = 0; // not yet implemented

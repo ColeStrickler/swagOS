@@ -62,20 +62,22 @@ int split_line(argstruct* args_out, char** file_out, char* line)
     int index = 0;
     int argc = 0;
     char* ARGC_OVERFLOW = "Argument exceeded MAX_PATH\n";
-    strsplit(line, '\n');
     argc = strsplit(line, ' ');
+    strsplit(line, '\n'); 
     *file_out = line;
-
-    line += strlen(file_out);
+    //printf0(*file_out);
+    line += strlen(*file_out)+1;
+    //printf1("len: %d\n", strlen(*file_out));
+    //printf0(line);
     for (int i = 1; i < argc; i++)
     {
-        uint32_t len = strlen(line);
+        uint32_t len = strlen(line)+1;
         if (len > MAX_PATH)
         {
             // set error
             printf0(ARGC_OVERFLOW);
             return -1;
-        }
+        }     
         memcpy(&args_out[index].arg[0], line, len);
         line += len;
         index++;
@@ -108,7 +110,7 @@ void loop(void)
     {
         printf0("\n> ");
         int line_len = read_line(line_buf);
-        if (line_len == -1)
+        if (line_len <= 0)
             continue;
 
 

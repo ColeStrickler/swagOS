@@ -170,7 +170,7 @@ Process *FindFreeProcess()
 
 void CreatePageTableFromCopy(Process* new_proc, Thread* new_thread, Process* old_proc)
 {
-    log_hexval("copying page tables for new proc", new_proc->pid);
+    //log_hexval("copying page tables for new proc", new_proc->pid);
 
     memset(&new_proc->pgdir, 0x00, sizeof(thread_pagetables_t));
     /*
@@ -192,7 +192,7 @@ void CreatePageTableFromCopy(Process* new_proc, Thread* new_thread, Process* old
         char buf[0x1000];
         if(!FetchStruct(entry->page_va, buf, 0x1000, KERNEL_PML4T_PHYS(&old_proc->pgdir.pml4t[0])))
             panic("fetch struct fail\n");
-        log_hexval("entry", entry);
+      //  log_hexval("entry", entry);
         map_4kb_page_user(entry->page_va, new_frame, new_thread, entry->pdt_table_index, entry->pd_table_index);
         if(!WriteStruct(entry->page_va, buf, 0x1000, KERNEL_PML4T_PHYS(&new_proc->pgdir.pml4t[0])))
             panic("write struct fail\n");
@@ -218,18 +218,6 @@ int ForkUserProcess(Thread *old_thread, cpu_context_t* ctx)
         return -1;
     }
 
-    log_to_serial("Checking before ForkUserProcess()\n");
-
-    proc_used_page_entry* entry1 = (proc_used_page_entry*)old_proc->used_pages.first;
-    while(entry1 != NULL && entry1 != &old_proc->used_pages)
-    {
-        log_hexval("pa", entry1->page_pa);
-        log_hexval("va", entry1->page_va);
-        entry1 = (proc_used_page_entry*)entry1->entry.next;
-    }
-
-    
-
     ThreadEntry *entry = kalloc(sizeof(ThreadEntry));
     if (entry == NULL)
         panic("ForkUserProcess() --> kalloc() failure to allocate ThreadEntry.\n");
@@ -243,13 +231,13 @@ int ForkUserProcess(Thread *old_thread, cpu_context_t* ctx)
     memcpy(&new_proc->fd, &old_proc->fd, sizeof(new_proc->fd)); // copy over file descriptors
     new_thread->id = tid;
     new_thread->run_mode = old_thread->run_mode;
-    log_hexval("new_thread->id", new_thread->id);
-    log_hexval("old thread status", old_thread->status);
+   // log_hexval("new_thread->id", new_thread->id);
+   // log_hexval("old thread status", old_thread->status);
     new_thread->status = THREAD_STATE_READY;
     new_thread->owner_proc = new_proc;
     new_thread->can_wakeup = true;
     new_thread->pml4t_phys = KERNEL_PML4T_PHYS(&new_proc->pgdir.pml4t[0]);
-    log_to_serial("fork copying pt\n");
+   // log_to_serial("fork copying pt\n");
     CreatePageTableFromCopy(new_proc, new_thread, old_proc);
     
    // log_hexval("new_thread->pml4t_phys", new_thread->pml4t_phys);
@@ -345,6 +333,9 @@ int ExecUserProcess(Thread* thread, char* filepath, struct exec_args* args, cpu_
     for (int i = MAX_ARG_COUNT-1; i >= 0; i--)
     {
         char* arg_chars = &args->args[i].arg;
+        //log_to_serial("arg chars: ");
+        //log_to_serial(arg_chars);
+        //log_to_serial("\n");
         uint32_t arg_len  = strlen(arg_chars);
         if (arg_len)
         {
@@ -431,13 +422,13 @@ bool CreateUserProcess(uint8_t *elf)
     ctx->i_rsp = CreateUserProcessStack(init_thread); // stack_alloc; NEED TO SET THIS TO USER STACK
     log_to_serial("Checking during CreateUserProcess()\n");
 
-    proc_used_page_entry* entry = (proc_used_page_entry*)init_proc->used_pages.first;
-    while(entry != NULL && entry != &init_proc->used_pages)
-    {
-        log_hexval("pa", entry->page_pa);
-        log_hexval("va", entry->page_va);
-        entry = (proc_used_page_entry*)entry->entry.next;
-    }
+   // proc_used_page_entry* entry = (proc_used_page_entry*)init_proc->used_pages.first;
+   // while(entry != NULL && entry != &init_proc->used_pages)
+   // {
+   //     log_hexval("pa", entry->page_pa);
+   //     log_hexval("va", entry->page_va);
+   //     entry = (proc_used_page_entry*)entry->entry.next;
+   // }
 
 
     ctx->i_rflags = 0x202;                            // IF | Reserved
@@ -462,58 +453,47 @@ void CreateKernelThread(void (*entry)(void *))
 {
     acquire_Spinlock(&global_Settings.proc_table.lock);
     struct Thread *thread_table = &global_Settings.proc_table.thread_table[0];
-    for (uint32_t i = 0; i < MAX_NUM_THREADS; i++)
-    {
-        if (thread_table[i].status == THREAD_STATE_NOT_INITIALIZED || thread_table[i].status == THREAD_STATE_KILLED)
-        {
+    uint32_t tid = 0;
+    struct Thread *init_thread = FindFreeThread(&tid);
+    if (init_thread == NULL)
+        panic("CreateKernelThread() --> could not find free thread\n");
+    init_thread->id = tid;
+    // kernel thread
+    init_thread->pml4t_phys = KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel);
+    init_thread->pml4t_va = global_Settings.pml4t_kernel;
 
-            //log_hexval("Creating new thread at index", i);
-            struct Thread *init_thread = &thread_table[i];
+    init_thread->status = THREAD_STATE_READY;
+    init_thread->run_mode = KERNEL_THREAD;
 
-            /*
-                moved pgdir to Process structure
-            */
-            // memset(&init_thread->pgdir, 0x00, sizeof(thread_pagetables_t));
-            init_thread->id = i;
-            // kernel thread
-            init_thread->pml4t_phys = KERNEL_PML4T_PHYS(global_Settings.pml4t_kernel);
-            init_thread->pml4t_va = global_Settings.pml4t_kernel;
+    // allocate kernel stack
+    uint64_t stack_alloc = (uint64_t)kalloc(0x10000);
+    if (stack_alloc == NULL)
+        panic("CreateThread() --> kalloc() failed!\n");
+    stack_alloc += 0x10000; // point stack to top of allocation
 
-            init_thread->status = THREAD_STATE_READY;
-            init_thread->run_mode = KERNEL_THREAD;
+    /*
+        Need to set up the stack in such a way that we can pop off of it and run the process
 
-            // allocate kernel stack
-            uint64_t stack_alloc = (uint64_t)kalloc(0x10000);
-            if (stack_alloc == NULL)
-                panic("CreateThread() --> kalloc() failed!\n");
-            stack_alloc += 0x10000; // point stack to top of allocation
-           // log_hexval("STACK:", stack_alloc);
-            /*
-                Need to set up the stack in such a way that we can pop off of it and run the process
+        We can do this like we did in isr.asm and then point init_thread->execution_context to the top of all this
+        so that InvokeScheduler() can operate on it like any other.
+    */
+    struct cpu_context_t *ctx = &init_thread->execution_context;
+    if (ctx == NULL)
+        panic("CreateThread() --> failed to allocatged cpu_context_t for new task!\n");
 
-                We can do this like we did in isr.asm and then point init_thread->execution_context to the top of all this
-                so that InvokeScheduler() can operate on it like any other.
-            */
-            struct cpu_context_t *ctx = &init_thread->execution_context;
-            if (ctx == NULL)
-                panic("CreateThread() --> failed to allocatged cpu_context_t for new task!\n");
+    init_thread->can_wakeup = true;
+    ctx->i_rip = entry;
+    ctx->i_rsp = stack_alloc;
+    ctx->i_rflags = 0x202; // IF | Reserved
 
-            init_thread->can_wakeup = true;
-            ctx->i_rip = entry;
-            ctx->i_rsp = stack_alloc;
-            ctx->i_rflags = 0x202; // IF | Reserved
+    ctx->i_cs = KERNEL_CS; // we will need to set this differently for user/kernel threads
+    ctx->i_ss = KERNEL_DS; // we will need to set this differently for user/kernel threads
 
-            ctx->i_cs = KERNEL_CS; // we will need to set this differently for user/kernel threads
-            ctx->i_ss = KERNEL_DS; // we will need to set this differently for user/kernel threads
-
-            // pass args and other things
-            ctx->rdi = 0x0;
-            ctx->rsi = 0x0;
-            ctx->rbp = 0x0;
-
-            break;
-        }
-    }
+    // pass args and other things
+    ctx->rdi = 0x0;
+    ctx->rsi = 0x0;
+    ctx->rbp = 0x0;
+ 
     release_Spinlock(&global_Settings.proc_table.lock);
 }
 
@@ -523,11 +503,12 @@ void ThreadSleep(void *sleep_channel, struct Spinlock *spin_lock)
     thread->sleep_channel = sleep_channel;
     thread->status = THREAD_STATE_SLEEPING;
     thread->can_wakeup = false; // must save context first
-
+    //log_hexval("set thread to sleeping tid:", thread->id);
+    
     if (spin_lock == NULL || sleep_channel == NULL || thread == NULL)
         panic("ThreadSleep() --> got NULL.");
 
-    uint32_t sleeping_cpu = get_current_cpu()->id;
+   // uint32_t sleeping_cpu = get_current_cpu()->id;
 
     if (spin_lock != &global_Settings.proc_table.lock)
         release_Spinlock(spin_lock);
@@ -536,12 +517,20 @@ void ThreadSleep(void *sleep_channel, struct Spinlock *spin_lock)
     //  We currently have this set up to sleep if thread->status is PROCESS_STATE_SLEEPING
     //  If we want to add software debugging in the future we will need to edit this
    // DEBUG_PRINT("Sleeping", sleeping_cpu);
+ 
     if (thread->status == THREAD_STATE_SLEEPING) 
         __asm__ __volatile__("int3");
     else // woke up early
     {
-        log_hexval("state", thread->status);
-        panic("did not hit sleep state\n");
+       /*
+            We will hit here if this thread is interrupted, thread->can_wakeup gets set to true by one of the Wakeup()
+            calls, and the interrupt sees that old_thread->status == THREAD_STATE_SLEEPING, so it will set save the context
+            and set the status to THREAD_STATE_WAKEUP_READY, and then this thread can once again be scheduled even though we didn't
+            hit the INT3
+       */
+        //log_hexval("state", thread->status);
+        //log_hexval("tid", thread->id);
+        //panic("did not hit sleep state\n");
     }
 
     //log_hexval("Woken up!", lapic_id());
@@ -572,7 +561,7 @@ void Wakeup(void *channel)
                 We are getting here before the scheduler can set the execution context during sleep
 
             */
-          // log_hexval("Waking up", t->id);
+           //log_hexval("Locked Waking up", t->id);
             t->can_wakeup = true;
             //t->status = THREAD_STATE_READY;
         }
@@ -596,7 +585,7 @@ void NoLockWakeup(void *channel)
                 We are getting here before the scheduler can set the execution context during sleep
 
             */
-          // log_hexval("Waking up", t->id);
+           //log_hexval("NoLocked Waking up", t->id);
             t->can_wakeup = true;
             //t->status = THREAD_STATE_READY;
         }
@@ -678,11 +667,10 @@ void ProcessFree(Process* proc)
 
 void ExitThread()
 {
-    while(1);
     acquire_Spinlock(&global_Settings.proc_table.lock);
     Thread *t = GetCurrentThread();
     get_current_cpu()->current_thread = NULL;
-    log_hexval("Killing thread", 0);
+    log_hexval("Killing thread", t->id);
     t->status = THREAD_STATE_KILLED;
     t->id = -1;
     release_Spinlock(&global_Settings.proc_table.lock);

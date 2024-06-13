@@ -107,6 +107,7 @@ typedef struct file_descriptor
 typedef struct Thread
 {
     bool can_wakeup;
+    bool sleep_interrupt;
     THREAD_STATE status;
     THREAD_RUN_MODE run_mode;
     uint64_t kstack[0x10000];

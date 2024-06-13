@@ -25,6 +25,8 @@ uint32_t terminal_buf_location_to_ypixel();
 
 uint32_t terminal_buf_location_to_xpixel();
 
+void terminal_reset();
+
 void terminal_write_char(char c, uint32_t color);
 void terminal_print_string(char *fmt, uint32_t color);
 void printf(const char *fmt, ...);

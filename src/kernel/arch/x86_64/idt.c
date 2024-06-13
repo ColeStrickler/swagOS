@@ -225,7 +225,6 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
     //log_to_serial("IDT hit\n");
 
     NoINT_Enable(); // no interrupts will be handled recursively, we turn back off in apic_end_of_interrupt();
-
     switch(tf->isr_id)
     {
         case 3:
@@ -234,6 +233,8 @@ trapframe64_t* isr_handler(trapframe64_t* tf)
             //log_to_serial("INT3\n");
             if (GetCurrentThread()->status == THREAD_STATE_SLEEPING)
             {
+                //GetCurrentThread()->sleep_interrupt = true;
+                //log_hexval("Hit sleep on thread id", GetCurrentThread()->id);
                 //DEBUG_PRINT("Sleeping, invoking scheduler!", lapic_id());
                 InvokeScheduler((cpu_context_t*)tf);
             }
