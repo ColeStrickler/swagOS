@@ -2,7 +2,7 @@ This is my first attempt at writing an operating system from scratch.
 
 Current Features:
 - Ext2 File System(reads only)
-- SMP and multitasking
+- SMP multitasking
 - User mode shell
 - Some basic user mode utilities(ls, cat, clear, etc.)
 
